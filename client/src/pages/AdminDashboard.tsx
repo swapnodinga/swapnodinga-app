@@ -68,11 +68,12 @@ export default function AdminDashboard() {
   const totalFD = members.reduce((sum, m) => sum + m.fixedDeposit, 0);
   const totalInterest = members.reduce((sum, m) => sum + m.totalInterestEarned, 0);
 
-  // Chart Data Preparation
-  const chartData = members.map(m => ({
-    name: m.name.split(' ')[0],
-    Savings: m.totalInstalmentPaid + m.fixedDeposit
-  })).slice(0, 10);
+  // Chart Data Preparation - Society Financial Summary
+  const chartData = [
+    { name: 'Total Instalments', value: totalInstalments },
+    { name: 'Fixed Deposits', value: totalFD },
+    { name: 'Interest Earned', value: totalInterest }
+  ];
 
   const handleAddMember = (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,19 +165,19 @@ export default function AdminDashboard() {
             <div className="grid md:grid-cols-2 gap-4">
               <Card className="col-span-1">
                 <CardHeader>
-                  <CardTitle>Fund Distribution</CardTitle>
+                  <CardTitle>Financial Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                      <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `৳${value}`} />
+                      <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} angle={-45} textAnchor="end" height={100} />
+                      <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `৳${(value / 1000).toFixed(0)}K`} />
                       <Tooltip 
-                        formatter={(value: number) => [`৳${value.toLocaleString()}`, "Savings"]}
+                        formatter={(value: number) => [`৳${value.toLocaleString()}`, "Amount"]}
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                       />
-                      <Bar dataKey="Savings" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>

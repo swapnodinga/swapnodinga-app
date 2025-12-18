@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Build Your Own Cooperative Society Web App - Complete Learning Guide</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.8;
+            color: #333;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            border-bottom: 4px solid #1a5f3d;
+            padding-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            color: #1a5f3d;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            color: #666;
+        }
+        
+        .table-of-contents {
+            background: #f0f8f5;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 40px;
+            border-left: 5px solid #2d9d6f;
+        }
+        
+        .table-of-contents h2 {
+            color: #1a5f3d;
+            margin-bottom: 20px;
+        }
+        
+        .toc-list {
+            list-style: none;
+        }
+        
+        .toc-list li {
+            padding: 8px 0;
+            margin-left: 20px;
+        }
+        
+        .toc-list a {
+            color: #2d9d6f;
+            text-decoration: none;
+            border-bottom: 1px dotted #2d9d6f;
+        }
+        
+        .toc-list a:hover {
+            color: #1a5f3d;
+            border-bottom: 1px solid #1a5f3d;
+        }
+        
+        section {
+            margin-bottom: 50px;
+        }
+        
+        h2 {
+            font-size: 2em;
+            color: #1a5f3d;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2d9d6f;
+        }
+        
+        h3 {
+            font-size: 1.5em;
+            color: #2d9d6f;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        
+        h4 {
+            font-size: 1.2em;
+            color: #555;
+            margin-top: 15px;
+            margin-bottom: 10px;
+        }
+        
+        p {
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+        
+        .code-block {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-left: 4px solid #2d9d6f;
+            padding: 15px;
+            margin: 20px 0;
+            overflow-x: auto;
+            border-radius: 5px;
+        }
+        
+        .code-block code {
+            font-family: 'Courier New', monospace;
+            font-size: 0.95em;
+            color: #333;
+        }
+        
+        .file-name {
+            background: #e8f5e9;
+            color: #1a5f3d;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        
+        ul, ol {
+            margin-left: 30px;
+            margin-bottom: 15px;
+        }
+        
+        li {
+            margin-bottom: 8px;
+        }
+        
+        .highlight {
+            background: #fff3cd;
+            padding: 20px;
+            border-left: 4px solid #ffc107;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .highlight h4 {
+            color: #856404;
+            margin-top: 0;
+        }
+        
+        .info-box {
+            background: #d1ecf1;
+            padding: 20px;
+            border-left: 4px solid #0c5460;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .info-box h4 {
+            color: #0c5460;
+            margin-top: 0;
+        }
+        
+        .success-box {
+            background: #d4edda;
+            padding: 20px;
+            border-left: 4px solid #155724;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .success-box h4 {
+            color: #155724;
+            margin-top: 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        table th {
+            background: #1a5f3d;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        
+        .download-section {
+            background: #e8f5e9;
+            padding: 30px;
+            border-radius: 8px;
+            margin: 40px 0;
+            text-align: center;
+            border: 2px solid #2d9d6f;
+        }
+        
+        .download-section h3 {
+            margin-top: 0;
+            color: #1a5f3d;
+        }
+        
+        .print-button {
+            background: #2d9d6f;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        
+        .print-button:hover {
+            background: #1a5f3d;
+        }
+        
+        @media print {
+            body {
+                background: white;
+            }
+            .container {
+                box-shadow: none;
+                padding: 0;
+            }
+            .print-button {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 Build Your Own Cooperative Society Web App</h1>
+            <p>A Complete Step-by-Step Learning Guide for Developers</p>
+            <p style="margin-top: 15px; color: #999; font-size: 0.9em;">Swapnodinga Cooperative Society | Learning Edition</p>
+        </div>
+
+        <div class="table-of-contents">
+            <h2>📋 Table of Contents</h2>
+            <ul class="toc-list">
+                <li><a href="#prerequisites">Prerequisites & Setup</a></li>
+                <li><a href="#structure">Project Structure</a></li>
+                <li><a href="#step1">Step 1: State Management (The Brain)</a></li>
+                <li><a href="#step2">Step 2: Building the Layout</a></li>
+                <li><a href="#step3">Step 3: Landing Page</a></li>
+                <li><a href="#step4">Step 4: Member Dashboard</a></li>
+                <li><a href="#step5">Step 5: Admin Dashboard</a></li>
+                <li><a href="#step6">Step 6: Routing & Assembly</a></li>
+                <li><a href="#learning">Learning Tips & Best Practices</a></li>
+            </ul>
+        </div>
+
+        <section id="prerequisites">
+            <h2>1. Prerequisites & Setup</h2>
+            <p>To build this app, you need to understand the following technologies:</p>
+            
+            <h3>Required Knowledge:</h3>
+            <ul>
+                <li><strong>React 18+</strong> - Component-based UI library</li>
+                <li><strong>TypeScript</strong> - Type-safe JavaScript</li>
+                <li><strong>Tailwind CSS</strong> - Utility-first CSS framework</li>
+                <li><strong>Context API</strong> - State management</li>
+                <li><strong>React Hooks</strong> - useState, useContext, useEffect</li>
+            </ul>
+
+            <h3>Technologies Used:</h3>
+            <table>
+                <tr>
+                    <th>Library</th>
+                    <th>Purpose</th>
+                    <th>Why We Use It</th>
+                </tr>
+                <tr>
+                    <td>React</td>
+                    <td>UI Library</td>
+                    <td>Build interactive components easily</td>
+                </tr>
+                <tr>
+                    <td>TypeScript</td>
+                    <td>Type Safety</td>
+                    <td>Catch errors before runtime</td>
+                </tr>
+                <tr>
+                    <td>Tailwind CSS</td>
+                    <td>Styling</td>
+                    <td>Rapid UI development with utility classes</td>
+                </tr>
+                <tr>
+                    <td>Shadcn/UI</td>
+                    <td>Components</td>
+                    <td>Pre-built accessible components</td>
+                </tr>
+                <tr>
+                    <td>Wouter</td>
+                    <td>Routing</td>
+                    <td>Lightweight client-side routing</td>
+                </tr>
+                <tr>
+                    <td>Recharts</td>
+                    <td>Charts/Graphs</td>
+                    <td>Beautiful data visualization</td>
+                </tr>
+            </table>
+
+            <div class="info-box">
+                <h4>💡 Why Context API?</h4>
+                <p>Instead of passing data through many component layers ("prop drilling"), we use Context API to make data available globally. Think of it as a central storage for your app's data.</p>
+            </div>
+        </section>
+
+        <section id="structure">
+            <h2>2. Project Structure</h2>
+            <p>A well-organized project is easier to maintain and scale. Here's the recommended folder structure:</p>
+
+            <div class="code-block">
+                <code>client/src/
+├── components/
+│   ├── ui/                    # Shadcn UI components
+│   │   ├── button.tsx
+│   │   ├── card.tsx
+│   │   ├── dialog.tsx
+│   │   └── ...
+│   ├── Layout.tsx             # Main wrapper (Sidebar + Content)
+│   ├── StatCard.tsx           # Dashboard stat display
+│   ├── TransactionTable.tsx   # Reusable table component
+│   └── PaymentModal.tsx       # Modal for payment submission
+├── context/
+│   └── SocietyContext.tsx     # Global state & "fake database"
+├── pages/
+│   ├── LandingPage.tsx        # Login/Register page
+│   ├── AdminDashboard.tsx     # Admin control center
+│   ├── MemberDashboard.tsx    # Member view
+│   ├── AboutPage.tsx
+│   ├── ContactPage.tsx
+│   └── ...
+├── lib/
+│   └── utils.ts              # Utility functions
+└── App.tsx                    # Main router</code>
+            </div>
+
+            <p><strong>Why this structure?</strong></p>
+            <ul>
+                <li><strong>components/</strong> - Reusable building blocks</li>
+                <li><strong>context/</strong> - Centralized data layer</li>
+                <li><strong>pages/</strong> - Full page views</li>
+                <li><strong>lib/</strong> - Helper functions</li>
+            </ul>
+        </section>
+
+        <section id="step1">
+            <h2>3. Step 1: State Management (The Brain)</h2>
+            <p>This is the core of your app. All data flows through here.</p>
+
+            <p class="file-name">File: client/src/context/SocietyContext.tsx</p>
+
+            <h3>What This Does:</h3>
+            <ul>
+                <li>Defines the structure of your data (Types)</li>
+                <li>Stores member list, transactions, and current user</li>
+                <li>Provides functions to add/update/delete data</li>
+                <li>Simulates API calls (in a real app, these would call a backend)</li>
+            </ul>
+
+            <h3>Key Code Sections:</h3>
+
+            <h4>1. Define Types (Data Shape)</h4>
+            <div class="code-block">
+                <code>export interface Member {
+  id: string;
+  name: string;
+  email: string;
+  role: "admin" | "member";
+  status: "active" | "pending";
+  monthlyInstalment: number;
+  fixedDeposit: number;
+  totalInstalmentPaid: number;
+  totalInterestEarned: number;
+  joinDate: string;
+}</code>
+            </div>
+
+            <h4>2. Create Context</h4>
+            <div class="code-block">
+                <code>const SocietyContext = createContext&lt;SocietyContextType | undefined&gt;(undefined);</code>
+            </div>
+
+            <h4>3. Create Provider Component</h4>
+            <div class="code-block">
+                <code>export function SocietyProvider({ children }) {
+  const [members, setMembers] = useState&lt;Member[]&gt;(MOCK_MEMBERS);
+  const [currentUser, setCurrentUser] = useState&lt;Member | null&gt;(null);
+  
+  const login = async (email: string, pass: string) => {
+    const user = members.find(m => m.email === email);
+    if (user) {
+      setCurrentUser(user);
+      return true;
+    }
+    return false;
+  };
+  
+  return (
+    &lt;SocietyContext.Provider value={{ members, currentUser, login }}&gt;
+      {children}
+    &lt;/SocietyContext.Provider&gt;
+  );
+}</code>
+            </div>
+
+            <h4>4. Create Custom Hook</h4>
+            <div class="code-block">
+                <code>export function useSociety() {
+  const context = useContext(SocietyContext);
+  if (!context) {
+    throw new Error("useSociety must be used within SocietyProvider");
+  }
+  return context;
+}</code>
+            </div>
+
+            <div class="success-box">
+                <h4>✅ Why This Pattern?</h4>
+                <p>The custom hook (useSociety) makes it easy to access data from any component. Instead of importing Context directly, components use: <code>const { members, login } = useSociety();</code></p>
+            </div>
+        </section>
+
+        <section id="step2">
+            <h2>4. Step 2: Building the Layout</h2>
+            <p>The Layout component wraps every page and provides consistent navigation.</p>
+
+            <p class="file-name">File: client/src/components/Layout.tsx</p>
+
+            <h3>Features:</h3>
+            <ul>
+                <li>Desktop Sidebar (hidden on mobile)</li>
+                <li>Mobile Menu (hamburger)</li>
+                <li>Navigation links based on user role (Admin vs Member)</li>
+                <li>User profile info</li>
+                <li>Logout button</li>
+            </ul>
+
+            <div class="code-block">
+                <code>export default function Layout({ children }) {
+  const { currentUser, logout } = useSociety();
+  const isAdmin = currentUser?.role === "admin";
+  
+  const navLinks = isAdmin ? adminLinks : memberLinks;
+  
+  return (
+    &lt;div className="flex"&gt;
+      {/* Sidebar */}
+      &lt;aside className="w-64 bg-sidebar hidden md:flex"&gt;
+        {/* Logo */}
+        {/* Navigation */}
+        {/* User Profile */}
+      &lt;/aside&gt;
+      
+      {/* Main Content */}
+      &lt;main className="flex-1"&gt;
+        {children}
+      &lt;/main&gt;
+    &lt;/div&gt;
+  );
+}</code>
+            </div>
+
+            <h3>Styling with Tailwind:</h3>
+            <table>
+                <tr>
+                    <th>Class</th>
+                    <th>Effect</th>
+                </tr>
+                <tr>
+                    <td>flex</td>
+                    <td>Display as flexbox (side-by-side layout)</td>
+                </tr>
+                <tr>
+                    <td>w-64</td>
+                    <td>Width of 64 units (16rem / 256px)</td>
+                </tr>
+                <tr>
+                    <td>hidden md:flex</td>
+                    <td>Hidden on mobile, visible on medium+ screens</td>
+                </tr>
+                <tr>
+                    <td>bg-sidebar</td>
+                    <td>Apply sidebar background color</td>
+                </tr>
+            </table>
+        </section>
+
+        <section id="step3">
+            <h2>5. Step 3: Landing Page (Login/Register)</h2>
+            <p>The entry point of your app. New users register here; existing users login.</p>
+
+            <p class="file-name">File: client/src/pages/LandingPage.tsx</p>
+
+            <h3>Layout:</h3>
+            <ul>
+                <li><strong>Left Side:</strong> Hero image + branding (desktop only)</li>
+                <li><strong>Right Side:</strong> Login/Register tabs</li>
+            </ul>
+
+            <h3>Login Form:</h3>
+            <div class="code-block">
+                <code>const [email, setEmail] = useState("");
+const [password, setPassword] = useState("");
+
+const handleLogin = async (e) => {
+  e.preventDefault();
+  const success = await login(email, password);
+  if (success) {
+    setLocation("/dashboard"); // Redirect
+  }
+};</code>
+            </div>
+
+            <h3>Registration Form:</h3>
+            <div class="code-block">
+                <code>const handleRegister = async (e) => {
+  e.preventDefault();
+  await register(name, email, password);
+  // Account is now "pending" until admin approves
+};</code>
+            </div>
+
+            <div class="highlight">
+                <h4>📌 Key Point: Registration Flow</h4>
+                <p>When someone registers, their status is set to "pending". The admin must approve them first before they can login. This ensures only legitimate members join.</p>
+            </div>
+        </section>
+
+        <section id="step4">
+            <h2>6. Step 4: Member Dashboard</h2>
+            <p>What regular members see. They track their savings and submit payments.</p>
+
+            <p class="file-name">File: client/src/pages/MemberDashboard.tsx</p>
+
+            <h3>Key Components:</h3>
+
+            <h4>A. Stat Cards</h4>
+            <div class="code-block">
+                <code>&lt;StatCard
+  title="My Total Savings"
+  value={`৳${totalSavings.toLocaleString()}`}
+  icon={Wallet}
+  description="Instalments + FD + Interest"
+/&gt;</code>
+            </div>
+
+            <h4>B. Payment Submission Modal</h4>
+            <div class="code-block">
+                <code>&lt;PaymentModal 
+  onSubmit={(amount, proof) => {
+    submitInstalment(amount, proof);
+  }} 
+/&gt;</code>
+            </div>
+
+            <h4>C. Transaction History Table</h4>
+            <div class="code-block">
+                <code>&lt;TransactionTable 
+  transactions={myTransactions}
+/&gt;</code>
+            </div>
+
+            <h3>What Members Can Do:</h3>
+            <ol>
+                <li>View their total savings (instalments + FD + interest)</li>
+                <li>Submit monthly instalment with payment proof</li>
+                <li>View transaction history</li>
+                <li>Check approval status of submitted payments</li>
+            </ol>
+        </section>
+
+        <section id="step5">
+            <h2>7. Step 5: Admin Dashboard</h2>
+            <p>The control center. Admins manage all members and approvals.</p>
+
+            <p class="file-name">File: client/src/pages/AdminDashboard.tsx</p>
+
+            <h3>Admin Features:</h3>
+
+            <h4>1. Overview Chart</h4>
+            <p>Shows total instalments, fixed deposits, and interest earned:</p>
+            <div class="code-block">
+                <code>const chartData = [
+  { name: 'Total Instalments', value: totalInstalments },
+  { name: 'Fixed Deposits', value: totalFD },
+  { name: 'Interest Earned', value: totalInterest }
+];</code>
+            </div>
+
+            <h4>2. Member Management Tab</h4>
+            <ul>
+                <li>View all members</li>
+                <li>Add new members</li>
+                <li>Update fixed deposit amounts</li>
+                <li>Delete members</li>
+                <li>Approve pending member applications</li>
+            </ul>
+
+            <h4>3. Approvals Tab</h4>
+            <div class="code-block">
+                <code>&lt;TransactionTable 
+  transactions={pendingTransactions}
+  isAdmin={true}
+  onApprove={approveTransaction}
+  onReject={rejectTransaction}
+/&gt;</code>
+            </div>
+
+            <h4>4. Reports Tab</h4>
+            <p>Buttons to generate financial reports (UI only in this demo)</p>
+
+            <div class="highlight">
+                <h4>🔐 Admin Access</h4>
+                <p>Email: <strong>admin@swapnodinga.com</strong></p>
+                <p>Password: (any password in demo mode)</p>
+            </div>
+        </section>
+
+        <section id="step6">
+            <h2>8. Step 6: Routing & Final Assembly</h2>
+            <p>Connect everything together in App.tsx.</p>
+
+            <p class="file-name">File: client/src/App.tsx</p>
+
+            <h3>How Routing Works:</h3>
+            <div class="code-block">
+                <code>import { Switch, Route } from "wouter";
+
+function Router() {
+  return (
+    &lt;Switch&gt;
+      &lt;Route path="/" component={LandingPage} /&gt;
+      &lt;Route path="/admin" component={AdminDashboard} /&gt;
+      &lt;Route path="/dashboard" component={MemberDashboard} /&gt;
+      &lt;Route path="/about" component={AboutPage} /&gt;
+      &lt;Route path="/contact" component={ContactPage} /&gt;
+      &lt;Route component={NotFound} /&gt;
+    &lt;/Switch&gt;
+  );
+}
+
+function App() {
+  return (
+    &lt;QueryClientProvider client={queryClient}&gt;
+      &lt;TooltipProvider&gt;
+        &lt;SocietyProvider&gt;
+          &lt;Toaster /&gt;
+          &lt;Router /&gt;
+        &lt;/SocietyProvider&gt;
+      &lt;/TooltipProvider&gt;
+    &lt;/QueryClientProvider&gt;
+  );
+}</code>
+            </div>
+
+            <h3>Provider Hierarchy (Nesting):</h3>
+            <ol>
+                <li><strong>QueryClientProvider</strong> - For data fetching (React Query)</li>
+                <li><strong>TooltipProvider</strong> - For UI tooltips</li>
+                <li><strong>SocietyProvider</strong> - Our custom global state (members, auth)</li>
+                <li><strong>Toaster</strong> - For notifications</li>
+                <li><strong>Router</strong> - Page routing</li>
+            </ol>
+
+            <div class="info-box">
+                <h4>💡 Why Nested Providers?</h4>
+                <p>Each provider wraps the components below it. This allows all child components to access data from any provider. For example, any page can use <code>useSociety()</code> because they're inside the SocietyProvider.</p>
+            </div>
+        </section>
+
+        <section id="learning">
+            <h2>9. Learning Tips & Best Practices</h2>
+
+            <h3>🎓 Understanding the Data Flow</h3>
+            <ol>
+                <li>User logs in → <code>login()</code> in SocietyContext</li>
+                <li><code>setCurrentUser()</code> updates the state</li>
+                <li>Any component using <code>useSociety()</code> sees the new user</li>
+                <li>Components re-render with new data automatically</li>
+            </ol>
+
+            <h3>📦 Component Reusability</h3>
+            <p>Notice how <code>TransactionTable</code> is used in both Admin and Member dashboards? This is React's power:</p>
+            <ul>
+                <li>Write once, use everywhere</li>
+                <li>Pass different data and callbacks via props</li>
+                <li>Admin version shows "Approve/Reject" buttons</li>
+                <li>Member version doesn't</li>
+            </ul>
+
+            <h3>🎨 Tailwind CSS Tips</h3>
+            <table>
+                <tr>
+                    <th>Class Pattern</th>
+                    <th>Example</th>
+                    <th>What It Does</th>
+                </tr>
+                <tr>
+                    <td>Sizing</td>
+                    <td>w-64, h-10, p-4</td>
+                    <td>Width, height, padding in units</td>
+                </tr>
+                <tr>
+                    <td>Colors</td>
+                    <td>bg-primary, text-white</td>
+                    <td>Background and text colors (from theme)</td>
+                </tr>
+                <tr>
+                    <td>Responsive</td>
+                    <td>hidden md:flex</td>
+                    <td>Hide on mobile, show on medium+ screens</td>
+                </tr>
+                <tr>
+                    <td>Hover States</td>
+                    <td>hover:bg-primary</td>
+                    <td>Background color changes on hover</td>
+                </tr>
+                <tr>
+                    <td>Flexbox</td>
+                    <td>flex justify-between</td>
+                    <td>Flexbox with space-between alignment</td>
+                </tr>
+            </table>
+
+            <h3>🔍 Debugging Tips</h3>
+            <ul>
+                <li>Use <code>console.log(currentUser)</code> to check state</li>
+                <li>Check browser DevTools Console for errors</li>
+                <li>Look at the Network tab to see API calls</li>
+                <li>Use React DevTools extension to inspect component tree</li>
+            </ul>
+
+            <h3>🚀 Next Steps (To Extend This App)</h3>
+            <ul>
+                <li><strong>Add a Real Backend:</strong> Replace Context state with API calls</li>
+                <li><strong>Database:</strong> Use PostgreSQL to persist data</li>
+                <li><strong>Authentication:</strong> Implement JWT tokens for security</li>
+                <li><strong>Email Notifications:</strong> Send emails when payments are approved/rejected</li>
+                <li><strong>File Upload:</strong> Allow members to upload payment proofs (image/PDF)</li>
+                <li><strong>Payment Gateway:</strong> Integrate with Stripe or Razorpay</li>
+            </ul>
+
+            <div class="success-box">
+                <h4>✅ Congratulations!</h4>
+                <p>You now understand the architecture of the Swapnodinga Cooperative Society app. Use this knowledge as a foundation to build your own variations or larger projects.</p>
+            </div>
+        </section>
+
+        <div class="download-section">
+            <h3>📥 How to Use This Guide</h3>
+            <p>You can print this guide or save it as a PDF for offline reference.</p>
+            <button class="print-button" onclick="window.print();">🖨️ Print / Save as PDF</button>
+            
+            <h4 style="margin-top: 30px; color: #1a5f3d;">Need the Complete Code?</h4>
+            <p>Visit the Swapnodinga project repository to see all source files with comments explaining each part.</p>
+        </div>
+
+        <hr style="margin: 50px 0; border: none; border-top: 2px solid #2d9d6f;">
+        
+        <footer style="text-align: center; color: #999; font-size: 0.9em; margin-top: 40px;">
+            <p>Swapnodinga Cooperative Society | Learning Guide v1.0</p>
+            <p>Last Updated: December 2024</p>
+            <p style="margin-top: 20px;">Happy Coding! 🚀</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import { type Express } from "express";
-import { createServer as createViteServer, createLogger } from "vite";
+import { createServer as createViteServer, createLogger, loadEnv } from "vite"; // Added loadEnv
 import { type Server } from "http";
 import viteConfig from "../vite.config";
 import fs from "fs";
@@ -9,6 +9,9 @@ import { nanoid } from "nanoid";
 const viteLogger = createLogger();
 
 export async function setupVite(server: Server, app: Express) {
+  // NEW: Manually load environment variables from the root folder
+  const env = loadEnv(process.env.NODE_ENV || 'development', process.cwd(), '');
+  
   const serverOptions = {
     middlewareMode: true,
     hmr: { server, path: "/vite-hmr" },
@@ -18,11 +21,16 @@ export async function setupVite(server: Server, app: Express) {
   const vite = await createViteServer({
     ...viteConfig,
     configFile: false,
+    // NEW: Pass the loaded env variables to Vite
+    define: {
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
+    },
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {
         viteLogger.error(msg, options);
-        process.exit(1);
+        // process.exit(1); // Optional: Commented out to prevent server from dying on minor HMR errors
       },
     },
     server: serverOptions,
@@ -42,7 +50,6 @@ export async function setupVite(server: Server, app: Express) {
         "index.html",
       );
 
-      // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,

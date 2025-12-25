@@ -1,19 +1,11 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link, useLocation } from "wouter";
 import { useSociety } from "@/context/SocietyContext";
 import { cn } from "@/lib/utils";
-import {
-  LayoutDashboard,
-  Users,
-  FileText,
-  LogOut,
-  Menu,
-  X,
-  CreditCard,
-  Building,
-  Phone,
-  Info,
-  ShieldCheck,
+import { 
+  LayoutDashboard, Users, ShieldCheck, Banknote, 
+  TrendingUp, LogOut, Home, ChevronRight, FileText,
+  Info, Briefcase, ShieldAlert, Phone, UserCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logo from "@assets/generated_images/swapnodinga_logo.png";
@@ -21,161 +13,128 @@ import logo from "@assets/generated_images/swapnodinga_logo.png";
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { currentUser, logout } = useSociety();
   const [location] = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const isAdmin = currentUser?.role === "admin";
+  // If on login/landing page, render children directly but keep global styles
+  if (location === "/") {
+    return <div className="min-h-screen bg-background">{children}</div>;
+  }
 
-  const adminLinks = [
+  const menuLinks = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/admin/members", label: "Members", icon: Users },
+    { href: "/admin/members", label: "Manage Members", icon: Users },
+    { href: "/admin/payments", label: "Verify Payments", icon: ShieldCheck },
     { href: "/admin/reports", label: "Reports", icon: FileText },
+    { href: "/admin/deposits", label: "Fixed Deposits", icon: Banknote },
+    { href: "/admin/interest", label: "Interest Records", icon: TrendingUp },
   ];
 
-  const memberLinks = [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/dashboard/instalments", label: "Instalments", icon: CreditCard },
-  ];
-
-  const publicLinks = [
+  const infoLinks = [
     { href: "/about", label: "About Us", icon: Info },
-    { href: "/project", label: "Our Project", icon: Building },
-    { href: "/policy", label: "Policy", icon: ShieldCheck },
+    { href: "/project", label: "Our Project", icon: Briefcase },
+    { href: "/policy", label: "Policy", icon: ShieldAlert },
     { href: "/contact", label: "Contact", icon: Phone },
   ];
 
-  const navLinks = isAdmin ? adminLinks : memberLinks;
-  const allLinks = [...navLinks, ...publicLinks];
-
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      {/* Sidebar for Desktop */}
-      <aside className="hidden md:flex flex-col w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border shadow-xl z-20">
-        <div className="p-6 flex items-center gap-3 border-b border-sidebar-border/50">
-          <img src={logo} alt="Swapnodinga" className="w-10 h-10 rounded-full bg-white p-1" />
-          <span className="font-serif font-bold text-xl tracking-tight">Swapnodinga</span>
+    <div className="flex h-screen bg-background overflow-hidden font-sans">
+      {/* SIDEBAR - Vibrant Green */}
+      <aside className="hidden md:flex flex-col w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border shadow-2xl">
+        <div className="p-6 flex items-center gap-3 border-b border-sidebar-border/40">
+          <div className="bg-white p-1.5 rounded-full shadow-md">
+            <img src={logo} alt="Logo" className="w-8 h-8 object-contain" />
+          </div>
+          <span className="font-serif font-bold text-xl tracking-tight text-white">Swapnodinga</span>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto py-8">
+          <nav className="px-4 space-y-8">
+            {/* MENU SECTION */}
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">Menu</p>
+              <div className="space-y-1">
+                {menuLinks.map((link) => (
+                  <Link key={link.href} href={link.href}>
+                    <a className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] transition-all group",
+                      location === link.href 
+                        ? "bg-sidebar-accent text-white font-medium shadow-sm" 
+                        : "text-white/60 hover:bg-sidebar-accent/50 hover:text-white"
+                    )}>
+                      <link.icon size={18} className={cn(
+                        location === link.href ? "text-sidebar-primary" : "text-white/30 group-hover:text-white"
+                      )} />
+                      <span className={cn(location === link.href ? "underline decoration-2 underline-offset-4" : "")}>
+                        {link.label}
+                      </span>
+                    </a>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* ACCOUNT SECTION */}
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">Account</p>
+              <Link href="/profile">
+                <a className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] transition-all group",
+                  location === "/profile" ? "bg-sidebar-accent text-white font-medium" : "text-white/60 hover:bg-sidebar-accent/50 hover:text-white"
+                )}>
+                  <UserCircle size={18} className="text-white/30 group-hover:text-white" />
+                  <span>Profile & Support</span>
+                </a>
+              </Link>
+            </div>
+
+            {/* INFORMATION SECTION */}
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">Information</p>
+              <div className="space-y-1">
+                {infoLinks.map((link) => (
+                  <Link key={link.href} href={link.href}>
+                    <a className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition-all text-[14px] group">
+                      <link.icon size={18} className="text-white/20 group-hover:text-white" />
+                      <span>{link.label}</span>
+                    </a>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </nav>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          <div className="mb-6">
-            <p className="px-4 text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider mb-2">
-              Menu
-            </p>
-            {navLinks.map((link) => (
-              <Link key={link.href} href={link.href}>
-                <a
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 group",
-                    location === link.href
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  )}
-                >
-                  <link.icon className="w-5 h-5" />
-                  <span className="font-medium">{link.label}</span>
-                </a>
-              </Link>
-            ))}
-          </div>
-
-          <div>
-             <p className="px-4 text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider mb-2">
-              Information
-            </p>
-            {publicLinks.map((link) => (
-              <Link key={link.href} href={link.href}>
-                <a
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 group",
-                    location === link.href
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  )}
-                >
-                  <link.icon className="w-5 h-5" />
-                  <span className="font-medium">{link.label}</span>
-                </a>
-              </Link>
-            ))}
-          </div>
-        </nav>
-
-        <div className="p-4 border-t border-sidebar-border/50 bg-sidebar-accent/10">
-          <div className="flex items-center gap-3 mb-4 px-2">
-            <div className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-bold">
-              {currentUser?.name.charAt(0)}
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-sm font-medium truncate">{currentUser?.name}</p>
-              <p className="text-xs text-sidebar-foreground/60 truncate capitalize">{currentUser?.role}</p>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            className="w-full justify-start text-sidebar-foreground/80 hover:text-destructive hover:bg-destructive/10"
+        {/* LOGOUT */}
+        <div className="p-6 border-t border-sidebar-border/40">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-rose-400 hover:text-rose-100 hover:bg-rose-950/30 gap-3 font-semibold transition-all" 
             onClick={logout}
           >
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
+            <LogOut size={18} />
+            <span>Sign Out</span>
           </Button>
         </div>
       </aside>
 
-      {/* Mobile Header */}
-      <div className="md:hidden bg-sidebar text-sidebar-foreground p-4 flex items-center justify-between shadow-md z-20">
-        <div className="flex items-center gap-2">
-           <img src={logo} alt="Swapnodinga" className="w-8 h-8 rounded-full bg-white p-1" />
-           <span className="font-serif font-bold text-lg">Swapnodinga</span>
-        </div>
-        <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-          {isMobileMenuOpen ? <X /> : <Menu />}
-        </Button>
+      {/* MAIN CONTENT */}
+      <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center px-8">
+          <nav className="flex items-center text-[13px] text-slate-400">
+            <Home size={14} className="mr-2" />
+            <Link href="/" className="hover:text-primary">Home</Link>
+            {location.split('/').filter(Boolean).map((part, i) => (
+              <React.Fragment key={i}>
+                <ChevronRight size={12} className="mx-2 opacity-30" />
+                <span className="capitalize font-medium text-slate-900">{part.replace(/-/g, ' ')}</span>
+              </React.Fragment>
+            ))}
+          </nav>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-8">
+          <div className="max-w-7xl mx-auto">{children}</div>
+        </main>
       </div>
-
-      {/* Mobile Menu Overlay */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
-          <div className="absolute right-0 top-0 h-full w-64 bg-sidebar p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-end mb-6">
-              <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}>
-                <X className="text-sidebar-foreground" />
-              </Button>
-            </div>
-            <nav className="space-y-2">
-              {allLinks.map((link) => (
-                <Link key={link.href} href={link.href}>
-                  <a
-                    className={cn(
-                      "flex items-center gap-3 px-4 py-3 rounded-md transition-colors",
-                      location === link.href
-                        ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                        : "text-sidebar-foreground/80 hover:bg-sidebar-accent"
-                    )}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <link.icon className="w-5 h-5" />
-                    {link.label}
-                  </a>
-                </Link>
-              ))}
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-sidebar-foreground/80 hover:text-destructive mt-8"
-                onClick={logout}
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
-              </Button>
-            </nav>
-          </div>
-        </div>
-      )}
-
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto bg-muted/20">
-        <div className="container mx-auto p-4 md:p-8 max-w-7xl animate-in fade-in duration-500">
-          {children}
-        </div>
-      </main>
     </div>
   );
 }

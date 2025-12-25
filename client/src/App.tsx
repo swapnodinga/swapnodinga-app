@@ -5,37 +5,58 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SocietyProvider } from "@/context/SocietyContext";
 
+// Components & Pages
+import Layout from "@/components/Layout"; 
 import LandingPage from "@/pages/LandingPage";
 import AdminDashboard from "@/pages/AdminDashboard";
 import MemberDashboard from "@/pages/MemberDashboard";
+import AdminPayments from "@/pages/AdminPayments";
+import NotFound from "@/pages/not-found";
+import FixedDepositPage from "@/pages/FixedDepositPage";
+import SocietyTreasury from "@/pages/SocietyTreasury";
+import AdminMembers from "@/pages/AdminMembers";
+import ReportsPage from "@/pages/ReportsPage";
+import ProfilePage from "@/pages/ProfilePage";
 import AboutPage from "@/pages/AboutPage";
-import ContactPage from "@/pages/ContactPage";
 import ProjectPage from "@/pages/ProjectPage";
 import PolicyPage from "@/pages/PolicyPage";
-import NotFound from "@/pages/not-found";
+import ContactPage from "@/pages/ContactPage";
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={LandingPage} />
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/admin/members" component={AdminDashboard} /> {/* Reusing component for demo simplicity */}
-      <Route path="/admin/reports" component={AdminDashboard} /> {/* Reusing component for demo simplicity */}
-      
-      <Route path="/dashboard" component={MemberDashboard} />
-      <Route path="/dashboard/instalments" component={MemberDashboard} /> {/* Reusing component for demo simplicity */}
-      
-      <Route path="/about" component={AboutPage} />
-      <Route path="/contact" component={ContactPage} />
-      <Route path="/project" component={ProjectPage} />
-      <Route path="/policy" component={PolicyPage} />
-      
-      <Route component={NotFound} />
-    </Switch>
+    <Layout>
+      <Switch>
+        <Route path="/" component={LandingPage} />
+        <Route path="/profile" component={ProfilePage} />
+        
+        {/* Admin Dashboard & Main Management */}
+        <Route path="/admin" component={AdminDashboard} />
+        <Route path="/admin/payments" component={AdminPayments} />
+        
+        {/* New Specialized Management Pages */}
+        <Route path="/admin/deposits" component={FixedDepositPage} />
+        <Route path="/admin/interest" component={SocietyTreasury} />
+        <Route path="/admin/reports" component={ReportsPage} />
+        <Route path="/admin/members" component={AdminMembers} />
+        
+        {/* Placeholder Routes */}
+        <Route path="/admin/members" component={AdminDashboard} />
+        <Route path="/admin/reports" component={AdminDashboard} />
+        
+
+        {/* Member View */}
+        <Route path="/dashboard" component={MemberDashboard} />
+        <Route path="/about" component={AboutPage} />
+        <Route path="/project" component={ProjectPage} />
+        <Route path="/policy" component={PolicyPage} />
+        <Route path="/contact" component={ContactPage} />
+        <Route component={NotFound} />
+      </Switch>
+    </Layout>
   );
 }
 
-function App() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -47,5 +68,3 @@ function App() {
     </QueryClientProvider>
   );
 }
-
-export default App;

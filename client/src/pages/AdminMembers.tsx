@@ -3,16 +3,70 @@ import { useSociety } from '../context/SocietyContext';
 import { 
   Table, TableHeader, TableBody, TableHead, TableRow, TableCell 
 } from "@/components/ui/table";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserPlus, UserCheck, Users } from 'lucide-react';
+import { Users, CheckCircle } from 'lucide-react';
 
-export default function AdminMembers() { // Essential default export
+export default function AdminMembers() {
   const { members, approveMember } = useSociety();
+
+  // Filter based on the 'status' column from Supabase
   const pendingMembers = members.filter(m => m.status === 'pending');
   const activeMembers = members.filter(m => m.status === 'active');
+
+  const MemberTable = ({ data, showApprove = false }: { data: any[], showApprove?: boolean }) => (
+    <Card>
+      <CardContent className="pt-6">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Member ID</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Status</TableHead>
+              {showApprove && <TableHead>Action</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={showApprove ? 5 : 4} className="text-center py-8 text-muted-foreground">
+                  No members found in this category.
+                </TableCell>
+              </TableRow>
+            ) : (
+              data.map((member) => (
+                <TableRow key={member.id}>
+                  <TableCell className="font-medium">{member.society_id}</TableCell>
+                  {/* Fixed: Use full_name to match database */}
+                  <TableCell>{member.full_name || member.name}</TableCell>
+                  <TableCell>{member.email}</TableCell>
+                  <TableCell>
+                    <Badge variant={member.status === 'active' ? 'default' : 'secondary'}>
+                      {member.status}
+                    </Badge>
+                  </TableCell>
+                  {showApprove && (
+                    <TableCell>
+                      <Button 
+                        size="sm" 
+                        onClick={() => approveMember(member.id)}
+                        className="flex items-center gap-1"
+                      >
+                        <CheckCircle className="h-4 w-4" /> Approve
+                      </Button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="p-6">
@@ -20,21 +74,18 @@ export default function AdminMembers() { // Essential default export
         <Users className="h-6 w-6" /> Member Management
       </h2>
 
-      <Tabs defaultValue="active" className="w-full">
-        <TabsList>
-          <TabsTrigger value="active">Active Members</TabsTrigger>
-          <TabsTrigger value="pending">Pending Requests</TabsTrigger>
+      <Tabs defaultValue="pending" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="active">Active Members ({activeMembers.length})</TabsTrigger>
+          <TabsTrigger value="pending">Pending Requests ({pendingMembers.length})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pending">
-          {/* PASTE THE TABSCONTENT CODE YOU SHARED EARLIER HERE */}
-          <Card>
-             {/* ... table with {member.full_name || member.name} ... */}
-          </Card>
+        <TabsContent value="active">
+          <MemberTable data={activeMembers} />
         </TabsContent>
 
-        <TabsContent value="active">
-          {/* Similar table for activeMembers */}
+        <TabsContent value="pending">
+          <MemberTable data={pendingMembers} showApprove={true} />
         </TabsContent>
       </Tabs>
     </div>

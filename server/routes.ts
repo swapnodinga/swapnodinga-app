@@ -9,7 +9,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // 1. LOGIN: Prefix with /api to fix 404 error
+  // 1. LOGIN: Prefix with /api and Admin Bypass
   app.post("/api/login", async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -19,15 +19,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .ilike('email', email.trim())
         .single();
 
-      // Check credentials
       if (error || !user || user.password !== password) {
         return res.status(401).json({ success: false, message: "Invalid credentials" });
       }
       
-      // ADMIN BYPASS: Specific email bypass logic
       const isAdmin = user.email.toLowerCase() === 'swapnodinga.scs@gmail.com';
 
-      // Allow if 'active' OR if user is the designated admin
       if (user.status !== 'active' && !isAdmin) {
         return res.status(403).json({ success: false, message: "Account pending admin approval" });
       }
@@ -38,31 +35,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 2. REGISTRATION: Prefix with /api and map full_name
+  // 2. REGISTRATION: Sequential Society ID Generator
   app.post("/api/register", async (req, res) => {
     const { full_name, email, password, status } = req.body;
     try {
+      const { data: lastMember } = await supabase
+        .from('members')
+        .select('society_id')
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let nextId = "SCS-001"; 
+      if (lastMember?.society_id && lastMember.society_id.startsWith('SCS-')) {
+        const lastNum = parseInt(lastMember.society_id.split('-')[1]);
+        nextId = `SCS-${(lastNum + 1).toString().padStart(3, '0')}`;
+      }
+
       const { data, error } = await supabase
         .from('members')
         .insert([{ 
-          name: full_name, 
+          society_id: nextId,
+          full_name: full_name,
           email: email.trim(), 
-          password, 
+          password: password, 
           status: status || 'pending', 
-          fixedDeposit: 0,
-          totalInterestEarned: 0
+          fixed_deposit_amount: 0,
+          fixed_deposit_interest: 0
         }])
         .select()
         .single();
 
-      if (error) throw error;
-      res.json({ success: true, user: data });
+      if (error) {
+        console.error("Supabase Error:", error.message);
+        return res.status(400).json({ success: false, message: error.message });
+      }
+      
+      res.json({ success: true, user: data, assignedId: nextId });
     } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+      res.status(500).json({ success: false, message: "Registration server error" });
     }
   });
 
-  // 3. ADMIN TOOLS: Ensure all use /api prefix
+  // 3. MEMBER DATA FETCHING (NEW): Required for AdminMembers.tsx to show pending list
+  app.get("/api/members", async (_req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('members')
+        .select('*')
+        .order('id', { ascending: false });
+
+      if (error) throw error;
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ success: false, message: "Failed to fetch members" });
+    }
+  });
+
+  // 4. ADMIN TOOLS: Standardized /api prefix
   app.post('/api/approve-member', async (req, res) => {
     const { id } = req.body;
     try {

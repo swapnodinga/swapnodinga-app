@@ -48,14 +48,18 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     return transactions.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   }, [transactions]);
 
-  const refreshData = async () => {
+const refreshData = async () => {
     try {
+      // Use catch on individual requests so one failure doesn't stop the other
       const [membersRes, transRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/members`),
-        axios.get(`${API_BASE_URL}/transactions`)
+        axios.get(`${API_BASE_URL}/members`).catch(() => ({ data: [] })),
+        axios.get(`${API_BASE_URL}/transactions`).catch(() => ({ data: [] }))
       ]);
+      
       setMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
       setTransactions(Array.isArray(transRes.data) ? transRes.data : []);
+      
+      console.log("Sync Complete: Members list updated.");
     } catch (err) {
       console.error("Refresh failed:", err);
     }

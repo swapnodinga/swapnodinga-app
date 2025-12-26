@@ -7,12 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Home, Key, UserPlus } from "lucide-react";
+import { useToast } from "@/hooks/use-toast"; // Added for feedback
 import logo from "@assets/generated_images/swapnodinga_logo.png";
 import heroBg from "@assets/generated_images/housing_community_hero_background.png";
 
 export default function LandingPage() {
   const { login, register } = useSociety();
   const [, setLocation] = useLocation();
+  const { toast } = useToast(); // Added for visual feedback
   const [loading, setLoading] = useState(false);
 
   // Login State
@@ -37,16 +39,48 @@ export default function LandingPage() {
         setLocation("/dashboard");
       }
     } else {
-      alert("Invalid credentials or account not active.");
+      toast({ 
+        variant: "destructive", 
+        title: "Login Failed", 
+        description: "Invalid credentials or account not active." 
+      });
     }
   };
 
+  // FIXED: handleRegister now passes an object to match the context
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await register(regName, regEmail, regPass);
-    setLoading(false);
-    // Switch to login tab ideally, but simple alert handled in context
+    
+    try {
+      const success = await register({
+        fullName: regName,
+        email: regEmail,
+        password: regPass
+      });
+
+      if (success) {
+        toast({ 
+          title: "Application Submitted!", 
+          description: "Please wait for admin approval before logging in." 
+        });
+        // Clear registration fields
+        setRegName("");
+        setRegEmail("");
+        setRegPass("");
+        // Ideally switch to login tab here if using a state-controlled Tab component
+      } else {
+        toast({ 
+          variant: "destructive", 
+          title: "Error", 
+          description: "Registration failed. Please try again." 
+        });
+      }
+    } catch (err) {
+      console.error("Registration error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -60,13 +94,15 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-primary/90 to-primary/60" />
         
         <div className="relative z-10 flex items-center gap-3">
-          <img src={logo} alt="Logo" className="w-12 h-12 bg-white rounded-full p-1" />
+          <div className="bg-white p-1 rounded-full shadow-md">
+            <img src={logo} alt="Logo" className="w-10 h-10 object-contain" />
+          </div>
           <h1 className="text-2xl font-serif font-bold">Swapnodinga</h1>
         </div>
 
         <div className="relative z-10 space-y-6 max-w-lg">
           <h2 className="text-5xl font-serif font-bold leading-tight">
-            Building Our Dream Homes <span className="text-accent">Together</span>
+            Building Our Dream Homes <span className="text-emerald-400">Together</span>
           </h2>
           <p className="text-lg text-primary-foreground/80 font-light">
             A cooperative society dedicated to securing a future for our families. 
@@ -75,7 +111,7 @@ export default function LandingPage() {
         </div>
 
         <div className="relative z-10 text-sm text-primary-foreground/60">
-          &copy; 2024 Swapnodinga Cooperative Society. All rights reserved.
+          &copy; 2025 Swapnodinga Cooperative Society. All rights reserved.
         </div>
       </div>
 

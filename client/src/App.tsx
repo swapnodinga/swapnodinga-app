@@ -29,27 +29,21 @@ function Router() {
         <Route path="/" component={LandingPage} />
         <Route path="/profile" component={ProfilePage} />
         
-        {/* Admin Dashboard & Main Management */}
+        {/* Admin Dashboard & Management */}
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/admin/payments" component={AdminPayments} />
-        
-        {/* New Specialized Management Pages */}
         <Route path="/admin/deposits" component={FixedDepositPage} />
         <Route path="/admin/interest" component={SocietyTreasury} />
         <Route path="/admin/reports" component={ReportsPage} />
         <Route path="/admin/members" component={AdminMembers} />
         
-        {/* Placeholder Routes */}
-        <Route path="/admin/members" component={AdminDashboard} />
-        <Route path="/admin/reports" component={AdminDashboard} />
-        
-
         {/* Member View */}
         <Route path="/dashboard" component={MemberDashboard} />
         <Route path="/about" component={AboutPage} />
         <Route path="/project" component={ProjectPage} />
         <Route path="/policy" component={PolicyPage} />
         <Route path="/contact" component={ContactPage} />
+        
         <Route component={NotFound} />
       </Switch>
     </Layout>

@@ -10,29 +10,49 @@ import {
   HelpCircle, 
   MessageSquare, 
   Lock,
-  CheckCircle2
+  CheckCircle2,
+  Camera,
+  Loader2
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ProfilePage() {
-  const { currentUser, updateProfile } = useSociety();
+  const { currentUser, updateProfile, uploadProfilePic } = useSociety();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // FIXED: Sync with DB column name 'full_name' if applicable, or keep 'name'
   const [formData, setFormData] = useState({
     name: currentUser?.name || "",
     email: currentUser?.email || ""
   });
 
-  // Update form data if currentUser loads late
   useEffect(() => {
     if (currentUser) {
-      setFormData({ name: currentUser.name, email: currentUser.email });
+      setFormData({ name: currentUser.name || "", email: currentUser.email || "" });
     }
   }, [currentUser]);
 
   if (!currentUser) return null;
+
+  // Handles the Profile Picture Upload
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploading(true);
+      await uploadProfilePic(file);
+      toast({ title: "Photo Updated", description: "Your profile picture has been synced with Supabase." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Upload Failed", description: "Could not save image to storage." });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleSaveInfo = async () => {
     try {
@@ -59,15 +79,39 @@ export default function ProfilePage() {
         <div className="space-y-6">
           <Card className="border-emerald-100 shadow-sm overflow-hidden">
             <div className="h-24 bg-emerald-800 flex items-center justify-center relative">
-              <div className="h-28 w-28 rounded-full bg-white border-4 border-slate-50 flex items-center justify-center -mb-28 shadow-xl overflow-hidden z-10">
-                {currentUser.profilePic ? (
-                  <img src={currentUser.profilePic} alt="Profile" className="h-full w-full object-cover" />
+              {/* Profile Image Container */}
+              <div 
+                className="h-28 w-28 rounded-full bg-white border-4 border-slate-50 flex items-center justify-center -mb-28 shadow-xl overflow-hidden z-10 relative group cursor-pointer"
+                onClick={() => !isUploading && fileInputRef.current?.click()}
+              >
+                {isUploading ? (
+                  <div className="flex flex-col items-center">
+                    <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
+                  </div>
+                ) : currentUser.profile_pic ? ( // FIXED: Changed profilePic to profile_pic
+                  <img src={currentUser.profile_pic} alt="Profile" className="h-full w-full object-cover" />
                 ) : (
                   <div className="bg-emerald-50 h-full w-full flex items-center justify-center">
                     <User size={48} className="text-emerald-800" />
                   </div>
                 )}
+
+                {/* Camera Overlay on Hover */}
+                {!isUploading && (
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera className="text-white" size={24} />
+                  </div>
+                )}
               </div>
+              
+              {/* Hidden File Input */}
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handlePhotoUpload} 
+                className="hidden" 
+                accept="image/*" 
+              />
             </div>
             
             <CardContent className="pt-20 text-center">

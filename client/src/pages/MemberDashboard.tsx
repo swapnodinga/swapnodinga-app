@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 export default function MemberDashboard() {
+  // Destructure society data and the submission function from context
   const { currentUser, transactions, societyTotalFund, submitInstalment } = useSociety();
 
   if (!currentUser) return (
@@ -26,7 +27,7 @@ export default function MemberDashboard() {
   // Filter transactions using society_id to match your Supabase schema
   const myTransactions = transactions.filter(t => t.memberId === currentUser.society_id);
   
-  // Calculate total individual savings
+  // Calculate total individual savings based on user profile fields
   const totalSavings = (currentUser.totalInstalmentPaid || 0) + 
                        (currentUser.fixedDeposit || 0) + 
                        (currentUser.totalInterestEarned || 0);
@@ -161,19 +162,27 @@ export default function MemberDashboard() {
 
         {/* INSTALMENTS TAB */}
         <TabsContent value="instalments" className="space-y-6">
-          {/* Action Banner */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-[#064e3b] p-8 rounded-2xl border border-emerald-800 shadow-xl text-white relative overflow-hidden">
             <div className="relative z-10">
               <h3 className="text-2xl font-bold mb-2">Submit Monthly Payment</h3>
               <p className="text-emerald-100/80 text-sm max-w-md leading-relaxed">
-                Payments are due by the end of each month. 
-                Fines apply after the 1st (৳500) and 5th (৳1000). 
+                Payments are due by the end of each month.
+                Fines apply after the 1st (৳500) and 5th (৳1000).
                 Upload your transaction receipt for verification.
               </p>
             </div>
             <div className="relative z-10">
+              {/* FIXED MODAL PROPS: Added society_id and updated onSubmit logic */}
               <PaymentModal 
-                onSubmit={(amount, proofUrl, month) => submitInstalment(amount, proofUrl, month)} 
+                userSocietyId={currentUser.society_id}
+                onSubmit={(amount, proofUrl, month, lateFee, societyId) => {
+                  if (typeof submitInstalment === 'function') {
+                    // Pass all 5 required parameters to your context
+                    submitInstalment(amount, proofUrl, month, lateFee, societyId);
+                  } else {
+                    console.error("submitInstalment function missing from context");
+                  }
+                }} 
               />
             </div>
             <div className="absolute -right-8 -bottom-8 opacity-10">

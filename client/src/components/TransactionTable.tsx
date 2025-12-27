@@ -1,21 +1,13 @@
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Transaction } from "@/context/SocietyContext";
 import { Check, X, Eye } from "lucide-react";
 
 interface TransactionTableProps {
-  transactions: Transaction[];
+  transactions: any[];
   isAdmin?: boolean;
-  onApprove?: (id: string, email: string, name: string) => void;
-  onReject?: (id: string, email: string, name: string) => void;
+  onApprove?: (id: number) => void;
+  onReject?: (id: number) => void;
 }
 
 export function TransactionTable({ transactions, isAdmin, onApprove, onReject }: TransactionTableProps) {
@@ -34,91 +26,54 @@ export function TransactionTable({ transactions, isAdmin, onApprove, onReject }:
         </TableHeader>
         <TableBody>
           {transactions.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={isAdmin ? 6 : 4} className="text-center h-24 text-muted-foreground italic">
-                No transaction records found in database.
-              </TableCell>
-            </TableRow>
+            <TableRow><TableCell colSpan={isAdmin ? 6 : 4} className="text-center h-24 text-muted-foreground italic">No transaction records found.</TableCell></TableRow>
           ) : (
             transactions.map((tx) => (
               <TableRow key={tx.id} className="hover:bg-primary/5 transition-colors">
                 <TableCell>
-                  {/* Displays the month selected in the PaymentModal */}
-                  <div className="font-medium text-primary">{(tx as any).month || "Instalment"}</div>
-                  <div className="text-[10px] text-muted-foreground">{tx.date}</div>
+                  <div className="font-medium text-primary">{tx.month || "Instalment"}</div>
+                  {tx.created_at && <div className="text-[10px] text-muted-foreground">{new Date(tx.created_at).toLocaleDateString()}</div>}
                 </TableCell>
                 
                 {isAdmin && (
                   <TableCell>
-                    <div className="text-sm font-medium">{tx.memberName}</div>
-                    <div className="text-[10px] text-muted-foreground font-mono">{tx.memberId}</div>
+                    <div className="text-sm font-medium">{tx.memberName || "Unknown Member"}</div>
+                    {/* FIXED: Priority display of society_id (e.g., SCS-002) */}
+                    <div className="text-[10px] text-blue-600 font-bold font-mono uppercase">
+                      {tx.society_id || `ID: ${tx.member_id}`}
+                    </div>
                   </TableCell>
                 )}
 
-                <TableCell className="font-mono font-bold text-slate-700">
-                  ৳{tx.amount?.toLocaleString()}
+                <TableCell>
+                  <div className="font-mono font-bold text-slate-700">৳{Number(tx.amount || 0).toLocaleString()}</div>
+                  {tx.late_fee > 0 && <div className="text-[9px] text-red-500 font-semibold italic">Includes ৳{tx.late_fee} Late Fee</div>}
                 </TableCell>
 
                 <TableCell className="text-center">
-                  <Badge
-                    variant={
-                      tx.status === "approved" || tx.status === "Paid"
-                        ? "default"
-                        : tx.status === "rejected"
-                        ? "destructive"
-                        : "secondary"
-                    }
-                    className={
-                      tx.status === "approved" || tx.status === "Paid"
-                        ? "bg-green-600 hover:bg-green-700 text-white shadow-sm"
-                        : tx.status === "pending"
-                        ? "bg-orange-100 text-orange-700 border-orange-200"
-                        : ""
-                    }
-                  >
-                    {tx.status}
+                  <Badge variant={tx.status?.toLowerCase() === "approved" ? "default" : tx.status?.toLowerCase() === "rejected" ? "destructive" : "secondary"}
+                    className={tx.status?.toLowerCase() === "approved" ? "bg-green-600 text-white" : tx.status?.toLowerCase() === "pending" ? "bg-orange-100 text-orange-700" : ""}>
+                    {tx.status || "Pending"}
                   </Badge>
                 </TableCell>
 
                 <TableCell className="text-center">
-                  {tx.proofUrl ? (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      asChild 
-                      className="h-7 text-primary hover:bg-primary/10 text-xs gap-1"
-                    >
-                      <a href={tx.proofUrl} target="_blank" rel="noopener noreferrer">
-                        <Eye className="w-3.5 h-3.5" /> View
-                      </a>
+                  {/* FIXED: Now using 'payment_proof_url' */}
+                  {tx.payment_proof_url ? (
+                    <Button variant="ghost" size="sm" asChild className="h-7 text-primary gap-1">
+                      <a href={tx.payment_proof_url} target="_blank" rel="noopener noreferrer"><Eye className="w-3.5 h-3.5" /> View</a>
                     </Button>
                   ) : (
-                    <span className="text-[10px] text-muted-foreground">No Proof</span>
+                    <span className="text-[10px] text-muted-foreground italic">No Proof</span>
                   )}
                 </TableCell>
 
                 {isAdmin && (
                   <TableCell className="text-right">
-                    {tx.status === "pending" && (
+                    {tx.status?.toLowerCase() === "pending" && (
                       <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          title="Approve & Send Email"
-                          className="h-8 w-8 p-0 border-green-200 text-green-600 hover:text-white hover:bg-green-600 transition-all"
-                          onClick={() => onApprove?.(tx.id, (tx as any).email || "", tx.memberName)}
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          title="Reject & Send Email"
-                          className="h-8 w-8 p-0 border-red-200 text-red-600 hover:text-white hover:bg-red-600 transition-all"
-                          onClick={() => onReject?.(tx.id, (tx as any).email || "", tx.memberName)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 text-green-600" onClick={() => onApprove?.(tx.id)}><Check className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 text-red-600" onClick={() => onReject?.(tx.id)}><X className="h-4 w-4" /></Button>
                       </div>
                     )}
                   </TableCell>

@@ -3,7 +3,7 @@ import axios from "axios";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabase"; 
 
-const API_BASE_URL = "/api"; // Using a relative path is safer for most Vite/Express setups
+const API_BASE_URL = "/api";
 
 interface SocietyContextType {
   currentUser: any;
@@ -17,9 +17,11 @@ interface SocietyContextType {
   updateProfile: (data: any) => Promise<void>;
   uploadProfilePic: (file: File) => Promise<void>;
   refreshData: () => Promise<void>;
-  // ADDED: Missing Admin Actions required by AdminMembers.tsx
   approveMember: (id: string) => Promise<void>;
   deleteMember: (id: string) => Promise<void>;
+  // UPDATED: Now accepts 5 parameters
+  submitInstalment: (amount: number, proofUrl: string, month: string, lateFee: number, societyId: string) => Promise<void>;
+  approveInstalment: (id: number) => Promise<void>;
 }
 
 const SocietyContext = createContext<SocietyContextType | undefined>(undefined);
@@ -45,12 +47,13 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const societyTotalFund = useMemo(() => {
     if (!Array.isArray(transactions)) return 0;
-    return transactions.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+    return transactions
+      .filter(t => t.status?.toLowerCase() === 'approved') 
+      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   }, [transactions]);
 
-const refreshData = async () => {
+  const refreshData = async () => {
     try {
-      // Use catch on individual requests so one failure doesn't stop the other
       const [membersRes, transRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/members`).catch(() => ({ data: [] })),
         axios.get(`${API_BASE_URL}/transactions`).catch(() => ({ data: [] }))
@@ -58,8 +61,6 @@ const refreshData = async () => {
       
       setMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
       setTransactions(Array.isArray(transRes.data) ? transRes.data : []);
-      
-      console.log("Sync Complete: Members list updated.");
     } catch (err) {
       console.error("Refresh failed:", err);
     }
@@ -69,28 +70,67 @@ const refreshData = async () => {
     if (currentUser) refreshData();
   }, [currentUser]);
 
-  // FIXED: Ensure backend receives proper keys and handle response correctly
+  // UPDATED: Logic to send lateFee and societyId to your backend
+  const submitInstalment = async (
+    amount: number, 
+    proofUrl: string, 
+    month: string, 
+    lateFee: number, 
+    societyId: string
+  ) => {
+    try {
+      if (!currentUser) throw new Error("No user logged in");
+
+      const res = await axios.post(`${API_BASE_URL}/submit-instalment`, {
+        memberId: currentUser.id,      
+        society_id: societyId,         // Correctly mapped from modal
+        memberName: currentUser.full_name, 
+        amount: Number(amount),        
+        late_fee: Number(lateFee),     // Explicitly tracked late fee
+        proofUrl: proofUrl,            
+        month: month,                  
+        status: 'Pending'               
+      });
+
+      if (res.data.success) {
+        await refreshData(); 
+      }
+    } catch (err) {
+      console.error("Instalment submission failed:", err);
+      throw err;
+    }
+  };
+
+  const approveInstalment = async (id: number) => {
+    try {
+      const res = await axios.post(`${API_BASE_URL}/approve-instalment`, { id });
+      if (res.data.success) {
+        await refreshData();
+      }
+    } catch (err) {
+      console.error("Approval failed:", err);
+    }
+  };
+
   const register = async (userData: any) => {
     try {
       const res = await axios.post(`${API_BASE_URL}/register`, {
-        full_name: userData.fullName, // Maps LandingPage regName
+        full_name: userData.fullName,
         email: userData.email,
         password: userData.password,
-        status: 'pending' // Default status for admin review
+        status: 'pending'
       });
       
       if (res.data.success) {
-        await refreshData(); // Update member list for admin immediately
+        await refreshData();
         return true;
       }
       return false;
     } catch (err) {
-      console.error("Registration failed:", err);
       return false;
     }
   };
 
-  // ADDED: approveMember for AdminMembers.tsx
   const approveMember = async (id: string) => {
     try {
       await axios.post(`${API_BASE_URL}/approve-member`, { id });
@@ -100,7 +140,6 @@ const refreshData = async () => {
     }
   };
 
-  // ADDED: deleteMember for AdminMembers.tsx
   const deleteMember = async (id: string) => {
     try {
       await axios.delete(`${API_BASE_URL}/members/${id}`);
@@ -167,7 +206,9 @@ const refreshData = async () => {
     <SocietyContext.Provider value={{ 
       currentUser, members, transactions, societyTotalFund, isLoading,
       login, register, logout, updateProfile, uploadProfilePic, refreshData,
-      approveMember, deleteMember // Exposed for Admin Panel
+      approveMember, deleteMember,
+      submitInstalment,
+      approveInstalment 
     }}>
       {children}
     </SocietyContext.Provider>

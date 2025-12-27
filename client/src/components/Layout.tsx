@@ -14,9 +14,10 @@ import {
   Briefcase,
   ShieldAlert,
   Phone,
-  FileText, // For Reports
-  PiggyBank, // For Fixed Deposits
-  TrendingUp // For Interest Records
+  FileText,
+  PiggyBank,
+  TrendingUp,
+  CreditCard // Added for Member Payments
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logo from "@assets/generated_images/swapnodinga_logo.png";
@@ -25,19 +26,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { currentUser, logout } = useSociety();
   const [location, setLocation] = useLocation();
 
-  // Guard: Redirect to login if user session is cleared
   useEffect(() => {
     if (!currentUser && location !== "/") {
       setLocation("/");
     }
   }, [currentUser, location, setLocation]);
 
-  // Don't show sidebar on Login page
   if (location === "/") {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
 
-  // Admin Management Links - Updated to match your sidebar screenshot
+  // Admin-specific sidebar links
   const adminLinks = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/members", label: "Manage Members", icon: Users },
@@ -47,7 +46,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/admin/interest", label: "Interest Records", icon: TrendingUp },
   ];
 
-  // Information Links
+  // Member-specific sidebar links
+  const memberLinks = [
+    { href: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
+    { href: "/dashboard/contributions", label: "My Payments", icon: CreditCard },
+  ];
+
   const infoLinks = [
     { href: "/about", label: "About Us", icon: Info },
     { href: "/project", label: "Our Project", icon: Briefcase },
@@ -68,11 +72,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         
         <div className="flex-1 overflow-y-auto py-8 px-4">
           <nav className="space-y-8">
-            {/* MAIN MENU (ADMIN) */}
+            {/* DYNAMIC MENU BASED ON ROLE */}
             <div>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">Menu</p>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">
+                {currentUser?.is_admin ? "Admin Menu" : "Member Menu"}
+              </p>
               <div className="space-y-1">
-                {adminLinks.map((link) => (
+                {(currentUser?.is_admin ? adminLinks : memberLinks).map((link) => (
                   <Link key={link.href} href={link.href}>
                     <a className={cn(
                       "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] transition-all group",
@@ -122,7 +128,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     ? "bg-emerald-800 text-white font-medium" 
                     : "text-white/60 hover:bg-emerald-800/50 hover:text-white"
                 )}>
-                  {/* Avatar synced with profile_pic column */}
                   {currentUser?.profile_pic ? (
                     <img 
                       src={currentUser.profile_pic} 
@@ -139,7 +144,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
 
-        {/* LOGOUT BUTTON */}
         <div className="p-6 border-t border-white/10">
           <Button 
             variant="ghost" 
@@ -155,30 +159,40 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center px-8 shadow-sm justify-between">
-           <nav className="flex items-center text-[13px] text-slate-400">
-            <Home size={14} className="mr-2" />
-            <Link href="/admin" className="hover:text-emerald-700 transition-colors">Admin</Link>
-            {location.split('/').filter(Boolean).map((part, i) => (
-              i > 0 && (
+            <nav className="flex items-center text-[13px] text-slate-400">
+             <Home size={14} className="mr-2" />
+             {/* FIXED: DYNAMIC BREADCRUMB */}
+             <Link 
+               href={currentUser?.is_admin ? "/admin" : "/dashboard"} 
+               className="hover:text-emerald-700 transition-colors"
+             >
+               {currentUser?.is_admin ? "Admin" : "Home"}
+             </Link>
+             
+             {location.split('/').filter(Boolean).map((part, i) => {
+               if (part === 'admin' || part === 'dashboard') return null;
+               return (
                 <React.Fragment key={i}>
                   <ChevronRight size={12} className="mx-2 opacity-30" />
                   <span className="capitalize font-medium text-slate-900">{part.replace(/-/g, ' ')}</span>
                 </React.Fragment>
-              )
-            ))}
+               );
+             })}
           </nav>
           
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
-              <p className="text-xs font-bold text-slate-900 leading-none">{currentUser?.full_name || currentUser?.name || "User"}</p>
-              <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{currentUser?.role || "Member"}</p>
+              <p className="text-xs font-bold text-slate-900 leading-none">{currentUser?.full_name || "User"}</p>
+              {/* FIXED: DYNAMIC ROLE LABEL */}
+              <p className="text-[10px] text-slate-400 uppercase tracking-tighter">
+                {currentUser?.is_admin ? "Administrator" : "Member"}
+              </p>
             </div>
             <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 shadow-sm bg-slate-100">
                <img 
-                 src={currentUser?.profile_pic || "/default-avatar.png"} 
+                 src={currentUser?.profile_pic || "https://via.placeholder.com/150"} 
                  alt="User" 
                  className="w-full h-full object-cover" 
-                 onError={(e) => { (e.target as HTMLImageElement).src = "https://via.placeholder.com/150" }}
                />
             </div>
           </div>

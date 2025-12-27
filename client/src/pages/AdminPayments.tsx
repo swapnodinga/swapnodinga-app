@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function AdminPayments() {
-  const { transactions, approveTransaction, rejectTransaction } = useSociety();
+  // Updated to use the correct function name from your SocietyContext
+  const { transactions, approveInstalment } = useSociety();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [monthFilter, setMonthFilter] = useState("all");
@@ -18,23 +19,26 @@ export default function AdminPayments() {
     .filter(Boolean)
     .sort();
 
-  // Filter Logic
+  // Filter Logic matching your database column names
   const filteredTransactions = transactions.filter((tx) => {
-    const matchesSearch = 
-      tx.memberName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      tx.memberId.toLowerCase().includes(searchTerm.toLowerCase());
+    // memberName and member_id match your Supabase schema
+    const nameMatch = tx.memberName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const idMatch = tx.member_id?.toString().includes(searchTerm);
+    
+    const matchesSearch = nameMatch || idMatch;
     const matchesMonth = monthFilter === "all" || tx.month === monthFilter;
+    
     return matchesSearch && matchesMonth;
   });
 
-  // Calculate Summary for Filtered View
+  // Calculate Summary based on database 'status' values
   const totalCollected = filteredTransactions
-    .filter(t => t.status === "approved" || t.status === "Paid")
-    .reduce((sum, t) => sum + t.amount, 0);
+    .filter(t => t.status?.toLowerCase() === "approved")
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
   const totalPending = filteredTransactions
-    .filter(t => t.status === "pending")
-    .reduce((sum, t) => sum + t.amount, 0);
+    .filter(t => t.status?.toLowerCase() === "pending")
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -118,11 +122,11 @@ export default function AdminPayments() {
             Showing {filteredTransactions.length} results
           </span>
         </div>
+        {/* Passed approveInstalment as the onApprove prop */}
         <TransactionTable 
           transactions={filteredTransactions} 
           isAdmin={true} 
-          onApprove={approveTransaction}
-          onReject={rejectTransaction}
+          onApprove={approveInstalment}
         />
       </div>
     </div>

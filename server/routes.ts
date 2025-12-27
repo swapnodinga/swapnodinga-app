@@ -9,7 +9,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // 1. LOGIN: Prefix with /api and Admin Bypass
+  // 1. LOGIN
   app.post("/api/login", async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -24,7 +24,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const isAdmin = user.email.toLowerCase() === 'swapnodinga.scs@gmail.com';
-
       if (user.status !== 'active' && !isAdmin) {
         return res.status(403).json({ success: false, message: "Account pending admin approval" });
       }
@@ -35,7 +34,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 2. REGISTRATION: Sequential Society ID Generator
+  // 2. REGISTRATION
   app.post("/api/register", async (req, res) => {
     const { full_name, email, password, status } = req.body;
     try {
@@ -66,25 +65,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select()
         .single();
 
-      if (error) {
-        console.error("Supabase Error:", error.message);
-        return res.status(400).json({ success: false, message: error.message });
-      }
-      
+      if (error) return res.status(400).json({ success: false, message: error.message });
       res.json({ success: true, user: data, assignedId: nextId });
-    } catch (err: any) {
+    } catch (err) {
       res.status(500).json({ success: false, message: "Registration server error" });
     }
   });
 
-  // 3. MEMBER DATA FETCHING (NEW): Required for AdminMembers.tsx to show pending list
+  // 3. MEMBER DATA FETCHING
   app.get("/api/members", async (_req, res) => {
     try {
-      const { data, error } = await supabase
-        .from('members')
-        .select('*')
-        .order('id', { ascending: false });
-
+      const { data, error } = await supabase.from('members').select('*').order('id', { ascending: false });
       if (error) throw error;
       res.json(data);
     } catch (err) {
@@ -92,7 +83,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 4. ADMIN TOOLS: Standardized /api prefix
+  // 4. ADMIN TOOLS
   app.post('/api/approve-member', async (req, res) => {
     const { id } = req.body;
     try {
@@ -109,6 +100,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error) throw error;
       res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false }); }
+  });
+
+// 5. SUBMIT INSTALMENT (Aligned with Frontend Context)
+app.post("/api/submit-instalment", async (req, res) => {
+  try {
+    // UPDATED: Destructuring keys must match what SocietyContext sends
+    const { 
+      memberId, 
+      society_id,  // Matches SocietyContext key
+      memberName, 
+      amount, 
+      proofUrl, 
+      month, 
+      late_fee     // Matches SocietyContext key
+    } = req.body;
+
+    const { data, error } = await supabase
+      .from('Installments') 
+      .insert([{
+        member_id: memberId,            // int8 (internal DB ID)
+        society_id: society_id,         // text (SCS-XXX)
+        memberName: memberName,         // text
+        amount: Number(amount),         // numeric (Base + Fee)
+        late_fee: Number(late_fee || 0),// numeric
+        payment_proof_url: proofUrl,    // Exact column name
+        month: month,                   // text
+        status: 'Pending',              // text
+        created_at: new Date().toISOString() 
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Supabase Error:", error.message);
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    res.json({ success: true, transaction: data });
+  } catch (err: any) {
+    console.error("Internal Server Error:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
+
+  // 6. Approve an instalment
+  app.post("/api/approve-instalment", async (req, res) => {
+    try {
+      const { id } = req.body;
+      const { data, error } = await supabase
+        .from('Installments')
+        .update({ 
+          status: 'Approved', 
+          approved_at: new Date().toISOString() 
+        })
+        .eq('id', id)
+        .select();
+
+      if (error) throw error;
+      res.json({ success: true, transaction: data });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
+  // 7. Reject an instalment
+  app.post("/api/reject-instalment", async (req, res) => {
+    try {
+      const { id } = req.body;
+      const { data, error } = await supabase
+        .from('Installments')
+        .update({ status: 'Rejected' })
+        .eq('id', id)
+        .select();
+
+      if (error) throw error;
+      res.json({ success: true, transaction: data });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
+  // 8. FETCH TRANSACTIONS
+  app.get("/api/transactions", async (_req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('Installments')
+        .select('*')
+        .order('id', { ascending: false });
+
+      if (error) throw error;
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ success: false, message: "Failed to fetch transactions" });
+    }
   });
 
   return createServer(app);

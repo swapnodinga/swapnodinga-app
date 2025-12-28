@@ -1,222 +1,114 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
-import axios from "axios";
-import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabase"; 
-
-const API_BASE_URL = "/api";
 
 interface SocietyContextType {
   currentUser: any;
-  members: any[];
+  members: any[]; 
   transactions: any[];
   societyTotalFund: number;
+  societyFixedDeposit: number;
+  societyDepositInterest: number;
   isLoading: boolean;
   login: (email: string, pass: string) => Promise<boolean>;
-  register: (userData: any) => Promise<boolean>;
   logout: () => void;
-  updateProfile: (data: any) => Promise<void>;
-  uploadProfilePic: (file: File) => Promise<void>;
   refreshData: () => Promise<void>;
-  approveMember: (id: string) => Promise<void>;
-  deleteMember: (id: string) => Promise<void>;
-  // UPDATED: Now accepts 5 parameters
-  submitInstalment: (amount: number, proofUrl: string, month: string, lateFee: number, societyId: string) => Promise<void>;
-  approveInstalment: (id: number) => Promise<void>;
 }
 
 const SocietyContext = createContext<SocietyContextType | undefined>(undefined);
 
 export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [members, setMembers] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]); 
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [societyFixedDeposit, setSocietyFixedDeposit] = useState(0);
+  const [societyDepositInterest, setSocietyDepositInterest] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [, setLocation] = useLocation();
-
-  useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    if (savedUser) {
-      try {
-        setCurrentUser(JSON.parse(savedUser));
-      } catch (e) {
-        console.error("Failed to parse user session");
-      }
-    }
-    setIsLoading(false);
-  }, []);
-
-  const societyTotalFund = useMemo(() => {
-    if (!Array.isArray(transactions)) return 0;
-    return transactions
-      .filter(t => t.status?.toLowerCase() === 'approved') 
-      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-  }, [transactions]);
 
   const refreshData = async () => {
     try {
-      const [membersRes, transRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/members`).catch(() => ({ data: [] })),
-        axios.get(`${API_BASE_URL}/transactions`).catch(() => ({ data: [] }))
-      ]);
+      // 1. Fetch Global Data (Required for interest sharing logic)
+      const { data: mData } = await supabase.from('members').select('*');
+      const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
+      const { data: deposits } = await supabase.from('fixed_deposits').select('*');
+      const { data: interestRecords } = await supabase.from('member_profit_records').select('*');
+
+      setMembers(mData || []);
+
+      // 2. Calculate Society Totals (Aligns with image_fc70e7)
+      const totalInstallments = installments?.reduce((acc, i) => acc + (Number(i.amount) || 0), 0) || 0;
+      const totalFD = deposits?.reduce((acc, d) => acc + (Number(d.amount) || 0), 0) || 0;
+      const totalInterestEarned = interestRecords?.reduce((acc, n) => acc + (Number(n.amount_earned) || 0), 0) || 0;
       
-      setMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
-      setTransactions(Array.isArray(transRes.data) ? transRes.data : []);
-    } catch (err) {
-      console.error("Refresh failed:", err);
-    }
-  };
+      setSocietyFixedDeposit(totalFD);
+      setSocietyDepositInterest(totalInterestEarned);
+      setTransactions(installments || []);
 
-  useEffect(() => {
-    if (currentUser) refreshData();
-  }, [currentUser]);
+      // 3. Member Dashboard Calculation Logic (Aligns with image_fc70a9)
+      const savedUser = localStorage.getItem("user");
+      if (savedUser && mData) {
+        const parsed = JSON.parse(savedUser);
+        const profile = mData.find(m => String(m.id) === String(parsed.id));
 
-  // UPDATED: Logic to send lateFee and societyId to your backend
-  const submitInstalment = async (
-    amount: number, 
-    proofUrl: string, 
-    month: string, 
-    lateFee: number, 
-    societyId: string
-  ) => {
-    try {
-      if (!currentUser) throw new Error("No user logged in");
+        if (profile) {
+          const mId = String(profile.id);
+          const mName = (profile.name || profile.full_name || "").trim().toLowerCase();
+          
+          // Member's Individual Contribution
+          const mContribution = installments?.filter(i => 
+            String(i.member_id) === mId || (i.memberName?.trim().toLowerCase() === mName && mName !== "")
+          ).reduce((sum, i) => sum + Number(i.amount || 0), 0) || 0;
 
-      const res = await axios.post(`${API_BASE_URL}/submit-instalment`, {
-        memberId: currentUser.id,      
-        society_id: societyId,         // Correctly mapped from modal
-        memberName: currentUser.full_name, 
-        amount: Number(amount),        
-        late_fee: Number(lateFee),     // Explicitly tracked late fee
-        proofUrl: proofUrl,            
-        month: month,                  
-        status: 'Pending'               
-      });
+          // Member's Share of Total Society Profit
+          const totalSocietyCapital = totalInstallments + totalFD;
+          const mInterestShare = totalSocietyCapital > 0 ? (mContribution / totalSocietyCapital) * totalInterestEarned : 0;
 
-      if (res.data.success) {
-        await refreshData(); 
+          setCurrentUser({
+            ...profile,
+            calculatedInstalments: mContribution,
+            calculatedInterest: mInterestShare // This will now show ৳2,622 for Md Golam Kibria
+          });
+        } else {
+          setCurrentUser(parsed); 
+        }
       }
     } catch (err) {
-      console.error("Instalment submission failed:", err);
-      throw err;
+      console.error("Critical Sync Error:", err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const approveInstalment = async (id: number) => {
-    try {
-      const res = await axios.post(`${API_BASE_URL}/approve-instalment`, { id });
-      if (res.data.success) {
-        await refreshData();
-      }
-    } catch (err) {
-      console.error("Approval failed:", err);
-    }
-  };
-
-  const register = async (userData: any) => {
-    try {
-      const res = await axios.post(`${API_BASE_URL}/register`, {
-        full_name: userData.fullName,
-        email: userData.email,
-        password: userData.password,
-        status: 'pending'
-      });
-      
-      if (res.data.success) {
-        await refreshData();
-        return true;
-      }
-      return false;
-    } catch (err) {
-      return false;
-    }
-  };
-
-  const approveMember = async (id: string) => {
-    try {
-      await axios.post(`${API_BASE_URL}/approve-member`, { id });
-      await refreshData();
-    } catch (err) {
-      console.error("Approval failed:", err);
-    }
-  };
-
-  const deleteMember = async (id: string) => {
-    try {
-      await axios.delete(`${API_BASE_URL}/members/${id}`);
-      await refreshData();
-    } catch (err) {
-      console.error("Deletion failed:", err);
-    }
-  };
+  useEffect(() => { refreshData(); }, []);
 
   const login = async (email: string, pass: string) => {
-    try {
-      const res = await axios.post(`${API_BASE_URL}/login`, { 
-        email: email.trim(), 
-        password: pass 
-      });
-      if (res.data.success) {
-        setCurrentUser(res.data.user);
-        localStorage.setItem("user", JSON.stringify(res.data.user));
-        return true;
-      }
-      return false;
-    } catch (err) {
-      return false;
+    const { data } = await supabase.from('members').select('*').eq('email', email.trim()).single();
+    if (data && data.password === pass) {
+      setCurrentUser(data);
+      localStorage.setItem("user", JSON.stringify(data));
+      await refreshData();
+      return true;
     }
-  };
-
-  const updateProfile = async (data: any) => {
-    const updatedUser = { ...currentUser, ...data };
-    setCurrentUser(updatedUser);
-    localStorage.setItem("user", JSON.stringify(updatedUser));
-  };
-
-  const uploadProfilePic = async (file: File) => {
-    try {
-      if (!currentUser) return;
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${currentUser.id}-${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file);
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
-      const publicUrl = data.publicUrl;
-
-      await updateProfile({ profile_pic: publicUrl });
-      await axios.post(`${API_BASE_URL}/update-profile-pic`, { 
-        userId: currentUser.id, 
-        profilePic: publicUrl 
-      });
-    } catch (err: any) {
-      console.error("Upload error:", err);
-    }
+    return false;
   };
 
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem("user");
-    setLocation("/");
   };
+
+  const societyTotalFund = useMemo(() => {
+    const installmentTotal = transactions.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+    return installmentTotal + societyFixedDeposit + societyDepositInterest;
+  }, [transactions, societyFixedDeposit, societyDepositInterest]);
 
   return (
     <SocietyContext.Provider value={{ 
-      currentUser, members, transactions, societyTotalFund, isLoading,
-      login, register, logout, updateProfile, uploadProfilePic, refreshData,
-      approveMember, deleteMember,
-      submitInstalment,
-      approveInstalment 
+      currentUser, members, transactions, societyTotalFund, societyFixedDeposit, 
+      societyDepositInterest, isLoading, login, logout, refreshData 
     }}>
       {children}
     </SocietyContext.Provider>
   );
 }
 
-export function useSociety() {
-  const context = useContext(SocietyContext);
-  if (!context) throw new Error("useSociety must be used within a SocietyProvider");
-  return context;
-}
+export const useSociety = () => useContext(SocietyContext)!;

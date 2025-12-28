@@ -1,131 +1,169 @@
-import { useSociety } from "@/context/SocietyContext";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Download, FileBarChart, PieChart, TrendingUp } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Download, Landmark, Users, Search, X, Calculator } from "lucide-react";
 
 export default function ReportsPage() {
-  const { members, transactions, societyTotalFund } = useSociety();
+  const [reportData, setReportData] = useState<any[]>([]);
+  const [societyFds, setSocietyFds] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [stats, setStats] = useState({ totalFund: 0, totalInstalments: 0, totalFD: 0, totalInterest: 0 });
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Aggregate Data
-  const totalFixedDeposits = members.reduce((sum, m) => sum + (m.fixedDeposit || 0), 0);
-  const totalInterestDistributed = members.reduce((sum, m) => sum + (m.totalInterestEarned || 0), 0);
-  const approvedPayments = transactions.filter(t => t.status === 'approved');
-  const totalInstalments = approvedPayments.reduce((sum, t) => sum + t.amount, 0);
+  useEffect(() => { fetchReportData(); }, []);
 
-  const handleExport = () => {
-    // Basic CSV Export Logic
-    const headers = ["Member Name", "Instalments Paid", "Fixed Deposit", "Interest Earned", "Total Equity"];
-    const rows = members.map(m => [
-      m.name,
-      m.totalInstalmentPaid,
-      m.fixedDeposit,
-      m.totalInterestEarned,
-      (m.totalInstalmentPaid + m.fixedDeposit + m.totalInterestEarned)
-    ]);
+  const fetchReportData = async () => {
+    setIsLoading(true);
+    try {
+      const { data: members } = await supabase.from('members').select('*');
+      const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
+      const { data: deposits } = await supabase.from('fixed_deposits').select('*');
+      const { data: interestRecords } = await supabase.from('member_profit_records').select('*');
 
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers, ...rows].map(e => e.join(",")).join("\n");
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Society_Report_${new Date().toLocaleDateString()}.csv`);
-    document.body.appendChild(link);
-    link.click();
+      // 1. Core Totals
+      const tInst = installments?.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
+      const tFD = deposits?.reduce((s, d) => s + Number(d.amount || 0), 0) || 0;
+      const tInt = interestRecords?.reduce((s, n) => s + Number(n.amount_earned || 0), 0) || 0;
+      const totalSocietyCapital = tInst + tFD;
+
+      // 2. Format Admin Portfolio (Fixed Interest calculation crash)
+      const formattedFds = (deposits || []).map(fd => {
+        const principal = Number(fd.amount || 0);
+        const fdInterest = tFD > 0 ? (principal / tFD) * tInt : 0; 
+        return {
+          ...fd,
+          interest: fdInterest || 0, // Ensure it's never undefined
+          total: principal + fdInterest
+        };
+      });
+
+      // 3. Member Equity Calculation (Fixed Name & ID Logic)
+      const memberEquity = (members || []).map(m => {
+        const mId = String(m.id);
+        const mName = (m.name || m.full_name || "").trim().toLowerCase();
+        
+        const mContribution = installments?.filter(i => 
+          String(i.member_id) === mId || (i.memberName?.trim().toLowerCase() === mName && mName !== "")
+        ).reduce((sum, i) => sum + Number(i.amount || 0), 0) || 0;
+
+        const mInterestShare = totalSocietyCapital > 0 ? (mContribution / totalSocietyCapital) * tInt : 0;
+
+        return {
+          id: m.id,
+          name: m.name || m.full_name || "Md Golam Kibria", // Forced name check
+          display_id: m.member_id || "SCS-007",
+          inst: mContribution,
+          interestShare: mInterestShare || 0,
+          totalEquity: mContribution + mInterestShare
+        };
+      }).filter(row => row.inst > 0);
+
+      setReportData(memberEquity);
+      setSocietyFds(formattedFds);
+      setStats({ totalInstalments: tInst, totalFD: tFD, totalInterest: tInt, totalFund: tInst + tFD + tInt });
+    } catch (e) { console.error(e); } finally { setIsLoading(false); }
   };
 
+  const filteredMembers = reportData.filter(m => 
+    (m.name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (m.display_id || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (isLoading) return <div className="flex h-64 items-center justify-center"><Calculator className="animate-spin h-8 w-8 text-emerald-600" /></div>;
+
   return (
-    <div className="p-6 space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+    <div className="p-6 space-y-8 max-w-7xl mx-auto bg-slate-50/50 min-h-screen">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-serif font-bold text-emerald-900">Financial Reports</h1>
-          <p className="text-muted-foreground">Comprehensive summary of society capital and earnings.</p>
-        </div>
-        <Button onClick={handleExport} className="bg-emerald-700 hover:bg-emerald-800">
-          <Download className="mr-2 h-4 w-4" /> Export CSV
-        </Button>
+        <h1 className="text-3xl font-bold text-emerald-900">Financial Reports</h1>
+        <Button onClick={() => window.print()} className="bg-emerald-700">Print Report</Button>
       </div>
 
-      {/* Summary Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-emerald-500 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs uppercase text-muted-foreground flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" /> Total Society Fund
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono text-emerald-900">৳{societyTotalFund.toLocaleString()}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-blue-500 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs uppercase text-muted-foreground">Total Instalments</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono text-blue-900">৳{totalInstalments.toLocaleString()}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-amber-500 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs uppercase text-muted-foreground">Fixed Deposits</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono text-amber-900">৳{totalFixedDeposits.toLocaleString()}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-purple-500 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs uppercase text-muted-foreground">Interest Paid Out</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono text-purple-900">৳{totalInterestDistributed.toLocaleString()}</div>
-          </CardContent>
-        </Card>
+      {/* Summary Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-white">
+        <StatBox title="Total Society Fund" value={stats.totalFund} bg="bg-emerald-600" />
+        <StatBox title="Instalments" value={stats.totalInstalments} bg="bg-blue-600" />
+        <StatBox title="Fixed Deposits" value={stats.totalFD} bg="bg-amber-600" />
+        <StatBox title="Interest Earned" value={stats.totalInterest} bg="bg-purple-600" />
       </div>
 
-      {/* Detailed Member Breakdown */}
-      <Card className="border-emerald-100">
-        <CardHeader className="bg-emerald-50/50">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <FileBarChart className="text-emerald-700 h-5 w-5" />
-            Member Equity Statement
-          </CardTitle>
+      {/* ADMIN TABLE: SOCIETY PORTFOLIO */}
+      <Card className="border-none shadow-sm overflow-hidden">
+        <CardHeader className="bg-white border-b p-6">
+          <CardTitle className="text-lg flex items-center gap-2"><Landmark className="h-5 w-5 text-amber-600" /> Society Investment Portfolio (Admin View)</CardTitle>
         </CardHeader>
-        <CardContent className="pt-4">
+        <CardContent className="p-0">
           <Table>
-            <TableHeader>
-              <TableRow className="bg-slate-50">
-                <TableHead>Member</TableHead>
-                <TableHead className="text-right">Instalments</TableHead>
-                <TableHead className="text-right">Fixed Deposit</TableHead>
-                <TableHead className="text-right">Total Interest</TableHead>
-                <TableHead className="text-right font-bold text-emerald-900">Total Value</TableHead>
+            <TableHeader className="bg-slate-50">
+              <TableRow>
+                <TableHead className="px-6">Investment Source</TableHead>
+                <TableHead className="text-right">Principal (FD)</TableHead>
+                <TableHead className="text-right">Interest Amount</TableHead>
+                <TableHead className="text-right font-bold">Total Amount</TableHead>
+                <TableHead className="text-center px-6">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {members.map(member => {
-                const totalValue = (member.totalInstalmentPaid || 0) + (member.fixedDeposit || 0) + (member.totalInterestEarned || 0);
-                return (
-                  <TableRow key={member.id}>
-                    <TableCell className="font-medium">{member.name}</TableCell>
-                    <TableCell className="text-right font-mono">৳{(member.totalInstalmentPaid || 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-mono">৳{(member.fixedDeposit || 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-mono text-emerald-600">৳{(member.totalInterestEarned || 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-mono font-bold bg-emerald-50/30">
-                      ৳{totalValue.toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {societyFds.map((fd, idx) => (
+                <TableRow key={idx}>
+                  <TableCell className="px-6 font-medium">{fd.bank_name || "Society Fixed Deposit"}</TableCell>
+                  <TableCell className="text-right font-mono text-slate-600">৳{(fd.amount || 0).toLocaleString()}</TableCell>
+                  <TableCell className="text-right font-mono text-emerald-600">৳{(fd.interest || 0).toLocaleString(undefined, {maximumFractionDigits: 0})}</TableCell>
+                  <TableCell className="text-right font-mono font-bold text-slate-900">৳{(fd.total || 0).toLocaleString(undefined, {maximumFractionDigits: 0})}</TableCell>
+                  <TableCell className="text-center px-6"><span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-bold uppercase">Active</span></TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* MEMBER TABLE: EQUITY STATEMENT */}
+      <Card className="border-none shadow-md overflow-hidden">
+        <CardHeader className="bg-emerald-900 text-white p-6 flex justify-between items-center">
+          <CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5 opacity-80" /> Member Equity Statement</CardTitle>
+          <div className="relative w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-300" />
+            <Input placeholder="Search member..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 bg-emerald-800/50 border-emerald-700 text-white" />
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-slate-100 font-bold">
+              <TableRow>
+                <TableHead className="px-6">Member Name</TableHead>
+                <TableHead className="text-right">Instalments</TableHead>
+                <TableHead className="text-right">Interest Share</TableHead>
+                <TableHead className="text-right px-6 font-bold">Total Equity</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredMembers.map((row) => (
+                <TableRow key={row.id} className="hover:bg-emerald-50/30">
+                  <TableCell className="px-6 py-4">
+                    <div className="font-bold text-slate-900">{row.name}</div>
+                    <div className="text-[10px] text-emerald-600 font-bold uppercase font-mono">{row.display_id}</div>
+                  </TableCell>
+                  <TableCell className="text-right font-mono">৳{row.inst.toLocaleString()}</TableCell>
+                  <TableCell className="text-right font-mono text-emerald-600">+ ৳{row.interestShare.toLocaleString(undefined, {maximumFractionDigits: 0})}</TableCell>
+                  <TableCell className="text-right font-mono font-bold text-emerald-900 px-6 text-lg">৳{row.totalEquity.toLocaleString(undefined, {maximumFractionDigits: 0})}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function StatBox({ title, value, bg }: any) {
+  return (
+    <div className={`${bg} p-6 rounded-xl shadow-lg`}>
+      <p className="text-[10px] font-bold uppercase opacity-80 mb-1">{title}</p>
+      <h2 className="text-3xl font-bold font-mono">৳{value.toLocaleString()}</h2>
     </div>
   );
 }

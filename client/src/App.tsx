@@ -13,7 +13,7 @@ import MemberDashboard from "@/pages/MemberDashboard";
 import AdminPayments from "@/pages/AdminPayments";
 import NotFound from "@/pages/not-found";
 import FixedDepositPage from "@/pages/FixedDepositPage";
-import SocietyTreasury from "@/pages/SocietyTreasury";
+import InterestDistribution from "@/pages/InterestDistribution"; 
 import AdminMembers from "@/pages/AdminMembers";
 import ReportsPage from "@/pages/ReportsPage";
 import ProfilePage from "@/pages/ProfilePage";
@@ -22,27 +22,26 @@ import ProjectPage from "@/pages/ProjectPage";
 import PolicyPage from "@/pages/PolicyPage";
 import ContactPage from "@/pages/ContactPage";
 import MemberPayments from "@/pages/MemberPayments";
+import AdminSettings from "@/pages/AdminSettings"; //
+
 
 function Router() {
   const { currentUser, isLoading } = useSociety();
 
-  // Prevents flashing of wrong content while session loads
   if (isLoading) return null; 
 
   return (
     <Layout>
       <Switch>
-        {/* Public Route */}
+        {/* PUBLIC ROUTE */}
         <Route path="/" component={LandingPage} />
         
-        {/* Common Authenticated Routes */}
+        {/* COMMON AUTHENTICATED ROUTE */}
         <Route path="/profile">
           {currentUser ? <ProfilePage /> : <Redirect to="/" />}
         </Route>
 
-        {/* ADMIN ONLY ROUTES
-            If is_admin is false, redirect to Member Dashboard 
-        */}
+        {/* ADMIN ROUTES: Strictly accessible by is_admin users */}
         <Route path="/admin">
           {currentUser?.is_admin ? <AdminDashboard /> : <Redirect to="/dashboard" />}
         </Route>
@@ -53,7 +52,7 @@ function Router() {
           {currentUser?.is_admin ? <FixedDepositPage /> : <Redirect to="/dashboard" />}
         </Route>
         <Route path="/admin/interest">
-          {currentUser?.is_admin ? <SocietyTreasury /> : <Redirect to="/dashboard" />}
+          {currentUser?.is_admin ? <InterestDistribution /> : <Redirect to="/dashboard" />}
         </Route>
         <Route path="/admin/reports">
           {currentUser?.is_admin ? <ReportsPage /> : <Redirect to="/dashboard" />}
@@ -61,25 +60,35 @@ function Router() {
         <Route path="/admin/members">
           {currentUser?.is_admin ? <AdminMembers /> : <Redirect to="/dashboard" />}
         </Route>
+        {/* NEW SECURE SETTINGS ROUTE */}
+        <Route path="/admin/settings">
+          {currentUser?.is_admin ? <AdminSettings /> : <Redirect to="/dashboard" />}
+        </Route>
 
-        {/* MEMBER DASHBOARD */}
-        
+        {/* MEMBER ROUTES: If an Admin visits /dashboard, redirect them to /admin */}
         <Route path="/dashboard">
-          {currentUser ? <MemberDashboard /> : <Redirect to="/" />}
+          {currentUser ? (
+            currentUser.is_admin ? <Redirect to="/admin" /> : <MemberDashboard />
+          ) : (
+            <Redirect to="/" />
+          )}
         </Route>
-
-        {/* FIXED: Added route for My Payments */}
+        
         <Route path="/dashboard/contributions">
-          {currentUser ? <MemberPayments /> : <Redirect to="/" />}
+          {currentUser ? (
+            currentUser.is_admin ? <Redirect to="/admin" /> : <MemberPayments />
+          ) : (
+            <Redirect to="/" />
+          )}
         </Route>
 
-        {/* Information & Static Content */}
+        {/* STATIC PAGES */}
         <Route path="/about" component={AboutPage} />
         <Route path="/project" component={ProjectPage} />
         <Route path="/policy" component={PolicyPage} />
         <Route path="/contact" component={ContactPage} />
         
-        {/* 404 Fallback */}
+        {/* FALLBACK */}
         <Route component={NotFound} />
       </Switch>
     </Layout>

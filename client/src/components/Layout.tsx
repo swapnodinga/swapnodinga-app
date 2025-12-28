@@ -17,7 +17,8 @@ import {
   FileText,
   PiggyBank,
   TrendingUp,
-  CreditCard // Added for Member Payments
+  CreditCard,
+  Settings // Added for Admin Site Configuration
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logo from "@assets/generated_images/swapnodinga_logo.png";
@@ -44,6 +45,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/admin/reports", label: "Reports", icon: FileText },
     { href: "/admin/deposits", label: "Fixed Deposits", icon: PiggyBank },
     { href: "/admin/interest", label: "Interest Records", icon: TrendingUp },
+    { href: "/admin/settings", label: "Site Settings", icon: Settings }, // Added Settings link
   ];
 
   // Member-specific sidebar links
@@ -161,7 +163,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <header className="h-16 bg-white border-b border-slate-200 flex items-center px-8 shadow-sm justify-between">
             <nav className="flex items-center text-[13px] text-slate-400">
              <Home size={14} className="mr-2" />
-             {/* FIXED: DYNAMIC BREADCRUMB */}
              <Link 
                href={currentUser?.is_admin ? "/admin" : "/dashboard"} 
                className="hover:text-emerald-700 transition-colors"
@@ -183,7 +184,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
               <p className="text-xs font-bold text-slate-900 leading-none">{currentUser?.full_name || "User"}</p>
-              {/* FIXED: DYNAMIC ROLE LABEL */}
               <p className="text-[10px] text-slate-400 uppercase tracking-tighter">
                 {currentUser?.is_admin ? "Administrator" : "Member"}
               </p>

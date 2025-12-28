@@ -1,106 +1,178 @@
-import { useState } from "react";
-import { useSociety } from "@/context/SocietyContext";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Banknote, Calculator, Plus, Search } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Wallet, History, PlusCircle, TrendingUp, Banknote } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function FixedDepositPage() {
-  const { members, updateMemberFixedDeposit } = useSociety();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [deposits, setDeposits] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const [formData, setFormData] = useState({
+    amount: "",
+    month: "January",
+    year: "2025",
+    interest_rate: "9.75",
+    tenure_months: "36" // Input as whole number
+  });
 
-  const filteredMembers = members.filter(m => 
-    m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    m.society_id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const fetchDeposits = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('fixed_deposits')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (!error) setDeposits(data || []);
+    setIsLoading(false);
+  };
+
+  useEffect(() => { fetchDeposits(); }, []);
+
+  const handleAddDeposit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { error } = await supabase
+      .from('fixed_deposits')
+      .insert([{
+        member_id: 1, 
+        society_id: "ADMIN-TREASURY", 
+        amount: Number(formData.amount),
+        month: formData.month,
+        year: formData.year,
+        interest_rate: Number(formData.interest_rate),
+        tenure_months: Number(formData.tenure_months) // Saves as integer
+      }]);
+
+    if (!error) {
+      setFormData({ ...formData, amount: "" });
+      fetchDeposits();
+    } else {
+      alert("Error: " + error.message);
+    }
+  };
+
+  // Summary Logic for Emerald Cards
+  const totals = deposits.reduce((acc, d) => {
+    const principal = Number(d.amount || 0);
+    const months = Number(d.tenure_months || 0);
+    const interest = principal * (Number(d.interest_rate || 0) / 100) * (months / 12);
+
+    return {
+      principal: acc.principal + principal,
+      interest: acc.interest + interest,
+      total: acc.total + principal + interest
+    };
+  }, { principal: 0, interest: 0, total: 0 });
+
+  const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-3xl font-serif font-bold text-emerald-900">Fixed Deposit Management</h1>
-        <p className="text-muted-foreground">Manage long-term capital and interest allocations.</p>
+    <div className="space-y-8 p-6">
+      <h1 className="text-3xl font-serif font-bold text-emerald-900">Society Treasury Ledger</h1>
+
+      {/* THREE IDENTICAL EMERALD CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {[
+          { label: "Total Treasury Principal", val: totals.principal, icon: Wallet },
+          { label: "Total Expected Interest", val: totals.interest, icon: TrendingUp },
+          { label: "Total Maturity Value", val: totals.total, icon: Banknote }
+        ].map((card, i) => (
+          <Card key={i} className="bg-[#064e3b] text-white shadow-xl border-none rounded-2xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-[11px] font-bold flex items-center gap-2 opacity-70 uppercase tracking-widest">
+                <card.icon size={14} /> {card.label}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold">৳{Math.round(card.val).toLocaleString()}</div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Calculator Tool */}
-        <Card className="md:col-span-1 border-amber-100 shadow-sm bg-amber-50/30">
-          <CardHeader>
-            <CardTitle className="text-amber-900 flex items-center gap-2 text-lg">
-              <Calculator size={20} />
-              Returns Estimator
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <Card className="lg:col-span-1 border-emerald-100 shadow-sm rounded-xl">
+          <CardHeader className="border-b bg-slate-50/30">
+            <CardTitle className="text-lg text-emerald-900 flex items-center gap-2 font-bold">
+              <PlusCircle size={18} className="text-emerald-600" /> New Bank Entry
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Principal Amount (৳)</Label>
-              <Input type="number" placeholder="50,000" className="border-amber-200" />
-            </div>
-            <div className="space-y-2">
-              <Label>Annual Interest (%)</Label>
-              <Input type="number" placeholder="8" className="border-amber-200" />
-            </div>
-            <Button className="w-full bg-amber-600 hover:bg-amber-700">Calculate</Button>
+          <CardContent className="pt-6">
+            <form onSubmit={handleAddDeposit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">Month</Label>
+                  <Select value={formData.month} onValueChange={(v) => setFormData({...formData, month: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent className="bg-white">
+                      {monthsList.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Year</Label>
+                  <Input value={formData.year} onChange={(e) => setFormData({...formData, year: e.target.value})} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Principal Amount (৳)</Label>
+                <Input type="number" required value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Interest Rate (%)</Label>
+                <Input type="number" step="0.01" value={formData.interest_rate} onChange={(e) => setFormData({...formData, interest_rate: e.target.value})} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Tenure (Months)</Label>
+                <Input type="number" required value={formData.tenure_months} onChange={(e) => setFormData({...formData, tenure_months: e.target.value})} />
+              </div>
+              <Button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold h-12 rounded-lg mt-2">Save Deposit</Button>
+            </form>
           </CardContent>
         </Card>
 
-        {/* Member FD List */}
-        <Card className="md:col-span-2 border-emerald-100 shadow-sm">
-          <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between">
-            <CardTitle className="text-emerald-900">Member Holdings</CardTitle>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input 
-                placeholder="Search member..." 
-                className="pl-9 h-9" 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+        <Card className="lg:col-span-2 border-slate-100 shadow-sm rounded-xl overflow-hidden">
+          <CardHeader className="bg-slate-50/50 border-b">
+            <CardTitle className="text-lg text-slate-700 flex items-center gap-2 font-bold">
+              <History size={18} className="text-slate-400" /> Deposit History
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-emerald-50 text-emerald-900 text-left border-b">
-                    <th className="p-4 font-bold">Member</th>
-                    <th className="p-4 font-bold">FD Amount</th>
-                    <th className="p-4 font-bold">Interest Earned</th>
-                    <th className="p-4 text-right font-bold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filteredMembers.map((member) => (
-                    <tr key={member.id} className="hover:bg-emerald-50/20">
-                      <td className="p-4">
-                        <p className="font-bold text-emerald-950">{member.name}</p>
-                        <p className="text-[10px] font-mono text-slate-500">{member.society_id}</p>
-                      </td>
-                      <td className="p-4 font-medium text-emerald-700">
-                        ৳{member.fixedDeposit?.toLocaleString() || 0}
-                      </td>
-                      <td className="p-4">
-                        <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
-                          ৳{member.totalInterestEarned?.toLocaleString() || 0}
-                        </Badge>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-left border-b text-slate-500 uppercase text-[10px] tracking-widest font-bold">
+                  <th className="p-4">Date</th>
+                  <th className="p-4 text-center">Principal</th>
+                  <th className="p-4 text-center">Interest %</th>
+                  <th className="p-4 text-center">Tenure (Months)</th>
+                  <th className="p-4 text-right">Maturity Est.</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {deposits.map((d) => {
+                  const interest = Number(d.amount) * (Number(d.interest_rate) / 100) * (Number(d.tenure_months) / 12);
+                  return (
+                    <tr key={d.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4 font-semibold text-slate-900">{d.month} {d.year}</td>
+                      <td className="p-4 text-center text-emerald-700 font-bold">৳{Number(d.amount).toLocaleString()}</td>
+                      <td className="p-4 text-center font-bold text-blue-600">{d.interest_rate}%</td>
+                      <td className="p-4 text-center text-slate-900 font-bold text-lg">
+                        {d.tenure_months} {/* Shows 36, 6, etc. */}
                       </td>
                       <td className="p-4 text-right">
-                         <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-emerald-600 hover:bg-emerald-100"
-                            onClick={() => {/* Trigger Edit Dialog */}}
-                          >
-                            Update FD
-                          </Button>
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100 font-bold py-1 px-3">
+                          ৳{Math.round(Number(d.amount) + interest).toLocaleString()}
+                        </Badge>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  )
+                })}
+              </tbody>
+            </table>
           </CardContent>
         </Card>
       </div>

@@ -7,14 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Home, Key, UserPlus } from "lucide-react";
-import { useToast } from "@/hooks/use-toast"; // Added for feedback
+import { useToast } from "@/hooks/use-toast";
 import logo from "@assets/generated_images/swapnodinga_logo.png";
 import heroBg from "@assets/generated_images/housing_community_hero_background.png";
 
 export default function LandingPage() {
   const { login, register } = useSociety();
   const [, setLocation] = useLocation();
-  const { toast } = useToast(); // Added for visual feedback
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
   // Login State
@@ -47,37 +47,44 @@ export default function LandingPage() {
     }
   };
 
-  // FIXED: handleRegister now passes an object to match the context
+  // FIXED: handleRegister now uses 'full_name' to satisfy the database not-null constraint
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
     try {
+      // The database requires 'full_name'
       const success = await register({
-        fullName: regName,
+        full_name: regName, // Changed from fullName to match Supabase column
         email: regEmail,
-        password: regPass
+        password: regPass,
+        status: 'pending' // Ensures immediate visibility in AdminMembers.tsx
       });
 
       if (success) {
         toast({ 
           title: "Application Submitted!", 
-          description: "Please wait for admin approval before logging in." 
+          description: "Please wait for admin approval before logging in.",
+          className: "bg-emerald-50 border-emerald-200"
         });
         // Clear registration fields
         setRegName("");
         setRegEmail("");
         setRegPass("");
-        // Ideally switch to login tab here if using a state-controlled Tab component
       } else {
         toast({ 
           variant: "destructive", 
           title: "Error", 
-          description: "Registration failed. Please try again." 
+          description: "Registration failed. Database constraint error." 
         });
       }
     } catch (err) {
       console.error("Registration error:", err);
+      toast({ 
+        variant: "destructive", 
+        title: "Connection Error", 
+        description: "Could not reach the server." 
+      });
     } finally {
       setLoading(false);
     }

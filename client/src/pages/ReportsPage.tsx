@@ -21,11 +21,12 @@ export default function ReportsPage() {
   const fetchReportData = async () => {
     setIsLoading(true);
     try {
-      const { data: members } = await supabase.from('members').select('*');
+      // DYNAMIC ID FIX: Order by ID to ensure correct sequence
+      const { data: members } = await supabase.from('members').select('*').order('id', { ascending: true });
       const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
       const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 
-      // 1. Process Society FDs and identify "FINISHED" principal for interest calculation
+      // 1. Process Society FDs
       let finishedFdPrincipal = 0;
       let totalEarnedInterest = 0;
 
@@ -43,8 +44,8 @@ export default function ReportsPage() {
         const calculatedInterest = (principal * (rate / 100) * (tenure / 12));
 
         if (isFinished) {
-          finishedFdPrincipal += principal; // Should be 40,000
-          totalEarnedInterest += calculatedInterest; // Should be 1,950
+          finishedFdPrincipal += principal;
+          totalEarnedInterest += calculatedInterest;
         }
 
         return {
@@ -61,26 +62,28 @@ export default function ReportsPage() {
       const tFD = processedFds.reduce((s, d) => s + Number(d.amount || 0), 0) || 0;
 
       // 2. Member Equity Logic
+      // DYNAMIC ID FIX: Generate SCS-XXX based on the sorted index in the database
       const memberEquity = (members || [])
-        .filter(m => (m.name || "").toLowerCase() !== "admin")
-        .map(m => {
+        .filter(m => (m.full_name || m.name || "").toLowerCase() !== "admin")
+        .map((m, index) => {
           const mId = String(m.id);
-          const mName = (m.name || m.full_name || "").trim();
+          const mName = (m.full_name || m.name || "").trim();
           
           const mContribution = installments?.filter(i => 
             String(i.member_id) === mId || (i.memberName?.trim().toLowerCase() === mName.toLowerCase() && mName !== "")
           ).reduce((sum, i) => sum + Number(i.amount || 0), 0) || 0;
 
-          // INTEREST CALCULATION (OK): (1950 / 40000) * 10000 = 487.5
           const mInterestShare = finishedFdPrincipal > 0 
             ? (totalEarnedInterest / finishedFdPrincipal) * mContribution 
             : 0;
 
+          // Automatically generate SCS ID: e.g., Index 0 becomes SCS-001
+          const dynamicScsId = `SCS-${String(index + 1).padStart(3, '0')}`;
+
           return {
             id: m.id,
             name: mName,
-            // ID FIX: Explicitly map Md Golam Kibria to SCS-002
-            display_id: (mName === "Md Golam Kibria") ? "SCS-002" : (m.member_id || "SCS-000"),
+            display_id: dynamicScsId,
             inst: mContribution,
             interestShare: mInterestShare,
             totalEquity: mContribution + mInterestShare
@@ -114,7 +117,6 @@ export default function ReportsPage() {
         </Button>
       </div>
 
-      {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-white">
         <StatBox title="Total Society Fund" value={stats.totalFund} bg="bg-emerald-600" />
         <StatBox title="Instalments" value={stats.totalInstalments} bg="bg-blue-600" />
@@ -122,7 +124,6 @@ export default function ReportsPage() {
         <StatBox title="Interest Earned" value={stats.totalInterest} bg="bg-purple-600" />
       </div>
 
-      {/* Society Portfolio Table */}
       <Card className="border-none shadow-sm overflow-hidden">
         <CardHeader className="bg-white border-b p-6">
           <CardTitle className="text-lg flex items-center gap-2 font-bold">
@@ -163,7 +164,6 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
-      {/* Member Equity Statement */}
       <Card className="border-none shadow-md overflow-hidden">
         <CardHeader className="bg-emerald-900 text-white p-6 flex justify-between items-center">
           <CardTitle className="text-lg flex items-center gap-2">
@@ -194,7 +194,7 @@ export default function ReportsPage() {
                 <TableRow key={row.id} className="hover:bg-emerald-50/30">
                   <TableCell className="px-6 py-4">
                     <div className="font-bold text-slate-900">{row.name}</div>
-                    {/* ID IS NOW FIXED TO SCS-002 */}
+                    {/* DYNAMIC ID IS NOW AUTOMATIC */}
                     <div className="text-[10px] text-emerald-600 font-bold uppercase font-mono">{row.display_id}</div>
                   </TableCell>
                   <TableCell className="text-right font-mono">৳{row.inst.toLocaleString()}</TableCell>

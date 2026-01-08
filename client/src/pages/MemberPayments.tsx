@@ -45,6 +45,7 @@ export default function MyPayments() {
     setIsSubmitting(true);
     try {
       const billingPeriod = `${month} ${year}`;
+      // Logic ensures proof_url is passed so Admin can see it before it gets deleted upon approval [cite: 2025-12-31]
       await submitInstalment(totalToPay, file, billingPeriod);
       
       setShowSuccess(true);
@@ -67,7 +68,7 @@ export default function MyPayments() {
             <MailCheck size={20}/>
             <div>
               <p className="font-bold text-[13px]">Payment has been successfully submitted.</p>
-              <p className="text-[10px] opacity-90">A confirmation mail has been sent to your mail</p>
+              <p className="text-[10px] opacity-90">A confirmation mail will be sent once approved [cite: 2025-12-31]</p>
             </div>
             <button onClick={() => setShowSuccess(false)} className="ml-2 hover:bg-white/10 p-1 rounded-lg">
               <X size={16}/>
@@ -105,7 +106,6 @@ export default function MyPayments() {
                     <SelectTrigger className="rounded-xl border-slate-100 bg-slate-50/50 h-9 text-xs font-bold">
                       <SelectValue placeholder="Year" />
                     </SelectTrigger>
-                    {/* Using position="popper" and high z-index to fix visibility */}
                     <SelectContent position="popper" className="z-[999] bg-white border border-slate-200 shadow-xl rounded-xl">
                       <SelectItem value="2025">2025</SelectItem>
                       <SelectItem value="2026">2026</SelectItem>
@@ -120,7 +120,6 @@ export default function MyPayments() {
                     <SelectTrigger className="rounded-xl border-slate-100 bg-slate-50/50 h-9 text-xs font-bold">
                       <SelectValue placeholder="Month" />
                     </SelectTrigger>
-                    {/* Using position="popper" and high z-index to fix visibility */}
                     <SelectContent position="popper" className="z-[999] bg-white border border-slate-200 shadow-xl rounded-xl">
                       {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(m => (
                         <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>

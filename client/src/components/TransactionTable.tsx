@@ -39,22 +39,34 @@ export function TransactionTable({ transactions, isAdmin, onApprove, onReject }:
               </Badge>
             </TableCell>
             <TableCell className="text-center">
+              {/* If proof exists, show view button so admin can verify before approving [cite: 2025-12-31] */}
               {tx.payment_proof_url ? (
-                <Button variant="ghost" size="sm" className="h-8 gap-1 text-slate-500" asChild>
+                <Button variant="ghost" size="sm" className="h-8 gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" asChild>
                   <a href={tx.payment_proof_url} target="_blank" rel="noreferrer">
-                    <Eye size={14}/> <span className="underline text-xs">View</span>
+                    <Eye size={14}/> <span className="underline text-xs font-bold">View Proof</span>
                   </a>
                 </Button>
-              ) : <span className="text-[10px] italic text-slate-300">File Deleted</span>}
+              ) : (
+                <span className="text-[10px] italic text-slate-300">File Deleted</span>
+              )}
             </TableCell>
             {isAdmin && (
               <TableCell className="text-right">
                 {tx.status === "Pending" && (
                   <div className="flex justify-end gap-2">
-                    <Button size="sm" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 h-8 w-8 p-0" onClick={() => onApprove(tx.id)}>
+                    {/* CRITICAL: Passing full 'tx' object to context [cite: 2025-12-31] */}
+                    <Button 
+                      size="sm" 
+                      className="bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white h-8 w-8 p-0 transition-colors" 
+                      onClick={() => onApprove(tx)}
+                    >
                       <Check size={16}/>
                     </Button>
-                    <Button size="sm" className="bg-red-100 text-red-700 hover:bg-red-200 h-8 w-8 p-0" onClick={() => onReject(tx.id)}>
+                    <Button 
+                      size="sm" 
+                      className="bg-red-100 text-red-700 hover:bg-red-600 hover:text-white h-8 w-8 p-0 transition-colors" 
+                      onClick={() => onReject(tx)}
+                    >
                       <X size={16}/>
                     </Button>
                   </div>

@@ -17,12 +17,12 @@ interface SocietyContextType {
   register: (userData: any) => Promise<boolean>;
   logout: () => void;
   updateProfile: (data: any) => Promise<void>;
-  uploadProfilePic: (file: File) => Promise<void>;
+  uploadProfilePic: (file: File) => Promise<string>; 
   refreshData: () => Promise<void>;
   approveMember: (id: string) => Promise<void>;
   deleteMember: (id: string) => Promise<void>;
   submitInstalment: (amount: number, file: File, month: string) => Promise<void>;
-  approveInstalment: (id: number) => Promise<void>; 
+  approveInstalment: (transaction: any, status: 'Approved' | 'Rejected') => Promise<void>; 
 }
 
 const SocietyContext = createContext<SocietyContextType | undefined>(undefined);
@@ -52,7 +52,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const societyTotalFund = useMemo(() => {
     if (!Array.isArray(transactions)) return 0;
     return transactions
-      .filter(t => t.status?.toLowerCase() === 'approved') 
+      .filter(t => t.status === 'Approved') 
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   }, [transactions]);
 
@@ -65,7 +65,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       setMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
       setTransactions(Array.isArray(transRes.data) ? transRes.data : []);
     } catch (err) {
-      console.error("Refresh failed:", err);
+      console.error("Data refresh failed:", err);
     }
   };
 
@@ -73,15 +73,48 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData();
   }, [currentUser]);
 
+  const approveInstalment = async (transaction: any, status: 'Approved' | 'Rejected') => {
+    try {
+      const res = await axios.post(`${API_BASE_URL}/approve-instalment`, { 
+        id: transaction.id, 
+        status: status 
+      });
+
+      if (res.data.success) {
+        const memberObj = members.find(m => 
+          String(m.id) === String(transaction.member_id || transaction.memberId)
+        );
+        
+        const targetEmail = memberObj?.email || transaction.memberEmail;
+
+        if (targetEmail) {
+          await supabase.functions.invoke('payment-notification', {
+            body: { 
+              status: status, 
+              memberEmail: targetEmail,
+              proofPath: transaction.proofPath || transaction.payment_proof_url?.split('/').pop(),
+              amount: transaction.amount,
+              month: transaction.month,
+              memberName: memberObj?.full_name || transaction.memberName || "Member"
+            }
+          });
+        }
+        await refreshData();
+      }
+    } catch (err) {
+      console.error("Action failed:", err);
+    }
+  };
+
   const submitInstalment = async (amount: number, file: File, month: string) => {
     try {
       if (!currentUser) throw new Error("No user logged in");
-
       const fileExt = file.name.split('.').pop();
-      const fileName = `${currentUser.id}-${Date.now()}.${fileExt}`;
+      const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`;
+      
       const { error: uploadError } = await supabase.storage.from('payments').upload(fileName, file);
       if (uploadError) throw uploadError;
-
+      
       const { data } = supabase.storage.from('payments').getPublicUrl(fileName);
 
       await axios.post(`${API_BASE_URL}/submit-instalment`, {
@@ -89,41 +122,27 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         memberName: currentUser.full_name, 
         society_id: currentUser.society_id, 
         amount: Number(amount),         
-        proofUrl: data.publicUrl,            
-        month: month,                  
+        proofUrl: data.publicUrl, 
+        proofPath: fileName,      
+        month: month,                   
         status: 'Pending'               
       });
-
       await refreshData();
     } catch (err) {
       throw err;
     }
   };
 
-  const approveInstalment = async (id: number) => {
-    try {
-      const res = await axios.post(`${API_BASE_URL}/approve-instalment`, { id });
-      if (res.data.success) await refreshData();
-    } catch (err) {
-      console.error("Approval failed:", err);
-    }
-  };
-
   const login = async (email: string, pass: string) => {
     try {
-      const res = await axios.post(`${API_BASE_URL}/login`, { 
-        email: email.trim(), 
-        password: pass 
-      });
+      const res = await axios.post(`${API_BASE_URL}/login`, { email: email.trim(), password: pass });
       if (res.data.success) {
         setCurrentUser(res.data.user);
         localStorage.setItem("user", JSON.stringify(res.data.user));
         return true;
       }
       return false;
-    } catch (err) {
-      return false;
-    }
+    } catch (err) { return false; }
   };
 
   const logout = () => {
@@ -132,26 +151,16 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setLocation("/");
   };
 
-  // FIXED: Registration logic now ensures 'full_name' is sent to the DB
   const register = async (userData: any) => { 
     try {
-      // The DB requires 'full_name' and cannot be null
-      const payload = {
-        ...userData,
-        full_name: userData.full_name || userData.name 
-      };
-
+      const payload = { ...userData, full_name: userData.full_name || userData.name };
       const res = await axios.post(`${API_BASE_URL}/register`, payload);
-      
       if (res.data.success) {
         await refreshData(); 
         return true;
       }
       return false;
-    } catch (err) {
-      console.error("Registration failed:", err);
-      return false;
-    }
+    } catch (err) { return false; }
   };
 
   const approveMember = async (id: string) => { 
@@ -170,7 +179,20 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("user", JSON.stringify(u)); 
   };
 
-  const uploadProfilePic = async (file: File) => { };
+  const uploadProfilePic = async (file: File): Promise<string> => {
+    try {
+      if (!currentUser) throw new Error("No user logged in");
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentUser.id}-${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file);
+      if (uploadError) throw uploadError;
+      const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
+      const publicUrl = data.publicUrl;
+      await updateProfile({ profile_pic: publicUrl });
+      await axios.post(`${API_BASE_URL}/update-profile-pic`, { userId: currentUser.id, profilePic: publicUrl });
+      return publicUrl;
+    } catch (err: any) { throw err; }
+  };
 
   return (
     <SocietyContext.Provider value={{ 

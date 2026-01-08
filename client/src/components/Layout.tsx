@@ -18,10 +18,12 @@ import {
   PiggyBank,
   TrendingUp,
   CreditCard,
-  Settings // Added for Admin Site Configuration
+  Settings 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import logo from "@assets/generated_images/swapnodinga_logo.png";
+
+// UPDATED LOGO IMPORT
+import logo from "@assets/generated_images/SwapnoDinga_Logo_Update.png";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { currentUser, logout } = useSociety();
@@ -37,7 +39,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
 
-  // Admin-specific sidebar links
   const adminLinks = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/members", label: "Manage Members", icon: Users },
@@ -45,10 +46,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/admin/reports", label: "Reports", icon: FileText },
     { href: "/admin/deposits", label: "Fixed Deposits", icon: PiggyBank },
     { href: "/admin/interest", label: "Interest Records", icon: TrendingUp },
-    { href: "/admin/settings", label: "Site Settings", icon: Settings }, // Added Settings link
+    { href: "/admin/settings", label: "Site Settings", icon: Settings },
   ];
 
-  // Member-specific sidebar links
   const memberLinks = [
     { href: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/contributions", label: "My Payments", icon: CreditCard },
@@ -65,16 +65,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen bg-background overflow-hidden font-sans">
       {/* SIDEBAR */}
       <aside className="hidden md:flex flex-col w-64 bg-[#1a4d3c] text-white border-r border-emerald-900/20 shadow-2xl">
-        <div className="p-6 flex items-center gap-3 border-b border-white/10">
-          <div className="bg-white p-1 rounded-full shadow-md">
-            <img src={logo} alt="Logo" className="w-8 h-8 object-contain" />
+        
+        {/* REVISED LOGO SECTION ONLY */}
+        <div className="p-6 flex items-center gap-4 border-b border-white/10">
+          <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-xl border-2 border-emerald-500/20 shrink-0">
+            <img 
+              src={logo} 
+              alt="Swapnodinga Logo" 
+              className="w-full h-full object-contain scale-150 transform translate-y-[-2px]" 
+              style={{ imageRendering: 'crisp-edges' }} 
+            />
           </div>
-          <span className="font-serif font-bold text-xl tracking-tight">Swapnodinga</span>
+          <span className="font-serif font-bold text-2xl tracking-tighter leading-tight text-white">
+            Swapnodinga
+          </span>
         </div>
         
         <div className="flex-1 overflow-y-auto py-8 px-4">
           <nav className="space-y-8">
-            {/* DYNAMIC MENU BASED ON ROLE */}
             <div>
               <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">
                 {currentUser?.is_admin ? "Admin Menu" : "Member Menu"}
@@ -98,7 +106,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            {/* INFORMATION SECTION */}
             <div>
               <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">Information</p>
               <div className="space-y-1">
@@ -120,7 +127,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             
-            {/* ACCOUNT SECTION */}
+            {/* ACCOUNT SECTION: Preserved exactly as provided */}
             <div>
               <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">Account</p>
               <Link href="/profile">
@@ -158,7 +165,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
+      {/* MAIN CONTENT AREA: Preserved exactly as provided */}
       <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center px-8 shadow-sm justify-between">
             <nav className="flex items-center text-[13px] text-slate-400">

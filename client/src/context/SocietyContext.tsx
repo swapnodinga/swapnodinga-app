@@ -49,11 +49,14 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   }, [transactions]);
 
-  // FIX 1: Fetch directly from Supabase tables
   const refreshData = async () => {
     try {
+      // Direct fetch from Supabase to bypass the missing Vercel backend
       const { data: mData, error: mErr } = await supabase.from('members').select('*');
-      const { data: tData, error: tErr } = await supabase.from('transactions').select('*').order('created_at', { ascending: false });
+      const { data: tData, error: tErr } = await supabase
+        .from('transactions')
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (mErr) throw mErr;
       if (tErr) throw tErr;
@@ -69,7 +72,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData();
   }, [currentUser]);
 
-  // FIX 2: Approve directly via Supabase
   const approveInstalment = async (transaction: any, status: 'Approved' | 'Rejected') => {
     try {
       const { error } = await supabase
@@ -96,30 +98,31 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           'nKSxYmGpgjuB2J4tF'
         );
 
-        const pathToDelete = transaction.proof_path;
-        if (pathToDelete) {
-           await supabase.storage.from('payments').remove([pathToDelete]);
+        // Delete proof from storage once approved to keep storage clean
+        if (transaction.proof_path) {
+           await supabase.storage.from('payments').remove([transaction.proof_path]);
         }
       }
       await refreshData();
     } catch (err) {
-      console.error("Approval failed:", err);
+      console.error("Approval workflow failed:", err);
     }
   };
 
-  // FIX 3: Submit directly via Supabase
   const submitInstalment = async (amount: number, file: File, month: string) => {
     try {
-      if (!currentUser) throw new Error("No user logged in");
+      if (!currentUser) throw new Error("No session found. Please log in again.");
       
       const fileExt = file.name.split('.').pop();
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`;
       
+      // 1. Upload file to Supabase Bucket
       const { error: uploadError } = await supabase.storage.from('payments').upload(fileName, file);
       if (uploadError) throw uploadError;
       
       const { data: urlData } = supabase.storage.from('payments').getPublicUrl(fileName);
 
+      // 2. Insert record directly into transactions table
       const { error: dbError } = await supabase
         .from('transactions')
         .insert([{
@@ -136,11 +139,11 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (dbError) throw dbError;
 
-      alert("Submission Successful!");
+      alert("Success! Your payment has been submitted for verification.");
       await refreshData();
     } catch (err: any) { 
-      alert("Error: " + err.message);
-      throw err; 
+      alert("Submission failed: " + err.message);
+      console.error(err);
     }
   };
 
@@ -159,7 +162,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         .eq('email', email.trim())
         .single();
 
-      if (dbError || !memberData) throw new Error("Member profile not found");
+      if (dbError || !memberData) throw new Error("Profile not found");
 
       setCurrentUser(memberData);
       localStorage.setItem("user", JSON.stringify(memberData));
@@ -202,7 +205,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const uploadProfilePic = async (file: File): Promise<string> => {
     try {
-      if (!currentUser) throw new Error("No user logged in");
+      if (!currentUser) throw new Error("Login required");
       const fileExt = file.name.split('.').pop();
       const fileName = `${currentUser.id}-${Date.now()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file);

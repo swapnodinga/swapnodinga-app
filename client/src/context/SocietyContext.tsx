@@ -1,10 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
-import axios from "axios";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabase"; 
 import emailjs from '@emailjs/browser';
-
-const API_BASE_URL = "/api";
 
 interface SocietyContextType {
   currentUser: any;
@@ -52,15 +49,17 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   }, [transactions]);
 
+  // FIX 1: Fetch directly from Supabase tables
   const refreshData = async () => {
     try {
-      // Fetch directly from Supabase
-      const { data: membersData } = await supabase.from('members').select('*');
-      const { data: transData } = await supabase.from('transactions').select('*').order('created_at', { ascending: false });
+      const { data: mData, error: mErr } = await supabase.from('members').select('*');
+      const { data: tData, error: tErr } = await supabase.from('transactions').select('*').order('created_at', { ascending: false });
 
-      // Ensure we map the Supabase data correctly so the UI can see it
-      setMembers(membersData || []);
-      setTransactions(transData || []);
+      if (mErr) throw mErr;
+      if (tErr) throw tErr;
+
+      setMembers(mData || []);
+      setTransactions(tData || []);
     } catch (err) {
       console.error("Data refresh failed:", err);
     }
@@ -70,45 +69,45 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData();
   }, [currentUser]);
 
+  // FIX 2: Approve directly via Supabase
   const approveInstalment = async (transaction: any, status: 'Approved' | 'Rejected') => {
     try {
-      // Direct Supabase Update for Approval
       const { error } = await supabase
         .from('transactions')
         .update({ status: status })
         .eq('id', transaction.id);
 
-      if (!error) {
-        const memberObj = members.find(m => String(m.id) === String(transaction.member_id));
-        const targetEmail = memberObj?.email || transaction.member_email;
+      if (error) throw error;
 
-        if (targetEmail) {
-          await emailjs.send(
-            'service_b8gcj9p',
-            'template_vi2p4ul',
-            {
-              member_name: memberObj?.full_name || "Member",
-              member_email: targetEmail,
-              amount: transaction.amount,
-              month: transaction.month,
-              status: status
-            },
-            'nKSxYmGpgjuB2J4tF'
-          );
+      const memberObj = members.find(m => String(m.id) === String(transaction.member_id));
+      const targetEmail = memberObj?.email || transaction.member_email;
 
-          // Cleanup storage
-          const pathToDelete = transaction.proof_path;
-          if (pathToDelete) {
-             await supabase.storage.from('payments').remove([pathToDelete]);
-          }
+      if (targetEmail && status === 'Approved') {
+        await emailjs.send(
+          'service_b8gcj9p',
+          'template_vi2p4ul',
+          {
+            member_name: memberObj?.full_name || "Member",
+            member_email: targetEmail,
+            amount: transaction.amount,
+            month: transaction.month,
+            status: status
+          },
+          'nKSxYmGpgjuB2J4tF'
+        );
+
+        const pathToDelete = transaction.proof_path;
+        if (pathToDelete) {
+           await supabase.storage.from('payments').remove([pathToDelete]);
         }
-        await refreshData();
       }
+      await refreshData();
     } catch (err) {
-      console.error("Workflow failed:", err);
+      console.error("Approval failed:", err);
     }
   };
 
+  // FIX 3: Submit directly via Supabase
   const submitInstalment = async (amount: number, file: File, month: string) => {
     try {
       if (!currentUser) throw new Error("No user logged in");
@@ -116,13 +115,11 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const fileExt = file.name.split('.').pop();
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`;
       
-      // 1. Upload to Storage
       const { error: uploadError } = await supabase.storage.from('payments').upload(fileName, file);
       if (uploadError) throw uploadError;
       
       const { data: urlData } = supabase.storage.from('payments').getPublicUrl(fileName);
 
-      // 2. Insert into Supabase table
       const { error: dbError } = await supabase
         .from('transactions')
         .insert([{
@@ -133,15 +130,16 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           payment_proof_url: urlData.publicUrl, 
           proof_path: fileName,      
           month: month,                   
-          status: 'Pending'
+          status: 'Pending',
+          created_at: new Date().toISOString()
         }]);
 
       if (dbError) throw dbError;
 
+      alert("Submission Successful!");
       await refreshData();
-      alert("Payment submitted successfully for approval!");
     } catch (err: any) { 
-      alert("Submission Error: " + err.message);
+      alert("Error: " + err.message);
       throw err; 
     }
   };
@@ -180,11 +178,9 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: any) => { 
     try {
       const { error } = await supabase.from('members').insert([userData]);
-      if (!error) {
-        await refreshData();
-        return true;
-      }
-      return false;
+      if (error) throw error;
+      await refreshData();
+      return true;
     } catch (err) { return false; }
   };
 

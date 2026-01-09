@@ -54,12 +54,17 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = async () => {
     try {
+      // Direct Supabase fetch to avoid 404 errors on Vercel
       const [membersRes, transRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/members`).catch(() => ({ data: [] })),
-        axios.get(`${API_BASE_URL}/transactions`).catch(() => ({ data: [] }))
+        supabase.from('members').select('*'),
+        supabase.from('transactions').select('*').order('created_at', { ascending: false })
       ]);
-      setMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
-      setTransactions(Array.isArray(transRes.data) ? transRes.data : []);
+
+      if (membersRes.error) throw membersRes.error;
+      if (transRes.error) throw transRes.error;
+
+      setMembers(membersRes.data || []);
+      setTransactions(transRes.data || []);
     } catch (err) {
       console.error("Data refresh failed:", err);
     }
@@ -71,6 +76,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const approveInstalment = async (transaction: any, status: 'Approved' | 'Rejected') => {
     try {
+      // Logic for admin approval
       const res = await axios.post(`${API_BASE_URL}/approve-instalment`, { 
         id: transaction.id, 
         status: status 
@@ -81,6 +87,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         const targetEmail = memberObj?.email || transaction.memberEmail;
 
         if (targetEmail) {
+          // Send Email Confirmation
           await emailjs.send(
             'service_b8gcj9p',
             'template_vi2p4ul',
@@ -94,12 +101,11 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
             'nKSxYmGpgjuB2J4tF'
           );
 
-          await supabase.functions.invoke('payment-notification', {
-            body: { 
-              status: "Cleanup", 
-              proofPath: transaction.proofPath || transaction.payment_proof_url?.split('/').pop()
-            }
-          });
+          // Cleanup: Delete proof from storage after approval/rejection
+          const pathToDelete = transaction.proof_path || transaction.payment_proof_url?.split('/').pop();
+          if (pathToDelete) {
+             await supabase.storage.from('payments').remove([pathToDelete]);
+          }
         }
         await refreshData();
       }
@@ -111,30 +117,42 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const submitInstalment = async (amount: number, file: File, month: string) => {
     try {
       if (!currentUser) throw new Error("No user logged in");
+      
       const fileExt = file.name.split('.').pop();
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`;
+      
+      // 1. Upload to Storage
       const { error: uploadError } = await supabase.storage.from('payments').upload(fileName, file);
       if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from('payments').getPublicUrl(fileName);
+      
+      const { data: urlData } = supabase.storage.from('payments').getPublicUrl(fileName);
 
-      await axios.post(`${API_BASE_URL}/submit-instalment`, {
-        memberId: currentUser.id,      
-        memberName: currentUser.full_name, 
-        society_id: currentUser.society_id, 
-        amount: Number(amount),         
-        proofUrl: data.publicUrl, 
-        proofPath: fileName,      
-        month: month,                   
-        status: 'Pending'               
-      });
+      // 2. Insert directly into Database
+      const { error: dbError } = await supabase
+        .from('transactions')
+        .insert([{
+          member_id: currentUser.id,      
+          member_name: currentUser.full_name, 
+          society_id: currentUser.society_id, 
+          amount: Number(amount),         
+          payment_proof_url: urlData.publicUrl, 
+          proof_path: fileName,      
+          month: month,                   
+          status: 'Pending',
+          created_at: new Date().toISOString()
+        }]);
+
+      if (dbError) throw dbError;
+
       await refreshData();
-    } catch (err) { throw err; }
+    } catch (err: any) { 
+      console.error("Submission failed:", err.message);
+      throw err; 
+    }
   };
 
-  // REVISED LOGIN: Talk directly to Supabase to work on Vercel
   const login = async (email: string, pass: string) => {
     try {
-      // 1. Authenticate with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: pass,
@@ -142,7 +160,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (authError) throw authError;
 
-      // 2. Fetch the member details from your database table
       const { data: memberData, error: dbError } = await supabase
         .from('members')
         .select('*')
@@ -151,7 +168,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (dbError || !memberData) throw new Error("Member profile not found");
 
-      // 3. Set the user session
       setCurrentUser(memberData);
       localStorage.setItem("user", JSON.stringify(memberData));
       return true;
@@ -205,7 +221,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
       const publicUrl = data.publicUrl;
       await updateProfile({ profile_pic: publicUrl });
-      await axios.post(`${API_BASE_URL}/update-profile-pic`, { userId: currentUser.id, profilePic: publicUrl });
       return publicUrl;
     } catch (err: any) { throw err; }
   };

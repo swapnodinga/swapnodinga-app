@@ -54,17 +54,13 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = async () => {
     try {
-      // Direct Supabase fetch to avoid 404 errors on Vercel
-      const [membersRes, transRes] = await Promise.all([
-        supabase.from('members').select('*'),
-        supabase.from('transactions').select('*').order('created_at', { ascending: false })
-      ]);
+      // Fetch directly from Supabase
+      const { data: membersData } = await supabase.from('members').select('*');
+      const { data: transData } = await supabase.from('transactions').select('*').order('created_at', { ascending: false });
 
-      if (membersRes.error) throw membersRes.error;
-      if (transRes.error) throw transRes.error;
-
-      setMembers(membersRes.data || []);
-      setTransactions(transRes.data || []);
+      // Ensure we map the Supabase data correctly so the UI can see it
+      setMembers(membersData || []);
+      setTransactions(transData || []);
     } catch (err) {
       console.error("Data refresh failed:", err);
     }
@@ -76,18 +72,17 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const approveInstalment = async (transaction: any, status: 'Approved' | 'Rejected') => {
     try {
-      // Logic for admin approval
-      const res = await axios.post(`${API_BASE_URL}/approve-instalment`, { 
-        id: transaction.id, 
-        status: status 
-      });
+      // Direct Supabase Update for Approval
+      const { error } = await supabase
+        .from('transactions')
+        .update({ status: status })
+        .eq('id', transaction.id);
 
-      if (res.data.success) {
-        const memberObj = members.find(m => String(m.id) === String(transaction.member_id || transaction.memberId));
-        const targetEmail = memberObj?.email || transaction.memberEmail;
+      if (!error) {
+        const memberObj = members.find(m => String(m.id) === String(transaction.member_id));
+        const targetEmail = memberObj?.email || transaction.member_email;
 
         if (targetEmail) {
-          // Send Email Confirmation
           await emailjs.send(
             'service_b8gcj9p',
             'template_vi2p4ul',
@@ -101,8 +96,8 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
             'nKSxYmGpgjuB2J4tF'
           );
 
-          // Cleanup: Delete proof from storage after approval/rejection
-          const pathToDelete = transaction.proof_path || transaction.payment_proof_url?.split('/').pop();
+          // Cleanup storage
+          const pathToDelete = transaction.proof_path;
           if (pathToDelete) {
              await supabase.storage.from('payments').remove([pathToDelete]);
           }
@@ -127,7 +122,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       
       const { data: urlData } = supabase.storage.from('payments').getPublicUrl(fileName);
 
-      // 2. Insert directly into Database
+      // 2. Insert into Supabase table
       const { error: dbError } = await supabase
         .from('transactions')
         .insert([{
@@ -138,15 +133,15 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           payment_proof_url: urlData.publicUrl, 
           proof_path: fileName,      
           month: month,                   
-          status: 'Pending',
-          created_at: new Date().toISOString()
+          status: 'Pending'
         }]);
 
       if (dbError) throw dbError;
 
       await refreshData();
+      alert("Payment submitted successfully for approval!");
     } catch (err: any) { 
-      console.error("Submission failed:", err.message);
+      alert("Submission Error: " + err.message);
       throw err; 
     }
   };
@@ -172,7 +167,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("user", JSON.stringify(memberData));
       return true;
     } catch (err) { 
-      console.error("Login Error:", err);
       return false; 
     }
   };
@@ -185,10 +179,9 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (userData: any) => { 
     try {
-      const payload = { ...userData, full_name: userData.full_name || userData.name };
-      const res = await axios.post(`${API_BASE_URL}/register`, payload);
-      if (res.data.success) {
-        await refreshData(); 
+      const { error } = await supabase.from('members').insert([userData]);
+      if (!error) {
+        await refreshData();
         return true;
       }
       return false;
@@ -196,12 +189,12 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   };
 
   const approveMember = async (id: string) => { 
-    await axios.post(`${API_BASE_URL}/approve-member`, { id }); 
+    await supabase.from('members').update({ is_active: true }).eq('id', id);
     await refreshData(); 
   };
 
   const deleteMember = async (id: string) => { 
-    await axios.delete(`${API_BASE_URL}/members/${id}`); 
+    await supabase.from('members').delete().eq('id', id);
     await refreshData(); 
   };
 

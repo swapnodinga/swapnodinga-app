@@ -49,30 +49,34 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   }, [transactions]);
 
-  // FIX 1: Fetch directly from Supabase tables (Bypass /api)
+  // FIX: Fetch Data Directly from Supabase
   const refreshData = async () => {
     try {
+      // Fetch Members
       const { data: mData, error: mErr } = await supabase.from('members').select('*');
+      if (mErr) throw mErr;
+
+      // Fetch Transactions
       const { data: tData, error: tErr } = await supabase
         .from('transactions')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (mErr) throw mErr;
       if (tErr) throw tErr;
 
       setMembers(mData || []);
       setTransactions(tData || []);
-    } catch (err) {
-      console.error("Data refresh failed:", err);
+    } catch (err: any) {
+      console.error("Data refresh failed:", err.message);
     }
   };
 
+  // Auto-refresh when user logs in
   useEffect(() => {
     if (currentUser) refreshData();
   }, [currentUser]);
 
-  // FIX 2: Approve directly via Supabase Update
+  // FIX: Approve/Reject Directly via Supabase
   const approveInstalment = async (transaction: any, status: 'Approved' | 'Rejected') => {
     try {
       const { error } = await supabase
@@ -99,31 +103,38 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           'nKSxYmGpgjuB2J4tF'
         );
 
+        // Delete proof from storage to save space
         if (transaction.proof_path) {
            await supabase.storage.from('payments').remove([transaction.proof_path]);
         }
       }
       await refreshData();
-    } catch (err) {
-      console.error("Approval failed:", err);
+    } catch (err: any) {
+      alert("Approval Failed: " + err.message);
     }
   };
 
-  // FIX 3: Submit directly via Supabase Insert (This fixes the button)
+  // FIX: Submit Payment Directly via Supabase
   const submitInstalment = async (amount: number, file: File, month: string) => {
     try {
-      if (!currentUser) throw new Error("No user session found. Please re-login.");
+      if (!currentUser) {
+        alert("You are not logged in. Please reload the page.");
+        return;
+      }
       
       const fileExt = file.name.split('.').pop();
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`;
       
-      // 1. Upload to Supabase Storage
+      // 1. Upload Image
       const { error: uploadError } = await supabase.storage.from('payments').upload(fileName, file);
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        alert("Image Upload Failed: " + uploadError.message);
+        throw uploadError;
+      }
       
       const { data: urlData } = supabase.storage.from('payments').getPublicUrl(fileName);
 
-      // 2. Insert into Transactions Table
+      // 2. Save Data to Database
       const { error: dbError } = await supabase
         .from('transactions')
         .insert([{
@@ -138,12 +149,14 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           created_at: new Date().toISOString()
         }]);
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        alert("Database Error: " + dbError.message);
+        throw dbError;
+      }
 
-      alert("Submission Successful! Your payment is pending approval.");
+      alert("Payment Submitted Successfully!");
       await refreshData();
-    } catch (err: any) { 
-      alert("Submission Error: " + err.message);
+    } catch (err) { 
       console.error(err);
     }
   };
@@ -179,24 +192,26 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setLocation("/");
   };
 
-  // FIX 4: Direct Registration
   const register = async (userData: any) => { 
     try {
       const { error } = await supabase.from('members').insert([userData]);
-      if (error) throw error;
+      if (error) {
+        alert("Registration Failed: " + error.message);
+        return false;
+      }
       await refreshData();
       return true;
     } catch (err) { return false; }
   };
 
   const approveMember = async (id: string) => { 
-    await supabase.from('members').update({ is_active: true }).eq('id', id);
-    await refreshData(); 
+    const { error } = await supabase.from('members').update({ is_active: true }).eq('id', id);
+    if (!error) await refreshData(); 
   };
 
   const deleteMember = async (id: string) => { 
-    await supabase.from('members').delete().eq('id', id);
-    await refreshData(); 
+    const { error } = await supabase.from('members').delete().eq('id', id);
+    if (!error) await refreshData(); 
   };
 
   const updateProfile = async (data: any) => { 

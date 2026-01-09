@@ -71,7 +71,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const approveInstalment = async (transaction: any, status: 'Approved' | 'Rejected') => {
     try {
-      // 1. Update Database Status
       const res = await axios.post(`${API_BASE_URL}/approve-instalment`, { 
         id: transaction.id, 
         status: status 
@@ -82,10 +81,9 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         const targetEmail = memberObj?.email || transaction.memberEmail;
 
         if (targetEmail) {
-          // 2. Send Email via EmailJS
           await emailjs.send(
-            'service_b8gcj9p', // Your Service ID from screenshot
-            'template_vi2p4ul', // Create a new template for payments
+            'service_b8gcj9p',
+            'template_vi2p4ul',
             {
               member_name: memberObj?.full_name || "Member",
               member_email: targetEmail,
@@ -93,10 +91,9 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
               month: transaction.month,
               status: status
             },
-            'nKSxYmGpgjuB2J4tF' // Your Public Key from screenshot
+            'nKSxYmGpgjuB2J4tF'
           );
 
-          // 3. Trigger storage cleanup in Supabase (deletes the image to save space)
           await supabase.functions.invoke('payment-notification', {
             body: { 
               status: "Cleanup", 
@@ -134,16 +131,34 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     } catch (err) { throw err; }
   };
 
+  // REVISED LOGIN: Talk directly to Supabase to work on Vercel
   const login = async (email: string, pass: string) => {
     try {
-      const res = await axios.post(`${API_BASE_URL}/login`, { email: email.trim(), password: pass });
-      if (res.data.success) {
-        setCurrentUser(res.data.user);
-        localStorage.setItem("user", JSON.stringify(res.data.user));
-        return true;
-      }
-      return false;
-    } catch (err) { return false; }
+      // 1. Authenticate with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: pass,
+      });
+
+      if (authError) throw authError;
+
+      // 2. Fetch the member details from your database table
+      const { data: memberData, error: dbError } = await supabase
+        .from('members')
+        .select('*')
+        .eq('email', email.trim())
+        .single();
+
+      if (dbError || !memberData) throw new Error("Member profile not found");
+
+      // 3. Set the user session
+      setCurrentUser(memberData);
+      localStorage.setItem("user", JSON.stringify(memberData));
+      return true;
+    } catch (err) { 
+      console.error("Login Error:", err);
+      return false; 
+    }
   };
 
   const logout = () => {

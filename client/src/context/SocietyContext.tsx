@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabase"; 
 import emailjs from '@emailjs/browser';
 
+// We no longer need axios or API_BASE_URL for the core functions to work on Vercel
 interface SocietyContextType {
   currentUser: any;
   members: any[];
@@ -49,19 +50,17 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   }, [transactions]);
 
-  // FIX: Fetching directly from Cloud Database (Supabase)
+  // REVISED: Fetching directly from Supabase instead of Axios
   const refreshData = async () => {
     try {
-      const { data: mData, error: mErr } = await supabase.from('members').select('*');
-      const { data: tData, error: tErr } = await supabase
+      const { data: membersData } = await supabase.from('members').select('*');
+      const { data: transData } = await supabase
         .from('transactions')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (mErr || tErr) throw (mErr || tErr);
-
-      setMembers(mData || []);
-      setTransactions(tData || []);
+      setMembers(membersData || []);
+      setTransactions(transData || []);
     } catch (err) {
       console.error("Data refresh failed:", err);
     }
@@ -71,20 +70,21 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData();
   }, [currentUser]);
 
-  // FIX: Admin Approval logic without needing a local backend
+  // REVISED: Direct Supabase Update for Admin Approval
   const approveInstalment = async (transaction: any, status: 'Approved' | 'Rejected') => {
     try {
-      const { error } = await supabase
+      const { error: dbError } = await supabase
         .from('transactions')
         .update({ status: status })
         .eq('id', transaction.id);
 
-      if (error) throw error;
+      if (dbError) throw dbError;
 
       const memberObj = members.find(m => String(m.id) === String(transaction.member_id));
       const targetEmail = memberObj?.email || transaction.member_email;
 
       if (targetEmail) {
+        // Send Email
         await emailjs.send(
           'service_b8gcj9p',
           'template_vi2p4ul',
@@ -98,32 +98,33 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           'nKSxYmGpgjuB2J4tF'
         );
 
-        // Cleanup storage after approval
-        if (transaction.proof_path) {
-           await supabase.storage.from('payments').remove([transaction.proof_path]);
+        // Cleanup Storage Proof
+        const proofPath = transaction.proof_path || transaction.payment_proof_url?.split('/').pop();
+        if (proofPath) {
+          await supabase.storage.from('payments').remove([proofPath]);
         }
       }
       await refreshData();
     } catch (err) {
-      console.error("Approval workflow failed:", err);
+      console.error("Workflow failed:", err);
     }
   };
 
-  // FIX: Member Submit logic talking directly to Cloud Storage and DB
+  // REVISED: Direct Supabase Insert for Member Submission
   const submitInstalment = async (amount: number, file: File, month: string) => {
     try {
-      if (!currentUser) throw new Error("Please log in again.");
+      if (!currentUser) throw new Error("No user logged in");
       
       const fileExt = file.name.split('.').pop();
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`;
       
-      // 1. Upload to cloud bucket (Supabase Storage)
+      // 1. Upload to Storage
       const { error: uploadError } = await supabase.storage.from('payments').upload(fileName, file);
       if (uploadError) throw uploadError;
       
       const { data: urlData } = supabase.storage.from('payments').getPublicUrl(fileName);
 
-      // 2. Insert record into cloud table (Supabase Database)
+      // 2. Insert record directly into Database table
       const { error: dbError } = await supabase
         .from('transactions')
         .insert([{
@@ -140,11 +141,10 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (dbError) throw dbError;
 
-      alert("Submission Successful! Record added as Pending.");
+      alert("Payment submitted successfully for admin approval!");
       await refreshData();
     } catch (err: any) { 
-      alert("Error: " + err.message);
-      console.error(err);
+      alert("Submission Error: " + err.message);
     }
   };
 
@@ -157,17 +157,18 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (authError) throw authError;
 
-      const { data: memberData, error: dbError } = await supabase
+      const { data: memberData } = await supabase
         .from('members')
         .select('*')
         .eq('email', email.trim())
         .single();
 
-      if (dbError || !memberData) throw new Error("Profile not found");
-
-      setCurrentUser(memberData);
-      localStorage.setItem("user", JSON.stringify(memberData));
-      return true;
+      if (memberData) {
+        setCurrentUser(memberData);
+        localStorage.setItem("user", JSON.stringify(memberData));
+        return true;
+      }
+      return false;
     } catch (err) { 
       return false; 
     }
@@ -206,15 +207,14 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const uploadProfilePic = async (file: File): Promise<string> => {
     try {
-      if (!currentUser) throw new Error("Login required");
+      if (!currentUser) throw new Error("No user logged in");
       const fileExt = file.name.split('.').pop();
       const fileName = `${currentUser.id}-${Date.now()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file);
       if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
-      const publicUrl = data.publicUrl;
-      await updateProfile({ profile_pic: publicUrl });
-      return publicUrl;
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
+      await updateProfile({ profile_pic: urlData.publicUrl });
+      return urlData.publicUrl;
     } catch (err: any) { throw err; }
   };
 

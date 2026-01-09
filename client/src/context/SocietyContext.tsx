@@ -49,7 +49,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   }, [transactions]);
 
-  // FIXED: Fetching directly from Supabase tables
+  // FIX 1: Fetch directly from Supabase tables (Bypass /api)
   const refreshData = async () => {
     try {
       const { data: mData, error: mErr } = await supabase.from('members').select('*');
@@ -72,7 +72,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData();
   }, [currentUser]);
 
-  // FIXED: Direct Supabase Update
+  // FIX 2: Approve directly via Supabase Update
   const approveInstalment = async (transaction: any, status: 'Approved' | 'Rejected') => {
     try {
       const { error } = await supabase
@@ -109,21 +109,21 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // FIXED: Direct Submission to Supabase
+  // FIX 3: Submit directly via Supabase Insert (This fixes the button)
   const submitInstalment = async (amount: number, file: File, month: string) => {
     try {
-      if (!currentUser) throw new Error("No user logged in. Please refresh.");
+      if (!currentUser) throw new Error("No user session found. Please re-login.");
       
       const fileExt = file.name.split('.').pop();
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`;
       
-      // 1. Storage Upload
+      // 1. Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage.from('payments').upload(fileName, file);
       if (uploadError) throw uploadError;
       
       const { data: urlData } = supabase.storage.from('payments').getPublicUrl(fileName);
 
-      // 2. Database Insert
+      // 2. Insert into Transactions Table
       const { error: dbError } = await supabase
         .from('transactions')
         .insert([{
@@ -140,10 +140,10 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (dbError) throw dbError;
 
-      alert("Submission Successful! Wait for Admin approval.");
+      alert("Submission Successful! Your payment is pending approval.");
       await refreshData();
     } catch (err: any) { 
-      alert("Error during submission: " + err.message);
+      alert("Submission Error: " + err.message);
       console.error(err);
     }
   };
@@ -179,7 +179,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setLocation("/");
   };
 
-  // FIXED: Direct Registration
+  // FIX 4: Direct Registration
   const register = async (userData: any) => { 
     try {
       const { error } = await supabase.from('members').insert([userData]);

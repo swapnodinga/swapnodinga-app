@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo } from "
 import axios from "axios";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabase"; 
+import emailjs from '@emailjs/browser';
 
 const API_BASE_URL = "/api";
 
@@ -10,8 +11,6 @@ interface SocietyContextType {
   members: any[];
   transactions: any[];
   societyTotalFund: number;
-  societyFixedDeposit: number;
-  societyDepositInterest: number;
   isLoading: boolean;
   login: (email: string, pass: string) => Promise<boolean>;
   register: (userData: any) => Promise<boolean>;
@@ -33,9 +32,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [, setLocation] = useLocation();
-
-  const [societyFixedDeposit] = useState(250000); 
-  const [societyDepositInterest] = useState(12500);
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
@@ -75,34 +71,43 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const approveInstalment = async (transaction: any, status: 'Approved' | 'Rejected') => {
     try {
+      // 1. Update Database Status
       const res = await axios.post(`${API_BASE_URL}/approve-instalment`, { 
         id: transaction.id, 
         status: status 
       });
 
       if (res.data.success) {
-        const memberObj = members.find(m => 
-          String(m.id) === String(transaction.member_id || transaction.memberId)
-        );
-        
+        const memberObj = members.find(m => String(m.id) === String(transaction.member_id || transaction.memberId));
         const targetEmail = memberObj?.email || transaction.memberEmail;
 
         if (targetEmail) {
-          await supabase.functions.invoke('payment-notification', {
-            body: { 
-              status: status, 
-              memberEmail: targetEmail,
-              proofPath: transaction.proofPath || transaction.payment_proof_url?.split('/').pop(),
+          // 2. Send Email via EmailJS
+          await emailjs.send(
+            'service_b8gcj9p', // Your Service ID from screenshot
+            'template_vi2p4ul', // Create a new template for payments
+            {
+              member_name: memberObj?.full_name || "Member",
+              member_email: targetEmail,
               amount: transaction.amount,
               month: transaction.month,
-              memberName: memberObj?.full_name || transaction.memberName || "Member"
+              status: status
+            },
+            'nKSxYmGpgjuB2J4tF' // Your Public Key from screenshot
+          );
+
+          // 3. Trigger storage cleanup in Supabase (deletes the image to save space)
+          await supabase.functions.invoke('payment-notification', {
+            body: { 
+              status: "Cleanup", 
+              proofPath: transaction.proofPath || transaction.payment_proof_url?.split('/').pop()
             }
           });
         }
         await refreshData();
       }
     } catch (err) {
-      console.error("Action failed:", err);
+      console.error("Workflow failed:", err);
     }
   };
 
@@ -111,10 +116,8 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       if (!currentUser) throw new Error("No user logged in");
       const fileExt = file.name.split('.').pop();
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`;
-      
       const { error: uploadError } = await supabase.storage.from('payments').upload(fileName, file);
       if (uploadError) throw uploadError;
-      
       const { data } = supabase.storage.from('payments').getPublicUrl(fileName);
 
       await axios.post(`${API_BASE_URL}/submit-instalment`, {
@@ -128,9 +131,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         status: 'Pending'               
       });
       await refreshData();
-    } catch (err) {
-      throw err;
-    }
+    } catch (err) { throw err; }
   };
 
   const login = async (email: string, pass: string) => {
@@ -196,7 +197,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <SocietyContext.Provider value={{ 
-      currentUser, members, transactions, societyTotalFund, societyFixedDeposit, societyDepositInterest, isLoading,
+      currentUser, members, transactions, societyTotalFund, isLoading,
       login, register, logout, updateProfile, uploadProfilePic, refreshData,
       approveMember, deleteMember, submitInstalment, approveInstalment 
     }}>

@@ -49,14 +49,16 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   }, [transactions]);
 
-  // REPLACEMENT: Fetching directly from Cloud Database (Supabase)
+  // FIX: Fetching directly from Cloud Database (Supabase)
   const refreshData = async () => {
     try {
-      const { data: mData } = await supabase.from('members').select('*');
-      const { data: tData } = await supabase
+      const { data: mData, error: mErr } = await supabase.from('members').select('*');
+      const { data: tData, error: tErr } = await supabase
         .from('transactions')
         .select('*')
         .order('created_at', { ascending: false });
+
+      if (mErr || tErr) throw (mErr || tErr);
 
       setMembers(mData || []);
       setTransactions(tData || []);
@@ -69,7 +71,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData();
   }, [currentUser]);
 
-  // REPLACEMENT: Admin Approval logic without needing a local backend
+  // FIX: Admin Approval logic without needing a local backend
   const approveInstalment = async (transaction: any, status: 'Approved' | 'Rejected') => {
     try {
       const { error } = await supabase
@@ -96,7 +98,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           'nKSxYmGpgjuB2J4tF'
         );
 
-        // Delete proof from Supabase Bucket after workflow completes
+        // Cleanup storage after approval
         if (transaction.proof_path) {
            await supabase.storage.from('payments').remove([transaction.proof_path]);
         }
@@ -107,7 +109,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // REPLACEMENT: Member Submit logic talking directly to Supabase
+  // FIX: Member Submit logic talking directly to Cloud Storage and DB
   const submitInstalment = async (amount: number, file: File, month: string) => {
     try {
       if (!currentUser) throw new Error("Please log in again.");
@@ -115,13 +117,13 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const fileExt = file.name.split('.').pop();
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`;
       
-      // 1. Upload to cloud bucket
+      // 1. Upload to cloud bucket (Supabase Storage)
       const { error: uploadError } = await supabase.storage.from('payments').upload(fileName, file);
       if (uploadError) throw uploadError;
       
       const { data: urlData } = supabase.storage.from('payments').getPublicUrl(fileName);
 
-      // 2. Insert into cloud table
+      // 2. Insert record into cloud table (Supabase Database)
       const { error: dbError } = await supabase
         .from('transactions')
         .insert([{
@@ -138,10 +140,11 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (dbError) throw dbError;
 
-      alert("Successfully submitted for Admin approval!");
+      alert("Submission Successful! Record added as Pending.");
       await refreshData();
     } catch (err: any) { 
       alert("Error: " + err.message);
+      console.error(err);
     }
   };
 

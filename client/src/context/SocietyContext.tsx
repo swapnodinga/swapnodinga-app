@@ -49,34 +49,27 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   }, [transactions]);
 
-  // FIX: Fetch Data Directly from Supabase
+  // REPLACEMENT: Fetching directly from Cloud Database (Supabase)
   const refreshData = async () => {
     try {
-      // Fetch Members
-      const { data: mData, error: mErr } = await supabase.from('members').select('*');
-      if (mErr) throw mErr;
-
-      // Fetch Transactions
-      const { data: tData, error: tErr } = await supabase
+      const { data: mData } = await supabase.from('members').select('*');
+      const { data: tData } = await supabase
         .from('transactions')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (tErr) throw tErr;
-
       setMembers(mData || []);
       setTransactions(tData || []);
-    } catch (err: any) {
-      console.error("Data refresh failed:", err.message);
+    } catch (err) {
+      console.error("Data refresh failed:", err);
     }
   };
 
-  // Auto-refresh when user logs in
   useEffect(() => {
     if (currentUser) refreshData();
   }, [currentUser]);
 
-  // FIX: Approve/Reject Directly via Supabase
+  // REPLACEMENT: Admin Approval logic without needing a local backend
   const approveInstalment = async (transaction: any, status: 'Approved' | 'Rejected') => {
     try {
       const { error } = await supabase
@@ -89,7 +82,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const memberObj = members.find(m => String(m.id) === String(transaction.member_id));
       const targetEmail = memberObj?.email || transaction.member_email;
 
-      if (targetEmail && status === 'Approved') {
+      if (targetEmail) {
         await emailjs.send(
           'service_b8gcj9p',
           'template_vi2p4ul',
@@ -103,38 +96,32 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           'nKSxYmGpgjuB2J4tF'
         );
 
-        // Delete proof from storage to save space
+        // Delete proof from Supabase Bucket after workflow completes
         if (transaction.proof_path) {
            await supabase.storage.from('payments').remove([transaction.proof_path]);
         }
       }
       await refreshData();
-    } catch (err: any) {
-      alert("Approval Failed: " + err.message);
+    } catch (err) {
+      console.error("Approval workflow failed:", err);
     }
   };
 
-  // FIX: Submit Payment Directly via Supabase
+  // REPLACEMENT: Member Submit logic talking directly to Supabase
   const submitInstalment = async (amount: number, file: File, month: string) => {
     try {
-      if (!currentUser) {
-        alert("You are not logged in. Please reload the page.");
-        return;
-      }
+      if (!currentUser) throw new Error("Please log in again.");
       
       const fileExt = file.name.split('.').pop();
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`;
       
-      // 1. Upload Image
+      // 1. Upload to cloud bucket
       const { error: uploadError } = await supabase.storage.from('payments').upload(fileName, file);
-      if (uploadError) {
-        alert("Image Upload Failed: " + uploadError.message);
-        throw uploadError;
-      }
+      if (uploadError) throw uploadError;
       
       const { data: urlData } = supabase.storage.from('payments').getPublicUrl(fileName);
 
-      // 2. Save Data to Database
+      // 2. Insert into cloud table
       const { error: dbError } = await supabase
         .from('transactions')
         .insert([{
@@ -149,15 +136,12 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           created_at: new Date().toISOString()
         }]);
 
-      if (dbError) {
-        alert("Database Error: " + dbError.message);
-        throw dbError;
-      }
+      if (dbError) throw dbError;
 
-      alert("Payment Submitted Successfully!");
+      alert("Successfully submitted for Admin approval!");
       await refreshData();
-    } catch (err) { 
-      console.error(err);
+    } catch (err: any) { 
+      alert("Error: " + err.message);
     }
   };
 
@@ -176,7 +160,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         .eq('email', email.trim())
         .single();
 
-      if (dbError || !memberData) throw new Error("Member profile not found");
+      if (dbError || !memberData) throw new Error("Profile not found");
 
       setCurrentUser(memberData);
       localStorage.setItem("user", JSON.stringify(memberData));
@@ -195,23 +179,20 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: any) => { 
     try {
       const { error } = await supabase.from('members').insert([userData]);
-      if (error) {
-        alert("Registration Failed: " + error.message);
-        return false;
-      }
+      if (error) throw error;
       await refreshData();
       return true;
     } catch (err) { return false; }
   };
 
   const approveMember = async (id: string) => { 
-    const { error } = await supabase.from('members').update({ is_active: true }).eq('id', id);
-    if (!error) await refreshData(); 
+    await supabase.from('members').update({ is_active: true }).eq('id', id);
+    await refreshData(); 
   };
 
   const deleteMember = async (id: string) => { 
-    const { error } = await supabase.from('members').delete().eq('id', id);
-    if (!error) await refreshData(); 
+    await supabase.from('members').delete().eq('id', id);
+    await refreshData(); 
   };
 
   const updateProfile = async (data: any) => { 
@@ -222,7 +203,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const uploadProfilePic = async (file: File): Promise<string> => {
     try {
-      if (!currentUser) throw new Error("No user logged in");
+      if (!currentUser) throw new Error("Login required");
       const fileExt = file.name.split('.').pop();
       const fileName = `${currentUser.id}-${Date.now()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file);

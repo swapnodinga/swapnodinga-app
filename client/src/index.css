@@ -1,0 +1,54 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* Mapping the HSL variables to Tailwind classes */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  
+  --font-sans: 'Plus Jakarta Sans', sans-serif;
+  --font-serif: 'Playfair Display', serif;
+}
+
+:root {
+  /* Vibrant Green Theme */
+  --background: 40 33% 98%;
+  --foreground: 162 45% 10%;
+  
+  --sidebar: 162 45% 18%; 
+  --sidebar-foreground: 160 20% 98%;
+  --sidebar-primary: 45 90% 45%; 
+  --sidebar-accent: 162 45% 25%; 
+  --sidebar-border: 162 45% 22%;
+  
+  --primary: 162 45% 18%;
+  --primary-foreground: 0 0% 100%;
+  --border: 162 20% 85%;
+  --input: 162 20% 90%;
+  --ring: 162 45% 18%;
+  --radius: 0.75rem;
+}
+
+@layer base {
+  /* Replaced @apply border-border with native CSS to stop the crash */
+  * { 
+    border-color: hsl(var(--border)); 
+  }
+  body { 
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}

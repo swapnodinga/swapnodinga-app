@@ -7,11 +7,11 @@ import { useMobile } from "@/hooks/use-mobile";
 import { 
   LayoutDashboard, Users, ShieldCheck, LogOut, UserCircle,
   ChevronRight, Home, Info, Briefcase, ShieldAlert, Phone,
-  FileText, PiggyBank, TrendingUp, CreditCard, Settings, Menu, X
+  FileText, PiggyBank, TrendingUp, CreditCard, Settings, Menu, X 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Logo import
+// UPDATED LOGO IMPORT
 import logo from "@assets/generated_images/SwapnoDinga_Logo_Update.png";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -28,6 +28,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [currentUser, location, setLocation]);
 
+  // Close mobile sidebar on route change
   useEffect(() => {
     setIsSidebarOpen(false);
   }, [location]);
@@ -59,73 +60,80 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   ];
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-[#1a4d3c] text-white">
       <div className="p-6 flex items-center gap-4 border-b border-white/10">
-        <div className="h-12 w-12 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-xl shrink-0">
-          <img src={logo} alt="Logo" className="w-full h-full object-contain scale-150 transform translate-y-[-2px]" />
+        <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-xl shrink-0">
+          <img 
+            src={logo} 
+            alt="Logo" 
+            className="w-full h-full object-contain scale-150 transform translate-y-[-2px]" 
+          />
         </div>
-        <span className="font-serif font-bold text-xl text-white">Swapnodinga</span>
+        <span className="font-serif font-bold text-2xl tracking-tighter text-white">
+          Swapnodinga
+        </span>
       </div>
       
       <div className="flex-1 overflow-y-auto py-8 px-4">
-        <div className="space-y-8">
+        <nav className="space-y-8">
           {currentUser && (
             <div>
               <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">
                 {currentUser?.is_admin ? "Admin Menu" : "Member Menu"}
               </p>
-              <nav className="space-y-1">
+              <div className="space-y-1">
                 {(currentUser?.is_admin ? adminLinks : memberLinks).map((link) => (
                   <Link key={link.href} href={link.href}>
-                    <a className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] transition-all group",
-                      location === link.href ? "bg-emerald-800 text-white" : "text-white/60 hover:bg-emerald-800/50 hover:text-white"
+                    <a className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] transition-all",
+                      location === link.href ? "bg-emerald-800 text-white font-medium" : "text-white/60 hover:bg-emerald-800/50 hover:text-white"
                     )}>
                       <link.icon size={18} />
                       <span>{link.label}</span>
                     </a>
                   </Link>
                 ))}
-              </nav>
+              </div>
             </div>
           )}
 
           <div>
             <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">Information</p>
-            <nav className="space-y-1">
+            <div className="space-y-1">
               {infoLinks.map((link) => (
                 <Link key={link.href} href={link.href}>
-                  <a className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] transition-all group",
-                    location === link.href ? "bg-emerald-800 text-white" : "text-white/60 hover:bg-emerald-800/50 hover:text-white"
+                  <a className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] transition-all",
+                    location === link.href ? "bg-emerald-800 text-white font-medium" : "text-white/60 hover:bg-emerald-800/50 hover:text-white"
                   )}>
                     <link.icon size={18} />
                     <span>{link.label}</span>
                   </a>
                 </Link>
               ))}
-            </nav>
+            </div>
           </div>
-
+          
           {currentUser && (
             <div>
               <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">Account</p>
-              <nav className="space-y-1">
-                <Link href="/profile">
-                  <a className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] transition-all group",
-                    location === "/profile" ? "bg-emerald-800 text-white" : "text-white/60 hover:bg-emerald-800/50 hover:text-white"
-                  )}>
-                    <UserCircle size={18} />
-                    <span>Profile & Support</span>
-                  </a>
-                </Link>
-              </nav>
+              <Link href="/profile">
+                <a className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] transition-all",
+                  location === "/profile" ? "bg-emerald-800 text-white font-medium" : "text-white/60 hover:bg-emerald-800/50 hover:text-white"
+                )}>
+                  <UserCircle size={18} />
+                  <span>Profile & Support</span>
+                </a>
+              </Link>
             </div>
           )}
-        </div>
+        </nav>
       </div>
 
       {currentUser && (
         <div className="p-6 border-t border-white/10">
-          <Button variant="ghost" className="w-full justify-start text-rose-400 gap-3 hover:bg-rose-900/20" onClick={logout}>
+          <Button variant="ghost" className="w-full justify-start text-rose-400 gap-3" onClick={logout}>
             <LogOut size={18} />
             <span>Sign Out</span>
           </Button>
@@ -136,14 +144,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden relative">
-      <aside className="hidden md:flex flex-col w-64 bg-[#1a4d3c] text-white border-r border-emerald-900/20 shadow-2xl shrink-0">
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex flex-col w-64 shrink-0 shadow-2xl">
         <SidebarContent />
       </aside>
 
+      {/* Mobile Sidebar Overlay */}
       {isMobile && isSidebarOpen && (
         <>
-          <aside className="fixed inset-y-0 left-0 z-50 w-72 bg-[#1a4d3c] text-white animate-in slide-in-from-left duration-300">
-            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(false)} className="absolute top-4 right-4 text-white">
+          <aside className="fixed inset-y-0 left-0 z-50 w-72 shadow-2xl animate-in slide-in-from-left duration-300">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setIsSidebarOpen(false)} 
+              className="absolute top-4 right-4 text-white z-50"
+            >
               <X size={24} />
             </Button>
             <SidebarContent />
@@ -152,19 +167,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </>
       )}
 
+      {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50">
         <header className="h-16 bg-white border-b flex items-center px-4 md:px-8 justify-between shrink-0 shadow-sm">
           <div className="flex items-center gap-3">
-            {isMobile && <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}><Menu size={24} /></Button>}
+            {isMobile && (
+              <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}>
+                <Menu size={24} />
+              </Button>
+            )}
             <nav className="flex items-center text-[13px] text-slate-400">
               <Home size={14} className="mr-2" />
               <Link href={currentUser ? (currentUser.is_admin ? "/admin" : "/dashboard") : "/"}>
-                <a className="hover:text-emerald-700">{currentUser ? (currentUser.is_admin ? "Admin" : "Home") : "Society"}</a>
+                <a className="hover:text-emerald-700">{currentUser ? (currentUser.is_admin ? "Admin" : "Home") : "Society Website"}</a>
               </Link>
               {location.split('/').filter(Boolean).map((part, i) => (part !== 'admin' && part !== 'dashboard') && (
                 <React.Fragment key={i}>
                   <ChevronRight size={12} className="mx-2 opacity-30" />
-                  <span className="capitalize font-medium text-slate-900 truncate max-w-[100px] md:max-w-none">{part.replace(/-/g, ' ')}</span>
+                  <span className="capitalize font-medium text-slate-900">{part.replace(/-/g, ' ')}</span>
                 </React.Fragment>
               ))}
             </nav>
@@ -173,9 +193,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-2">
               <div className="text-right hidden sm:block">
                 <p className="text-xs font-bold text-slate-900 leading-none">{currentUser.full_name}</p>
-                <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{currentUser.is_admin ? "Admin" : "Member"}</p>
+                <p className="text-[10px] text-slate-400 uppercase">{currentUser.is_admin ? "Admin" : "Member"}</p>
               </div>
-              <div className="w-8 h-8 rounded-full overflow-hidden border bg-slate-100 shrink-0">
+              <div className="w-8 h-8 rounded-full overflow-hidden border bg-slate-100">
                 <img src={currentUser.profile_pic || "https://via.placeholder.com/150"} alt="User" className="w-full h-full object-cover" />
               </div>
             </div>

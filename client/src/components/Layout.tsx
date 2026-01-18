@@ -68,13 +68,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </div>
       
       <div className="flex-1 overflow-y-auto py-8 px-4">
-        <nav className="space-y-8">
+        <div className="space-y-8">
           {currentUser && (
             <div>
               <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">
                 {currentUser?.is_admin ? "Admin Menu" : "Member Menu"}
               </p>
-              <div className="space-y-1">
+              <nav className="space-y-1">
                 {(currentUser?.is_admin ? adminLinks : memberLinks).map((link) => (
                   <Link key={link.href} href={link.href}>
                     <a className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] transition-all group",
@@ -85,13 +85,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </a>
                   </Link>
                 ))}
-              </div>
+              </nav>
             </div>
           )}
 
           <div>
             <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">Information</p>
-            <div className="space-y-1">
+            <nav className="space-y-1">
               {infoLinks.map((link) => (
                 <Link key={link.href} href={link.href}>
                   <a className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] transition-all group",
@@ -102,14 +102,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </a>
                 </Link>
               ))}
-            </div>
+            </nav>
           </div>
-        </nav>
+
+          {currentUser && (
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">Account</p>
+              <nav className="space-y-1">
+                <Link href="/profile">
+                  <a className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] transition-all group",
+                    location === "/profile" ? "bg-emerald-800 text-white" : "text-white/60 hover:bg-emerald-800/50 hover:text-white"
+                  )}>
+                    <UserCircle size={18} />
+                    <span>Profile & Support</span>
+                  </a>
+                </Link>
+              </nav>
+            </div>
+          )}
+        </div>
       </div>
 
       {currentUser && (
         <div className="p-6 border-t border-white/10">
-          <Button variant="ghost" className="w-full justify-start text-rose-400 gap-3" onClick={logout}>
+          <Button variant="ghost" className="w-full justify-start text-rose-400 gap-3 hover:bg-rose-900/20" onClick={logout}>
             <LogOut size={18} />
             <span>Sign Out</span>
           </Button>
@@ -126,29 +142,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {isMobile && isSidebarOpen && (
         <>
-          <aside className="fixed inset-y-0 left-0 z-50 w-72 bg-[#1a4d3c] text-white">
+          <aside className="fixed inset-y-0 left-0 z-50 w-72 bg-[#1a4d3c] text-white animate-in slide-in-from-left duration-300">
             <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(false)} className="absolute top-4 right-4 text-white">
               <X size={24} />
             </Button>
             <SidebarContent />
           </aside>
-          <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setIsSidebarOpen(false)} />
+          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)} />
         </>
       )}
 
       <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50">
-        <header className="h-16 bg-white border-b flex items-center px-4 md:px-8 justify-between shrink-0">
+        <header className="h-16 bg-white border-b flex items-center px-4 md:px-8 justify-between shrink-0 shadow-sm">
           <div className="flex items-center gap-3">
             {isMobile && <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}><Menu size={24} /></Button>}
             <nav className="flex items-center text-[13px] text-slate-400">
               <Home size={14} className="mr-2" />
               <Link href={currentUser ? (currentUser.is_admin ? "/admin" : "/dashboard") : "/"}>
-                {currentUser ? (currentUser.is_admin ? "Admin" : "Home") : "Society"}
+                <a className="hover:text-emerald-700">{currentUser ? (currentUser.is_admin ? "Admin" : "Home") : "Society"}</a>
               </Link>
               {location.split('/').filter(Boolean).map((part, i) => (part !== 'admin' && part !== 'dashboard') && (
                 <React.Fragment key={i}>
                   <ChevronRight size={12} className="mx-2 opacity-30" />
-                  <span className="capitalize font-medium text-slate-900 truncate">{part.replace(/-/g, ' ')}</span>
+                  <span className="capitalize font-medium text-slate-900 truncate max-w-[100px] md:max-w-none">{part.replace(/-/g, ' ')}</span>
                 </React.Fragment>
               ))}
             </nav>
@@ -156,10 +172,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {currentUser && (
             <div className="flex items-center gap-2">
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-slate-900">{currentUser.full_name}</p>
-                <p className="text-[10px] text-slate-400 uppercase">{currentUser.is_admin ? "Admin" : "Member"}</p>
+                <p className="text-xs font-bold text-slate-900 leading-none">{currentUser.full_name}</p>
+                <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{currentUser.is_admin ? "Admin" : "Member"}</p>
               </div>
-              <div className="w-8 h-8 rounded-full overflow-hidden border bg-slate-100">
+              <div className="w-8 h-8 rounded-full overflow-hidden border bg-slate-100 shrink-0">
                 <img src={currentUser.profile_pic || "https://via.placeholder.com/150"} alt="User" className="w-full h-full object-cover" />
               </div>
             </div>

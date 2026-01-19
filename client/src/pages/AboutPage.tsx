@@ -1,13 +1,12 @@
 "use client"
 import { useState, useEffect } from "react";
-import { Link } from "wouter"; // Import Link for navigation
+import { Link } from "wouter"; 
 import { supabase } from "@/lib/supabase";
 import { 
   Loader2, Sparkles, Eye, Target, 
   ShieldCheck, TrendingUp, HeartHandshake,
   Users, Award, Building2, Landmark
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 export default function AboutPage() {
   const [committee, setCommittee] = useState<any[]>([]);
@@ -174,23 +173,23 @@ export default function AboutPage() {
         </section>
       </div>
 
-      {/* 6. CALL TO ACTION - REVISED WITH NAVIGATION */}
+      {/* 6. CALL TO ACTION - UPDATED NAVIGATION */}
       <section className="bg-slate-50 py-24 px-6">
         <div className="max-w-4xl mx-auto text-center space-y-8 bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm">
-          <h2 className="text-3xl md:text-5xl font-serif font-bold text-slate-900">Ready to Join Our Community?</h2>
+          <h2 className="text-3xl md:text-5xl font-serif font-bold text-slate-900 leading-tight">Ready to Join Our Community?</h2>
           <p className="text-slate-500 text-lg">Experience the power of cooperative living and secure your financial future today.</p>
           
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            {/* BECOME A MEMBER: Opens Contact page with Join form trigger */}
-            <Link href="/contact?join=true">
-              <button className="w-full sm:w-auto px-10 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 active:scale-95">
+            {/* BECOME A MEMBER: Links to Landing Page with tab query to show Join Society Form */}
+            <Link href="/?tab=join">
+              <button className="w-full sm:w-auto px-10 py-4 bg-[#00985c] text-white rounded-2xl font-bold hover:bg-[#007a4a] transition-all shadow-lg shadow-emerald-600/20 active:scale-95">
                 Become a Member
               </button>
             </Link>
 
             {/* CONTACT SUPPORT: Opens standard Contact page */}
             <Link href="/contact">
-              <button className="w-full sm:w-auto px-10 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95">
+              <button className="w-full sm:w-auto px-10 py-4 bg-[#111827] text-white rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95">
                 Contact Support
               </button>
             </Link>

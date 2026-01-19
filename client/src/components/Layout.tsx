@@ -5,9 +5,9 @@ import { useSociety } from "@/context/SocietyContext";
 import { cn } from "@/lib/utils";
 import { useMobile } from "@/hooks/use-mobile";
 import { 
-  LayoutDashboard, Users, ShieldCheck, LogOut, UserCircle,
+  LayoutDashboard, Users, ShieldCheck, LogOut, 
   ChevronRight, Home, Info, Briefcase, ShieldAlert, Phone,
-  CreditCard, Menu, X, LogIn
+  CreditCard, Menu, LogIn, FileText, PiggyBank, LineChart, Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -35,10 +35,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
 
+  // Restored full Admin Menu items as per screenshot
   const adminLinks = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/members", label: "Manage Members", icon: Users },
     { href: "/admin/payments", label: "Verify Payments", icon: ShieldCheck },
+    { href: "/admin/reports", label: "Reports", icon: FileText },
+    { href: "/admin/deposits", label: "Fixed Deposits", icon: PiggyBank },
+    { href: "/admin/interests", label: "Interest Records", icon: LineChart },
+    { href: "/admin/settings", label: "Site Settings", icon: Settings },
   ];
 
   const memberLinks = [
@@ -63,21 +68,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </div>
       
       <div className="flex-1 overflow-y-auto py-6 px-4">
-        <nav className="space-y-6">
+        <nav className="space-y-8">
           {currentUser && (
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-3 px-3">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">
                 {currentUser?.is_admin ? "Admin Menu" : "Member Menu"}
               </p>
               <div className="space-y-1">
                 {(currentUser?.is_admin ? adminLinks : memberLinks).map((link) => (
                   <Link key={link.href} href={link.href}>
                     <a className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
-                      location === link.href ? "bg-emerald-800 text-white" : "text-white/60 hover:text-white hover:bg-white/5"
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
+                      location === link.href ? "bg-[#065f46] text-white" : "text-white/70 hover:text-white hover:bg-white/5"
                     )}>
-                      <link.icon size={18} />
-                      <span>{link.label}</span>
+                      <link.icon size={20} className={cn(location === link.href ? "text-white" : "text-white/40")} />
+                      <span className={cn("underline underline-offset-4 font-medium", location !== link.href && "text-white/70")}>
+                        {link.label}
+                      </span>
                     </a>
                   </Link>
                 ))}
@@ -86,30 +93,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           )}
 
           <div>
-            <p className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-3 px-3">Information</p>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">Information</p>
             <div className="space-y-1">
               {infoLinks.map((link) => (
                 <Link key={link.href} href={link.href}>
                   <a className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
-                    location === link.href ? "bg-emerald-800 text-white font-medium" : "text-white/60 hover:text-white hover:bg-white/5"
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
+                    location === link.href ? "bg-[#047857] text-white" : "text-white/70 hover:text-white hover:bg-white/5"
                   )}>
-                    <link.icon size={18} />
-                    <span className={cn(location === link.href && "underline underline-offset-4")}>{link.label}</span>
+                    <link.icon size={20} className={cn(location === link.href ? "text-white" : "text-white/40")} />
+                    <span className="underline underline-offset-4 font-medium">{link.label}</span>
                   </a>
                 </Link>
               ))}
             </div>
           </div>
 
-          {/* NEW ACCOUNT SECTION BASED ON YOUR IMAGE */}
           {currentUser && (
-            <div className="pt-4">
-              <p className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-3 px-3">Account</p>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-white/40 font-bold mb-4 px-3">Account</p>
               <Link href="/profile">
                 <a className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors group",
-                  location === "/profile" ? "bg-emerald-800 text-white" : "text-white/60 hover:text-white hover:bg-white/5"
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
+                  location === "/profile" ? "bg-[#047857] text-white" : "text-white/70 hover:text-white hover:bg-white/5"
                 )}>
                   <div className="w-6 h-6 rounded-full overflow-hidden border border-white/20 shrink-0">
                     <img 
@@ -118,9 +124,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       className="w-full h-full object-cover" 
                     />
                   </div>
-                  <span className={cn("underline underline-offset-4 font-medium", location === "/profile" ? "text-white" : "text-white/80")}>
-                    Profile & Support
-                  </span>
+                  <span className="underline underline-offset-4 font-medium">Profile & Support</span>
                 </a>
               </Link>
             </div>
@@ -132,11 +136,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="p-4 border-t border-white/10">
           <Button 
             variant="ghost" 
-            className="w-full justify-start text-rose-400 gap-3 hover:bg-rose-950/30 hover:text-rose-300" 
+            className="w-full justify-start text-[#fb7185] gap-3 hover:bg-rose-950/30 hover:text-rose-300" 
             onClick={logout}
           >
-            <LogOut size={18} />
-            <span className="font-semibold">Sign Out</span>
+            <LogOut size={20} />
+            <span className="font-bold">Sign Out</span>
           </Button>
         </div>
       )}
@@ -145,7 +149,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden relative">
-      <aside className="hidden md:flex flex-col w-64 shrink-0 shadow-xl border-r">
+      <aside className="hidden md:flex flex-col w-64 shrink-0 shadow-xl border-r border-white/5">
         <SidebarContent />
       </aside>
 
@@ -184,7 +188,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {currentUser ? (
               <div className="flex items-center gap-3 border-l pl-4 ml-2">
                 <div className="text-right hidden sm:block">
-                  <p className="text-xs font-bold text-slate-900 leading-none">{currentUser.full_name}</p>
+                  <p className="text-xs font-bold text-slate-900">{currentUser.full_name}</p>
                   <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{currentUser.is_admin ? "Administrator" : "Member"}</p>
                 </div>
                 <div className="w-8 h-8 rounded-full overflow-hidden border bg-slate-100">
@@ -193,7 +197,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
             ) : (
               <Link href="/">
-                <Button variant="default" className="bg-[#1a4d3c] hover:bg-[#143b2e] gap-2 h-9">
+                <Button variant="default" className="bg-[#1a4d3c] hover:bg-[#143b2e] gap-2 h-9 px-4">
                   <LogIn size={16} />
                   <span>Member Login</span>
                 </Button>

@@ -42,7 +42,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/admin/payments", label: "Verify Payments", icon: ShieldCheck },
     { href: "/admin/reports", label: "Reports", icon: FileText },
     { href: "/admin/deposits", label: "Fixed Deposits", icon: PiggyBank },
-    { href: "/admin/interests", label: "Interest Records", icon: LineChart },
+    { href: "/admin/interest", label: "Interest Records", icon: LineChart },
     { href: "/admin/settings", label: "Site Settings", icon: Settings },
   ];
 

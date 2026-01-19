@@ -7,8 +7,7 @@ import { useMobile } from "@/hooks/use-mobile";
 import { 
   LayoutDashboard, Users, ShieldCheck, LogOut, UserCircle,
   ChevronRight, Home, Info, Briefcase, ShieldAlert, Phone,
-  FileText, PiggyBank, TrendingUp, CreditCard, Settings, Menu, X,
-  LogIn
+  CreditCard, Menu, X, LogIn
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -32,30 +31,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     setIsSidebarOpen(false);
   }, [location]);
 
-  // If on Landing Page, don't show the wrapper layout
   if (location === "/") {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
 
-  // --- REVISED NAVIGATION LINKS ---
   const adminLinks = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/members", label: "Manage Members", icon: Users },
     { href: "/admin/payments", label: "Verify Payments", icon: ShieldCheck },
-    { href: "/profile", label: "My Profile", icon: UserCircle }, // Added Profile for Admin
   ];
 
   const memberLinks = [
     { href: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/contributions", label: "My Payments", icon: CreditCard },
-    { href: "/profile", label: "My Profile", icon: UserCircle }, // Added Profile for Member
   ];
 
   const infoLinks = [
     { href: "/about", label: "About Us", icon: Info },
     { href: "/project", label: "Our Project", icon: Briefcase },
     { href: "/policy", label: "Policy", icon: ShieldAlert },
-    { href: "/contact", label: "Support & Contact", icon: Phone }, // Renamed for clarity as Support
+    { href: "/contact", label: "Contact", icon: Phone },
   ];
 
   const SidebarContent = () => (
@@ -91,29 +86,57 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           )}
 
           <div>
-            <p className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-3 px-3">Information & Support</p>
+            <p className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-3 px-3">Information</p>
             <div className="space-y-1">
               {infoLinks.map((link) => (
                 <Link key={link.href} href={link.href}>
                   <a className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
-                    location === link.href ? "bg-emerald-800 text-white" : "text-white/60 hover:text-white hover:bg-white/5"
+                    location === link.href ? "bg-emerald-800 text-white font-medium" : "text-white/60 hover:text-white hover:bg-white/5"
                   )}>
                     <link.icon size={18} />
-                    <span>{link.label}</span>
+                    <span className={cn(location === link.href && "underline underline-offset-4")}>{link.label}</span>
                   </a>
                 </Link>
               ))}
             </div>
           </div>
+
+          {/* NEW ACCOUNT SECTION BASED ON YOUR IMAGE */}
+          {currentUser && (
+            <div className="pt-4">
+              <p className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-3 px-3">Account</p>
+              <Link href="/profile">
+                <a className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors group",
+                  location === "/profile" ? "bg-emerald-800 text-white" : "text-white/60 hover:text-white hover:bg-white/5"
+                )}>
+                  <div className="w-6 h-6 rounded-full overflow-hidden border border-white/20 shrink-0">
+                    <img 
+                      src={currentUser.profile_pic || "https://via.placeholder.com/150"} 
+                      alt="User" 
+                      className="w-full h-full object-cover" 
+                    />
+                  </div>
+                  <span className={cn("underline underline-offset-4 font-medium", location === "/profile" ? "text-white" : "text-white/80")}>
+                    Profile & Support
+                  </span>
+                </a>
+              </Link>
+            </div>
+          )}
         </nav>
       </div>
 
       {currentUser && (
         <div className="p-4 border-t border-white/10">
-          <Button variant="ghost" className="w-full justify-start text-rose-400 gap-3 hover:bg-rose-950/30 hover:text-rose-300" onClick={logout}>
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-rose-400 gap-3 hover:bg-rose-950/30 hover:text-rose-300" 
+            onClick={logout}
+          >
             <LogOut size={18} />
-            <span>Sign Out</span>
+            <span className="font-semibold">Sign Out</span>
           </Button>
         </div>
       )}
@@ -159,15 +182,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-3">
             {currentUser ? (
-              <Link href="/profile" className="flex items-center gap-3 border-l pl-4 ml-2 cursor-pointer group">
+              <div className="flex items-center gap-3 border-l pl-4 ml-2">
                 <div className="text-right hidden sm:block">
-                  <p className="text-xs font-bold text-slate-900 leading-none group-hover:text-emerald-700">{currentUser.full_name}</p>
+                  <p className="text-xs font-bold text-slate-900 leading-none">{currentUser.full_name}</p>
                   <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{currentUser.is_admin ? "Administrator" : "Member"}</p>
                 </div>
-                <div className="w-8 h-8 rounded-full overflow-hidden border bg-slate-100 group-hover:border-emerald-500 transition-colors">
+                <div className="w-8 h-8 rounded-full overflow-hidden border bg-slate-100">
                   <img src={currentUser.profile_pic || "https://via.placeholder.com/150"} alt="User" className="w-full h-full object-cover" />
                 </div>
-              </Link>
+              </div>
             ) : (
               <Link href="/">
                 <Button variant="default" className="bg-[#1a4d3c] hover:bg-[#143b2e] gap-2 h-9">

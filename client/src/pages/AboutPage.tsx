@@ -1,11 +1,13 @@
 "use client"
 import { useState, useEffect } from "react";
+import { Link } from "wouter"; // Import Link for navigation
 import { supabase } from "@/lib/supabase";
 import { 
   Loader2, Sparkles, Eye, Target, 
   ShieldCheck, TrendingUp, HeartHandshake,
   Users, Award, Building2, Landmark
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function AboutPage() {
   const [committee, setCommittee] = useState<any[]>([]);
@@ -67,7 +69,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* 2. STATS SECTION (Professional Trust Builders) */}
+      {/* 2. STATS SECTION */}
       <div className="max-w-6xl mx-auto px-6 -mt-12 mb-32 relative z-20">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 bg-white p-8 rounded-[2rem] shadow-2xl shadow-emerald-900/5 border border-slate-100">
           {[
@@ -86,7 +88,7 @@ export default function AboutPage() {
       </div>
 
       <div className="max-w-6xl mx-auto p-6 space-y-32 pb-32">
-        {/* 3. VISION & MISSION (Professional Cards) */}
+        {/* 3. VISION & MISSION */}
         <section className="grid md:grid-cols-2 gap-12">
           <div className="bg-slate-900 rounded-[3rem] p-12 text-white space-y-6 relative overflow-hidden group hover:-translate-y-2 transition-transform">
             <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
@@ -115,7 +117,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* 4. CORE VALUES (Professional Grid) */}
+        {/* 4. CORE VALUES */}
         <section className="space-y-16">
           <div className="text-center max-w-2xl mx-auto space-y-4">
             <h2 className="text-4xl font-bold text-slate-900">Our Core Values</h2>
@@ -138,7 +140,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* 5. EXECUTIVE BOARD (Updated Styling) */}
+        {/* 5. EXECUTIVE BOARD */}
         <section className="space-y-16">
           <div className="text-center space-y-4">
             <h2 className="text-4xl font-bold text-slate-900 uppercase tracking-tight">The Executive Board</h2>
@@ -172,18 +174,26 @@ export default function AboutPage() {
         </section>
       </div>
 
-      {/* 6. CALL TO ACTION */}
+      {/* 6. CALL TO ACTION - REVISED WITH NAVIGATION */}
       <section className="bg-slate-50 py-24 px-6">
         <div className="max-w-4xl mx-auto text-center space-y-8 bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm">
           <h2 className="text-3xl md:text-5xl font-serif font-bold text-slate-900">Ready to Join Our Community?</h2>
           <p className="text-slate-500 text-lg">Experience the power of cooperative living and secure your financial future today.</p>
+          
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-             <button className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
-               Become a Member
-             </button>
-             <button className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all">
-               Contact Support
-             </button>
+            {/* BECOME A MEMBER: Opens Contact page with Join form trigger */}
+            <Link href="/contact?join=true">
+              <button className="w-full sm:w-auto px-10 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 active:scale-95">
+                Become a Member
+              </button>
+            </Link>
+
+            {/* CONTACT SUPPORT: Opens standard Contact page */}
+            <Link href="/contact">
+              <button className="w-full sm:w-auto px-10 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95">
+                Contact Support
+              </button>
+            </Link>
           </div>
         </div>
       </section>

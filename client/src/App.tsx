@@ -40,7 +40,6 @@ function Router() {
       <Switch>
         {/* ==========================================
             PUBLIC ROUTES
-            Accessible by everyone
            ========================================== */}
         <Route path="/" component={LandingPage} />
         <Route path="/about" component={AboutPage} />
@@ -51,7 +50,6 @@ function Router() {
         
         {/* ==========================================
             COMMON AUTHENTICATED ROUTES
-            Accessible by any logged-in user
            ========================================== */}
         <Route path="/profile">
           {currentUser ? <ProfilePage /> : <Redirect to="/" />}
@@ -59,33 +57,39 @@ function Router() {
 
         {/* ==========================================
             ADMIN ROUTES
-            Strictly accessible by is_admin users only
+            Paths matched to Layout.tsx sidebar links
            ========================================== */}
         <Route path="/admin">
           {currentUser?.is_admin ? <AdminDashboard /> : <Redirect to="/dashboard" />}
         </Route>
-        <Route path="/admin/payments">
-          {currentUser?.is_admin ? <AdminPayments /> : <Redirect to="/dashboard" />}
-        </Route>
-        <Route path="/admin/deposits">
-          {currentUser?.is_admin ? <FixedDepositPage /> : <Redirect to="/dashboard" />}
-        </Route>
-        <Route path="/admin/interest">
-          {currentUser?.is_admin ? <InterestDistribution /> : <Redirect to="/dashboard" />}
-        </Route>
-        <Route path="/admin/reports">
-          {currentUser?.is_admin ? <ReportsPage /> : <Redirect to="/dashboard" />}
-        </Route>
+        
         <Route path="/admin/members">
           {currentUser?.is_admin ? <AdminMembers /> : <Redirect to="/dashboard" />}
         </Route>
+        
+        <Route path="/admin/payments">
+          {currentUser?.is_admin ? <AdminPayments /> : <Redirect to="/dashboard" />}
+        </Route>
+
+        <Route path="/admin/reports">
+          {currentUser?.is_admin ? <ReportsPage /> : <Redirect to="/dashboard" />}
+        </Route>
+
+        <Route path="/admin/deposits">
+          {currentUser?.is_admin ? <FixedDepositPage /> : <Redirect to="/dashboard" />}
+        </Route>
+
+        {/* Matches { href: "/admin/interest" } in your Layout.tsx */}
+        <Route path="/admin/interest">
+          {currentUser?.is_admin ? <InterestDistribution /> : <Redirect to="/dashboard" />}
+        </Route>
+
         <Route path="/admin/settings">
           {currentUser?.is_admin ? <AdminSettings /> : <Redirect to="/dashboard" />}
         </Route>
 
         {/* ==========================================
             MEMBER ROUTES
-            Redirects admins to /admin if they try to access
            ========================================== */}
         <Route path="/dashboard">
           {currentUser ? (
@@ -120,7 +124,6 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <SocietyProvider>
-          {/* Toaster provides global toast notifications */}
           <Toaster />
           <Router /> 
         </SocietyProvider>

@@ -1,3 +1,4 @@
+"use client"
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,14 +40,11 @@ export default function FixedDepositPage() {
 
   useEffect(() => { fetchDeposits(); }, []);
 
-  // Helper to determine if a deposit has finished based on tenure and current date
   const checkIsFinished = (startMonth: string, startYear: string, tenureMonths: number) => {
     const monthIndex = monthsList.indexOf(startMonth);
     const startDate = new Date(Number(startYear), monthIndex, 1);
     const maturityDate = new Date(startDate);
     maturityDate.setMonth(startDate.getMonth() + tenureMonths);
-    
-    // Compare maturity date to current date (Jan 2026)
     return maturityDate <= new Date();
   };
 
@@ -72,14 +70,12 @@ export default function FixedDepositPage() {
     }
   };
 
-  // Logic for Emerald Cards: Interest only added if tenure is finished
   const totals = useMemo(() => {
     return deposits.reduce((acc, d) => {
       const principal = Number(d.amount || 0);
       const tenure = Number(d.tenure_months || 0);
       const rate = Number(d.interest_rate || 0);
       const isFinished = checkIsFinished(d.month, d.year, tenure);
-      
       const interest = principal * (rate / 100) * (tenure / 12);
 
       return {
@@ -95,7 +91,6 @@ export default function FixedDepositPage() {
     <div className="space-y-8 p-6">
       <h1 className="text-3xl font-serif font-bold text-emerald-900">Society Treasury Ledger</h1>
 
-      {/* TOP SUMMARY CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
           { label: "Total Treasury Principal", val: totals.principal, icon: Wallet },
@@ -116,7 +111,6 @@ export default function FixedDepositPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* NEW ENTRY FORM */}
         <Card className="lg:col-span-1 border-emerald-100 shadow-sm rounded-xl">
           <CardHeader className="border-b bg-slate-50/30">
             <CardTitle className="text-lg text-emerald-900 flex items-center gap-2 font-bold">
@@ -130,7 +124,8 @@ export default function FixedDepositPage() {
                   <Label className="text-xs">Month</Label>
                   <Select value={formData.month} onValueChange={(v) => setFormData({...formData, month: v})}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent className="bg-white">
+                    {/* FIXED: Added max-height and overflow to make the 12 months scrollable */}
+                    <SelectContent className="bg-white max-h-[200px] overflow-y-auto">
                       {monthsList.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -159,7 +154,6 @@ export default function FixedDepositPage() {
           </CardContent>
         </Card>
 
-        {/* DEPOSIT HISTORY TABLE */}
         <Card className="lg:col-span-2 border-slate-100 shadow-sm rounded-xl overflow-hidden">
           <CardHeader className="bg-slate-50/50 border-b">
             <CardTitle className="text-lg text-slate-700 flex items-center gap-2 font-bold">

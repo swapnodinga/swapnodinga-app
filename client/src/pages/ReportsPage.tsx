@@ -23,12 +23,10 @@ export default function ReportsPage() {
   const fetchReportData = async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch data from Supabase
       const { data: members } = await supabase.from('members').select('id, full_name, society_id').order('id', { ascending: true });
       const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
       const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 
-      // 2. Process Society FDs Portfolio
       let finishedFdPrincipal = 0;
       let totalEarnedInterest = 0;
 
@@ -63,14 +61,12 @@ export default function ReportsPage() {
       const tInst = installments?.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
       const tFD = processedFds.reduce((s, d) => s + Number(d.amount || 0), 0) || 0;
 
-      // 3. Member Equity Logic (Dynamic society_id from table)
       const memberEquity = (members || [])
         .filter(m => (m.full_name || "").toLowerCase() !== "admin")
         .map((m) => {
           const mId = m.id;
           const mName = (m.full_name || "").trim();
           
-          // Match by member_id primarily, fallback to name match if member_id is missing
           const mContribution = installments?.filter(i => 
             Number(i.member_id) === Number(mId) || 
             (i.memberName?.trim().toLowerCase() === mName.toLowerCase() && mName !== "")
@@ -83,7 +79,7 @@ export default function ReportsPage() {
           return {
             id: m.id,
             name: mName,
-            display_id: m.society_id || "N/A", // Pulling dynamically from the 'society_id' column
+            display_id: m.society_id || "N/A",
             inst: mContribution,
             interestShare: mInterestShare,
             totalEquity: mContribution + mInterestShare
@@ -113,7 +109,30 @@ export default function ReportsPage() {
   if (isLoading) return <div className="flex h-64 items-center justify-center"><Calculator className="animate-spin h-8 w-8 text-emerald-600" /></div>;
 
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto bg-slate-50/50 min-h-screen">
+    <div className="p-6 space-y-8 max-w-7xl mx-auto bg-slate-50/50 min-h-screen print:bg-white print:p-0 print:m-0">
+      {/* GLOBAL PRINT STYLE TO REMOVE SIDEBARS */}
+      <style jsx global>{`
+        @media print {
+          /* Hide sidebar, navigation, and other UI elements from the parent layout */
+          nav, aside, header, .print-hidden, [role="navigation"], .sidebar {
+            display: none !important;
+          }
+          /* Ensure the content takes full width */
+          body, main, .max-w-7xl {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: white !important;
+          }
+          /* Reset card shadows for cleaner printing */
+          .shadow-md {
+            box-shadow: none !important;
+            border: 1px solid #e2e8f0 !important;
+          }
+        }
+      `}</style>
+
       <div className="flex justify-between items-center print:hidden">
         <h1 className="text-3xl font-bold text-emerald-900 uppercase tracking-tight">Financial Reports</h1>
         <Button onClick={() => window.print()} className="bg-emerald-700 hover:bg-emerald-800 shadow-sm font-bold">
@@ -121,15 +140,15 @@ export default function ReportsPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-white">
-        <StatBox title="Total Society Fund" value={stats.totalFund} bg="bg-slate-900" />
-        <StatBox title="Total Instalments" value={stats.totalInstalments} bg="bg-emerald-600" />
-        <StatBox title="Fixed Deposits" value={stats.totalFD} bg="bg-blue-600" />
-        <StatBox title="Interest Earned" value={stats.totalInterest} bg="bg-purple-600" />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-white print:gap-2">
+        <StatBox title="Total Society Fund" value={stats.totalFund} bg="bg-slate-900 print:bg-slate-100 print:text-black" />
+        <StatBox title="Total Instalments" value={stats.totalInstalments} bg="bg-emerald-600 print:bg-emerald-50 print:text-black" />
+        <StatBox title="Fixed Deposits" value={stats.totalFD} bg="bg-blue-600 print:bg-blue-50 print:text-black" />
+        <StatBox title="Interest Earned" value={stats.totalInterest} bg="bg-purple-600 print:bg-purple-50 print:text-black" />
       </div>
 
-      <Card className="border-none shadow-md overflow-hidden bg-white">
-        <CardHeader className="border-b p-6">
+      <Card className="border-none shadow-md overflow-hidden bg-white print:border print:border-slate-200">
+        <CardHeader className="border-b p-6 print:p-4">
           <CardTitle className="text-lg flex items-center gap-2 font-bold text-slate-800">
             <Landmark className="h-5 w-5 text-amber-600" /> Society Investment Portfolio
           </CardTitle>
@@ -152,7 +171,7 @@ export default function ReportsPage() {
                   <TableCell className="px-6 font-semibold text-slate-700">Fixed Deposit ({fd.month} {fd.year})</TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1.5 text-slate-500 font-bold text-xs uppercase">
-                      <Clock size={14}/>{fd.tenure_display}
+                      <Clock size={14} className="print:hidden"/>{fd.tenure_display}
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-mono text-slate-600">৳{(fd.amount || 0).toLocaleString()}</TableCell>
@@ -172,10 +191,10 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-none shadow-md overflow-hidden bg-white">
-        <CardHeader className="bg-emerald-900 text-white p-6 flex flex-col md:flex-row justify-between items-center gap-4">
+      <Card className="border-none shadow-md overflow-hidden bg-white print:border print:border-slate-200">
+        <CardHeader className="bg-emerald-900 text-white p-6 flex flex-col md:flex-row justify-between items-center gap-4 print:bg-white print:text-black print:border-b">
           <CardTitle className="text-lg flex items-center gap-2 font-bold uppercase tracking-wider">
-            <Users className="h-5 w-5 text-emerald-400" /> Member Equity Statement
+            <Users className="h-5 w-5 text-emerald-400 print:text-emerald-700" /> Member Equity Statement
           </CardTitle>
           <div className="relative w-full md:w-80 print:hidden">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-300" />
@@ -217,13 +236,18 @@ export default function ReportsPage() {
           </Table>
         </CardContent>
       </Card>
+      
+      {/* Footer for printed page */}
+      <div className="hidden print:block text-right pt-10 text-xs text-slate-400">
+        Generated on: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}
+      </div>
     </div>
   );
 }
 
 function StatBox({ title, value, bg }: any) {
   return (
-    <div className={`${bg} p-6 rounded-2xl shadow-lg border-b-4 border-black/10`}>
+    <div className={`${bg} p-6 rounded-2xl shadow-lg border-b-4 border-black/10 print:border-none print:shadow-none print:border print:border-slate-200`}>
       <p className="text-[10px] font-bold uppercase opacity-75 mb-1 tracking-widest">{title}</p>
       <h2 className="text-3xl font-black font-mono">৳{Math.round(value).toLocaleString()}</h2>
     </div>

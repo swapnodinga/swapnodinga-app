@@ -18,7 +18,8 @@ import {
   Youtube,
   Instagram,
   MapPin,
-  Loader2
+  Loader2,
+  Globe
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -31,7 +32,9 @@ export default function ContactPage() {
     facebook_url: "#",
     youtube_link: "#",
     instagram_link: "#",
-    google_map_url: "" // Dynamic map URL
+    whatsapp_number: "",
+    google_map_url: "",
+    office_address: "Loading address..."
   });
 
   // Fetch dynamic settings from Supabase
@@ -112,6 +115,11 @@ export default function ContactPage() {
         {/* Sidebar Info */}
         <div className="space-y-4">
           <ContactInfoCard 
+            icon={<MapPin />} 
+            title="Office Address" 
+            value={settings.office_address} 
+          />
+          <ContactInfoCard 
             icon={<Mail />} 
             title="Email Us" 
             value="swapnodinga.scs@gmail.com" 
@@ -129,11 +137,17 @@ export default function ContactPage() {
 
           <Card className="border-emerald-100 shadow-sm bg-emerald-900 text-white">
             <CardContent className="p-6">
-              <h4 className="font-bold mb-4">Follow Our Socials</h4>
+              <h4 className="font-bold mb-4 uppercase text-xs tracking-widest text-emerald-400">Digital Presence</h4>
               <div className="flex gap-4">
                 <SocialIcon href={settings.facebook_url} icon={<Facebook size={20} />} />
-                <SocialIcon href={settings.instagram_link} icon={<Instagram size={20} />} />
+                {settings.whatsapp_number && (
+                   <SocialIcon 
+                    href={`https://wa.me/${settings.whatsapp_number}`} 
+                    icon={<Globe size={20} />} 
+                   />
+                )}
                 <SocialIcon href={settings.youtube_link} icon={<Youtube size={20} />} />
+                <SocialIcon href={settings.instagram_link} icon={<Instagram size={20} />} />
               </div>
             </CardContent>
           </Card>
@@ -175,12 +189,18 @@ export default function ContactPage() {
         </Card>
       </div>
 
-      {/* NEW: GOOGLE MAPS SECTION */}
-      <div className="space-y-6">
-        <h2 className="text-2xl font-serif font-bold text-emerald-900 flex items-center gap-2">
-          <MapPin className="text-emerald-700" /> Visit Our Office
-        </h2>
-        <Card className="overflow-hidden border-emerald-100 shadow-lg h-[450px] bg-slate-100">
+      {/* DYNAMIC GOOGLE MAPS SECTION */}
+      <div className="space-y-6 pt-10 border-t">
+        <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-serif font-bold text-emerald-900 flex items-center gap-2">
+            <MapPin className="text-emerald-700" /> Location Map
+            </h2>
+            <Button variant="outline" size="sm" onClick={() => window.open(settings.google_map_url, '_blank')} className="text-emerald-700 border-emerald-200">
+                Open in Google Maps
+            </Button>
+        </div>
+        
+        <Card className="overflow-hidden border-emerald-100 shadow-lg h-[450px] bg-slate-100 relative">
           {settings.google_map_url ? (
             <iframe
               src={settings.google_map_url}
@@ -193,9 +213,12 @@ export default function ContactPage() {
               title="Society Office Location"
             ></iframe>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-2">
-              <MapPin size={48} className="opacity-20" />
-              <p>Office map location has not been configured by Admin.</p>
+            <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-4">
+              <MapPin size={64} className="opacity-10 animate-bounce" />
+              <div className="text-center">
+                <p className="font-bold text-slate-500">Map Not Configured</p>
+                <p className="text-sm">Please update the Google Maps URL in Admin Settings.</p>
+              </div>
             </div>
           )}
         </Card>
@@ -207,12 +230,12 @@ export default function ContactPage() {
 // Reusable Components
 function ContactInfoCard({ icon, title, value }: any) {
   return (
-    <Card className="border-emerald-100 shadow-sm">
+    <Card className="border-emerald-100 shadow-sm hover:border-emerald-300 transition-colors">
       <CardContent className="p-6 flex items-start gap-4">
-        <div className="p-3 bg-emerald-50 rounded-lg text-emerald-700">{icon}</div>
-        <div>
-          <h4 className="font-bold text-emerald-900">{title}</h4>
-          <p className="text-sm text-slate-500">{value}</p>
+        <div className="p-3 bg-emerald-50 rounded-lg text-emerald-700 shrink-0">{icon}</div>
+        <div className="min-w-0">
+          <h4 className="font-bold text-emerald-900 text-sm uppercase tracking-wider">{title}</h4>
+          <p className="text-sm text-slate-600 break-words leading-relaxed">{value || "Not provided"}</p>
         </div>
       </CardContent>
     </Card>
@@ -220,12 +243,14 @@ function ContactInfoCard({ icon, title, value }: any) {
 }
 
 function SocialIcon({ href, icon }: { href: string, icon: React.ReactNode }) {
+  if (!href || href === "#") return null;
+  
   return (
     <a 
-      href={href === "#" ? undefined : href} 
+      href={href} 
       target="_blank" 
       rel="noopener noreferrer" 
-      className="p-2 bg-emerald-800 hover:bg-emerald-700 rounded-full transition-colors"
+      className="p-2.5 bg-emerald-800 hover:bg-emerald-600 rounded-full transition-all hover:scale-110 text-white shadow-sm"
     >
       {icon}
     </a>

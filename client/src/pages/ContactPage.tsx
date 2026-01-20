@@ -1,6 +1,8 @@
+"use client"
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import emailjs from '@emailjs/browser'; // Ensure you ran npm install @emailjs/browser
+import emailjs from '@emailjs/browser'; 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +17,7 @@ import {
   Facebook,
   Youtube,
   Instagram,
-  Twitter,
+  MapPin,
   Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -26,9 +28,10 @@ export default function ContactPage() {
   const [settings, setSettings] = useState<any>({
     contact_phone: "+880 1XXX-XXXXXX",
     admin_hours: "Fri - Wed: 10AM - 8PM",
-    facebook_link: "#",
+    facebook_url: "#",
     youtube_link: "#",
-    instagram_link: "#"
+    instagram_link: "#",
+    google_map_url: "" // Dynamic map URL
   });
 
   // Fetch dynamic settings from Supabase
@@ -65,22 +68,19 @@ export default function ContactPage() {
     };
 
     try {
-      // 1. Save message to Supabase for Admin records
       const { error: supabaseError } = await supabase.from('contact_inquiries').insert([payload]);
       if (supabaseError) throw supabaseError;
 
-      // 2. Send email via EmailJS
-      // Variables below match your {{placeholder}} names in image_e37bbf
       await emailjs.send(
-        "service_b8gcj9p", // Your Service ID
-        "template_55k0e9l", // Your Template ID
+        "service_b8gcj9p",
+        "template_55k0e9l",
         {
           from_name: fullName, 
           from_email: email,   
           subject: subject,    
           message: message,    
         },
-        "nKSxYmGpgJuB2J4tF" // Your Public Key
+        "nKSxYmGpgJuB2J4tF"
       );
 
       toast({
@@ -102,13 +102,14 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-10 animate-in fade-in duration-700">
+    <div className="max-w-6xl mx-auto p-6 space-y-10 animate-in fade-in duration-700 pb-20">
       <div className="text-center space-y-2">
         <h1 className="text-4xl font-serif font-bold text-emerald-900">Get in Touch</h1>
         <p className="text-slate-600">Have a question or need assistance? We're here to help.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Sidebar Info */}
         <div className="space-y-4">
           <ContactInfoCard 
             icon={<Mail />} 
@@ -130,15 +131,15 @@ export default function ContactPage() {
             <CardContent className="p-6">
               <h4 className="font-bold mb-4">Follow Our Socials</h4>
               <div className="flex gap-4">
-                <SocialIcon href={settings.facebook_link} icon={<Facebook size={20} />} />
+                <SocialIcon href={settings.facebook_url} icon={<Facebook size={20} />} />
                 <SocialIcon href={settings.instagram_link} icon={<Instagram size={20} />} />
                 <SocialIcon href={settings.youtube_link} icon={<Youtube size={20} />} />
-                <SocialIcon href="#" icon={<Twitter size={20} />} />
               </div>
             </CardContent>
           </Card>
         </div>
 
+        {/* Contact Form */}
         <Card className="lg:col-span-2 border-emerald-100 shadow-md">
           <CardHeader className="bg-slate-50/50 border-b">
             <CardTitle className="text-xl flex items-center gap-2">
@@ -173,6 +174,32 @@ export default function ContactPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* NEW: GOOGLE MAPS SECTION */}
+      <div className="space-y-6">
+        <h2 className="text-2xl font-serif font-bold text-emerald-900 flex items-center gap-2">
+          <MapPin className="text-emerald-700" /> Visit Our Office
+        </h2>
+        <Card className="overflow-hidden border-emerald-100 shadow-lg h-[450px] bg-slate-100">
+          {settings.google_map_url ? (
+            <iframe
+              src={settings.google_map_url}
+              width="100%"
+              height="100%"
+              style={{ border: 0 }}
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              title="Society Office Location"
+            ></iframe>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-2">
+              <MapPin size={48} className="opacity-20" />
+              <p>Office map location has not been configured by Admin.</p>
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }
@@ -194,7 +221,12 @@ function ContactInfoCard({ icon, title, value }: any) {
 
 function SocialIcon({ href, icon }: { href: string, icon: React.ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="p-2 bg-emerald-800 hover:bg-emerald-700 rounded-full transition-colors">
+    <a 
+      href={href === "#" ? undefined : href} 
+      target="_blank" 
+      rel="noopener noreferrer" 
+      className="p-2 bg-emerald-800 hover:bg-emerald-700 rounded-full transition-colors"
+    >
       {icon}
     </a>
   );

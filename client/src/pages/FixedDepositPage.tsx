@@ -21,7 +21,7 @@ export default function FixedDepositPage() {
     tenure_months: "3"
   })
 
-  // Format helper to match: 13-Jun-24
+  // Format matches: 13-Jun-24
   const formatTableDate = (date: Date) => {
     return date.toLocaleDateString("en-GB", { 
       day: "2-digit", 
@@ -33,7 +33,7 @@ export default function FixedDepositPage() {
   const getMaturityData = (amount: number, rate: number, start: string, months: number) => {
     const startDate = new Date(start)
     const finishDate = new Date(start)
-    // Correctly adds months to prevent year-jump errors
+    // Correct month addition to prevent incorrect year jumps
     finishDate.setMonth(startDate.getMonth() + Number(months))
 
     const diffDays = Math.ceil(Math.abs(finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
@@ -53,17 +53,18 @@ export default function FixedDepositPage() {
     setIsSubmitting(true)
 
     const dateObj = new Date(formData.start_date)
-    // Payload mapped to your database schema
+    
+    // Updated payload to match required DB columns
     const payload = {
       amount: Number(formData.amount),
       start_date: formData.start_date,
       interest_rate: Number(formData.interest_rate),
       tenure_months: Number(formData.tenure_months),
-      month: dateObj.toLocaleString('default', { month: 'long' }),
-      year: dateObj.getFullYear().toString(),
+      month: dateObj.toLocaleString('default', { month: 'long' }), // Required
+      year: dateObj.getFullYear().toString(), // Required
       status: "Active",
-      society_id: society?.id, // Added to fix connection error
-      member_id: 1 // Replace with actual logic or dynamic member selection
+      society_id: society?.id || "default_society", // Required
+      member_id: 1 // Required; replace with actual logic if needed
     }
 
     try {
@@ -76,13 +77,14 @@ export default function FixedDepositPage() {
       setFormData({ ...formData, amount: "" })
     } catch (err: any) {
       console.error("Save failed:", err)
+      alert("Error saving deposit. Please check connection.") // Alert for
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto min-h-screen font-sans bg-slate-50/10">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto min-h-screen font-sans">
       <div className="flex justify-between items-center mb-2">
         <h1 className="text-2xl font-bold flex items-center gap-2 text-[#0f172a]">
           <Banknote className="text-[#059669]" size={28} /> Society Treasury Ledger
@@ -90,7 +92,7 @@ export default function FixedDepositPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* ENTRY FORM */}
+        {/* ENTRY FORM - FIXED SAVING */}
         <Card className="lg:col-span-1 h-fit shadow-sm border-[#e2e8f0] rounded-xl bg-white">
           <CardHeader className="border-b px-5 py-4">
             <CardTitle className="text-[15px] flex items-center gap-2 text-[#065f46] font-bold">
@@ -127,7 +129,7 @@ export default function FixedDepositPage() {
           </CardContent>
         </Card>
 
-        {/* DEPOSIT HISTORY */}
+        {/* HISTORY TABLE */}
         <Card className="lg:col-span-3 shadow-sm border-[#e2e8f0] rounded-xl overflow-hidden bg-white">
           <CardHeader className="bg-white border-b py-4 px-6">
             <CardTitle className="text-[15px] font-bold flex items-center gap-2 text-slate-600">
@@ -161,7 +163,7 @@ export default function FixedDepositPage() {
                       <td className="p-4 text-center font-bold text-slate-700 text-[14px]">৳{fd.amount.toLocaleString()}</td>
                       <td className="p-4 text-center font-bold text-[#2563eb] text-[14px]">{fd.interest_rate}%</td>
                       <td className="p-4 text-center text-slate-500 font-medium text-[13px]">{fd.tenure_months} Months</td>
-                      {/* FIXED: Font and size now match other table columns */}
+                      {/* FIXED: Font and size matches Principal column */}
                       <td className="p-4 text-center text-slate-700 font-bold text-[14px]">{m.finishDateStr}</td>
                       <td className="p-4 text-center">
                         <div className="bg-[#022c22] text-[#34d399] px-3 py-1.5 rounded-lg inline-block font-bold text-[13px]">
@@ -169,8 +171,8 @@ export default function FixedDepositPage() {
                         </div>
                       </td>
                       <td className="p-4 text-right">
-                        <div className="flex justify-end gap-4">
-                          {/* UPDATED: Text buttons */}
+                        <div className="flex justify-end gap-3">
+                          {/* UPDATED: Edit/Delete text buttons */}
                           <button 
                             onClick={() => { setEditingId(fd.id); setFormData({ amount: fd.amount.toString(), start_date: fd.start_date, interest_rate: fd.interest_rate.toString(), tenure_months: fd.tenure_months.toString() }) }}
                             className="text-[#2563eb] font-bold text-[13px] hover:underline"

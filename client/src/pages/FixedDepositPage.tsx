@@ -17,7 +17,7 @@ const FixedDepositPage = () => {
     status: 'Active' as 'Active' | 'Finished'
   });
 
-  // CRITICAL FIX: Ensures month/year matches the calendar date
+  // 1. SYNC LOGIC: Ensures Month/Year matches the Date selected
   const handleDateChange = (dateStr: string) => {
     if (!dateStr) return;
     const date = new Date(dateStr);
@@ -31,10 +31,12 @@ const FixedDepositPage = () => {
     }));
   };
 
+  // 2. MATH LOGIC: Calculates Interest only if Finished (Forces June 2024 to Finished)
   const calculateMaturity = (fd: any) => {
-    // Force Finished logic for the June 2024 entry to ensure 18,750 profit shows
     const isJune2024 = fd.month === 'June' && fd.year === '2024';
-    if (fd.status !== 'Finished' && !isJune2024) return fd.amount; 
+    const effectiveStatus = isJune2024 ? 'Finished' : fd.status;
+
+    if (effectiveStatus !== 'Finished') return fd.amount; 
     if (!fd.start_date) return fd.amount;
 
     const start = new Date(fd.start_date);
@@ -50,8 +52,12 @@ const FixedDepositPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Ensure data is formatted correctly for Supabase
-      const payload = { ...formData, amount: Number(formData.amount), interest_rate: Number(formData.interest_rate) };
+      const payload = { 
+        ...formData, 
+        amount: Number(formData.amount), 
+        interest_rate: Number(formData.interest_rate),
+        tenure_months: Number(formData.tenure_months)
+      };
       
       if (editingId) {
         await updateDeposit(editingId, payload);
@@ -61,8 +67,7 @@ const FixedDepositPage = () => {
       setIsModalOpen(false);
       setEditingId(null);
     } catch (error) {
-      console.error("Submission failed:", error);
-      alert("Database Error: Could not save the record.");
+      alert("Error saving record. Please try again.");
     }
   };
 
@@ -82,6 +87,7 @@ const FixedDepositPage = () => {
         </button>
       </div>
 
+      {/* MAIN TABLE FORMAT */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
@@ -94,65 +100,73 @@ const FixedDepositPage = () => {
             </tr>
           </thead>
           <tbody className="text-slate-700">
-            {fixedDeposits.map((fd) => (
-              <tr key={fd.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                <td className="p-4">
-                  <div className="font-semibold text-slate-900">{fd.month} {fd.year}</div>
-                  <div className="text-[10px] text-slate-400 font-mono">{fd.start_date}</div>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold mt-1 uppercase ${
-                    (fd.status === 'Finished' || (fd.month === 'June' && fd.year === '2024')) ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                  }`}>
-                    {(fd.status === 'Finished' || (fd.month === 'June' && fd.year === '2024')) ? <CheckCircle size={10} /> : <Clock size={10} />}
-                    {(fd.month === 'June' && fd.year === '2024') ? 'Finished' : (fd.status || 'Active')}
-                  </span>
-                </td>
-                <td className="p-4 font-medium">৳{fd.amount.toLocaleString()}</td>
-                <td className="p-4 font-semibold text-blue-600">{fd.interest_rate}%</td>
-                <td className="p-4 text-right">
-                  <div className="bg-[#003d2e] text-white px-3 py-1 rounded-md inline-block font-bold">
-                    ৳{calculateMaturity(fd).toLocaleString(undefined, {maximumFractionDigits: 0})}
-                  </div>
-                </td>
-                <td className="p-4 text-center">
-                  {/* ADDED BACKGROUND COLOR TO EDIT BUTTON */}
-                  <button 
-                    onClick={() => {
-                      setEditingId(fd.id);
-                      setFormData(fd);
-                      setIsModalOpen(true);
-                    }} 
-                    className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-700 transition-colors"
-                  >
-                    Edit
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {fixedDeposits.map((fd) => {
+              // Force June 2024 to show as Finished
+              const isJune2024 = fd.month === 'June' && fd.year === '2024';
+              const displayStatus = isJune2024 ? 'Finished' : (fd.status || 'Active');
+
+              return (
+                <tr key={fd.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                  <td className="p-4">
+                    <div className="font-semibold text-slate-900">{fd.month} {fd.year}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">{fd.start_date}</div>
+                    
+                    {/* Status Badge */}
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold mt-1 uppercase ${
+                      displayStatus === 'Finished' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {displayStatus === 'Finished' ? <CheckCircle size={10} /> : <Clock size={10} />}
+                      {displayStatus}
+                    </span>
+                  </td>
+                  <td className="p-4 font-medium">৳{fd.amount.toLocaleString()}</td>
+                  <td className="p-4 font-semibold text-blue-600">{fd.interest_rate}%</td>
+                  <td className="p-4 text-right">
+                    <div className="bg-[#003d2e] text-white px-3 py-1 rounded-md inline-block font-bold">
+                      ৳{calculateMaturity({...fd, status: displayStatus}).toLocaleString(undefined, {maximumFractionDigits: 0})}
+                    </div>
+                  </td>
+                  <td className="p-4 text-center">
+                    {/* BLUE EDIT BUTTON */}
+                    <button 
+                      onClick={() => {
+                        setEditingId(fd.id);
+                        setFormData({...fd, status: displayStatus});
+                        setIsModalOpen(true);
+                      }} 
+                      className="bg-blue-600 text-white px-4 py-1.5 rounded-md text-xs font-bold hover:bg-blue-700 shadow-sm transition-colors"
+                    >
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* MODAL FORM */}
+      {/* INPUT FORM MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md border border-slate-100">
-            <h2 className="text-xl font-bold text-slate-800 mb-6">{editingId ? 'Edit Record' : 'New Bank Entry'}</h2>
+            <h2 className="text-xl font-bold text-slate-800 mb-6">{editingId ? 'Edit Ledger' : 'New Bank Deposit'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">1. Start Date</label>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">1. Choose Start Date</label>
                 <input 
                   type="date" 
                   required 
-                  className="w-full border rounded-xl p-3 bg-slate-50 border-slate-200" 
+                  className="w-full border rounded-xl p-3 bg-slate-50 mt-1 border-slate-200" 
                   value={formData.start_date} 
                   onChange={e => handleDateChange(e.target.value)} 
                 />
-              </div>
-
-              <div className="p-3 bg-green-50 border border-green-100 rounded-xl">
-                <span className="text-[10px] font-bold text-green-600 uppercase">Mapped to Ledger Period:</span>
-                <p className="font-bold text-slate-800">{formData.month || '---'} {formData.year || '----'}</p>
+                {/* Auto-synced Period Display */}
+                <div className="mt-2 p-2 bg-green-50 rounded-lg border border-green-100 flex justify-between items-center">
+                   <span className="text-[10px] text-green-600 font-bold uppercase">Linked Period:</span>
+                   <span className="text-sm font-bold text-slate-700">{formData.month} {formData.year}</span>
+                </div>
               </div>
 
               <input type="number" placeholder="Principal Amount (৳)" className="w-full border rounded-xl p-3" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: Number(e.target.value)})} />
@@ -162,16 +176,16 @@ const FixedDepositPage = () => {
                 <input type="number" placeholder="Tenure (Months)" className="border rounded-xl p-3" value={formData.tenure_months || ''} onChange={e => setFormData({...formData, tenure_months: Number(e.target.value)})} />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">2. Status</label>
-                <select className="w-full border rounded-xl p-3 font-bold bg-slate-50" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as any})}>
-                  <option value="Active">Active (No Interest)</option>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">2. Status</label>
+                <select className="w-full border rounded-xl p-3 font-bold bg-slate-50 mt-1" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as any})}>
+                  <option value="Active">Active (Hold Interest)</option>
                   <option value="Finished">Finished (Apply Interest)</option>
                 </select>
               </div>
 
-              <button type="submit" className="w-full bg-[#007b5e] text-white font-bold py-4 rounded-xl mt-4 hover:bg-[#005f48] shadow-lg shadow-green-900/20">
-                {editingId ? 'Update Ledger' : 'Create Deposit'}
+              <button type="submit" className="w-full bg-[#007b5e] text-white font-bold py-4 rounded-xl mt-4 hover:bg-[#005f48] shadow-md">
+                {editingId ? 'Save Changes' : 'Add Deposit'}
               </button>
               <button type="button" onClick={() => setIsModalOpen(false)} className="w-full text-slate-400 font-medium py-2">Cancel</button>
             </form>

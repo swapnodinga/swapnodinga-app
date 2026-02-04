@@ -14,6 +14,7 @@ interface FixedDeposit {
   start_date: string;
   month: string;
   year: string;
+  status: 'Active' | 'Finished'; // Added status to match the ledger
 }
 
 interface SocietyContextType {
@@ -35,6 +36,7 @@ interface SocietyContextType {
   approveInstalment: (transaction: any, status: "Approved" | "Rejected") => Promise<void>
   addDeposit: (deposit: FixedDeposit) => Promise<void>
   updateDeposit: (id: string, updates: Partial<FixedDeposit>) => Promise<void>
+  deleteDeposit: (id: string) => Promise<void>
 }
 
 const SocietyContext = createContext<SocietyContextType | undefined>(undefined)
@@ -81,7 +83,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const { data: fdData } = await supabase
         .from("fixed_deposits")
         .select("*")
-        .order("year", { ascending: false })
+        .order("start_date", { ascending: false })
 
       const nameMap: { [key: string]: string } = {}
       if (membersData) {
@@ -103,7 +105,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       setTransactions(enrichedTransData)
       setFixedDeposits(fdData || [])
     } catch (err) {
-      console.error("[v0] Data refresh failed:", err)
+      console.error("[SocietyContext] Data refresh failed:", err)
     }
   }
 
@@ -142,7 +144,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       
       await refreshData()
     } catch (err) {
-      console.error("Workflow failed:", err)
+      console.error("Approval workflow failed:", err)
     }
   }
 
@@ -188,6 +190,12 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const updateDeposit = async (id: string, updates: Partial<FixedDeposit>) => {
     const { error } = await supabase.from("fixed_deposits").update(updates).eq("id", id)
+    if (error) throw error
+    await refreshData()
+  }
+
+  const deleteDeposit = async (id: string) => {
+    const { error } = await supabase.from("fixed_deposits").delete().eq("id", id)
     if (error) throw error
     await refreshData()
   }
@@ -280,7 +288,8 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         submitInstalment,
         approveInstalment,
         addDeposit,
-        updateDeposit
+        updateDeposit,
+        deleteDeposit
       }}
     >
       {children}

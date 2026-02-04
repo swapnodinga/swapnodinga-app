@@ -6,22 +6,11 @@ import { useLocation } from "wouter"
 import { supabase } from "@/lib/supabase"
 import emailjs from "@emailjs/browser"
 
-interface FixedDeposit {
-  id?: string;
-  amount: number;
-  interest_rate: number;
-  tenure_months: number;
-  start_date: string;
-  month: string;
-  year: string;
-  status: 'Active' | 'Finished'; // Added status to match the ledger
-}
-
 interface SocietyContextType {
   currentUser: any
   members: any[]
   transactions: any[]
-  fixedDeposits: FixedDeposit[]
+  fixedDeposits: any[] // Added for FD tracking
   societyTotalFund: number
   isLoading: boolean
   login: (email: string, pass: string) => Promise<boolean>
@@ -34,9 +23,10 @@ interface SocietyContextType {
   deleteMember: (id: string) => Promise<void>
   submitInstalment: (amount: number, file: File, month: string) => Promise<void>
   approveInstalment: (transaction: any, status: "Approved" | "Rejected") => Promise<void>
-  addDeposit: (deposit: FixedDeposit) => Promise<void>
-  updateDeposit: (id: string, updates: Partial<FixedDeposit>) => Promise<void>
-  deleteDeposit: (id: string) => Promise<void>
+  // Fixed Deposit Actions
+  addFixedDeposit: (data: any) => Promise<void>
+  updateFixedDeposit: (id: string, data: any) => Promise<void>
+  deleteFixedDeposit: (id: string) => Promise<void>
 }
 
 const SocietyContext = createContext<SocietyContextType | undefined>(undefined)
@@ -45,7 +35,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [members, setMembers] = useState<any[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
-  const [fixedDeposits, setFixedDeposits] = useState<FixedDeposit[]>([])
+  const [fixedDeposits, setFixedDeposits] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [, setLocation] = useLocation()
 
@@ -70,6 +60,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = async () => {
     try {
+      // Fetch Members
       const { data: membersData, error: memError } = await supabase.from("members").select("*")
       if (memError) console.error("Error fetching members:", memError)
 
@@ -80,10 +71,12 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         .order("created_at", { ascending: false })
 
       // Fetch Fixed Deposits
-      const { data: fdData } = await supabase
+      const { data: fdData, error: fdError } = await supabase
         .from("fixed_deposits")
         .select("*")
         .order("start_date", { ascending: false })
+      
+      if (fdError) console.error("Error fetching FDs:", fdError)
 
       const nameMap: { [key: string]: string } = {}
       if (membersData) {
@@ -105,7 +98,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       setTransactions(enrichedTransData)
       setFixedDeposits(fdData || [])
     } catch (err) {
-      console.error("[SocietyContext] Data refresh failed:", err)
+      console.error("[v0] Data refresh failed:", err)
     }
   }
 
@@ -113,7 +106,26 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData()
   }, [currentUser])
 
-  // --- Installment Logic ---
+  // --- Fixed Deposit CRUD Operations ---
+  const addFixedDeposit = async (data: any) => {
+    const { error } = await supabase.from("fixed_deposits").insert([data])
+    if (error) throw error
+    await refreshData()
+  }
+
+  const updateFixedDeposit = async (id: string, data: any) => {
+    const { error } = await supabase.from("fixed_deposits").update(data).eq("id", id)
+    if (error) throw error
+    await refreshData()
+  }
+
+  const deleteFixedDeposit = async (id: string) => {
+    const { error } = await supabase.from("fixed_deposits").delete().eq("id", id)
+    if (error) throw error
+    await refreshData()
+  }
+
+  // --- Installment Operations ---
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected") => {
     try {
       const { error: dbError } = await supabase
@@ -141,10 +153,9 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           "nKSxYmGpgjuB2J4tF",
         )
       }
-      
       await refreshData()
     } catch (err) {
-      console.error("Approval workflow failed:", err)
+      console.error("Workflow failed:", err)
     }
   }
 
@@ -181,26 +192,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // --- Fixed Deposit Logic ---
-  const addDeposit = async (deposit: FixedDeposit) => {
-    const { error } = await supabase.from("fixed_deposits").insert([deposit])
-    if (error) throw error
-    await refreshData()
-  }
-
-  const updateDeposit = async (id: string, updates: Partial<FixedDeposit>) => {
-    const { error } = await supabase.from("fixed_deposits").update(updates).eq("id", id)
-    if (error) throw error
-    await refreshData()
-  }
-
-  const deleteDeposit = async (id: string) => {
-    const { error } = await supabase.from("fixed_deposits").delete().eq("id", id)
-    if (error) throw error
-    await refreshData()
-  }
-
-  // --- Auth Logic ---
+  // --- Auth Operations ---
   const login = async (email: string, pass: string) => {
     try {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -287,9 +279,9 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         deleteMember,
         submitInstalment,
         approveInstalment,
-        addDeposit,
-        updateDeposit,
-        deleteDeposit
+        addFixedDeposit,
+        updateFixedDeposit,
+        deleteFixedDeposit,
       }}
     >
       {children}

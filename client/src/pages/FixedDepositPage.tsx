@@ -1,18 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useSociety } from "@/context/SocietyContext"
+import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Banknote, Calendar, Clock } from "lucide-react"
+import { Banknote, Calendar, Clock, Upload, FileText, Loader2 } from "lucide-react"
 
 export default function FixedDepositPage() {
   const { fixedDeposits, addFixedDeposit, updateFixedDeposit, deleteFixedDeposit, society } = useSociety()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadingId, setUploadingId] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   const [formData, setFormData] = useState({
     amount: "",
@@ -21,7 +24,6 @@ export default function FixedDepositPage() {
     tenure_months: "3"
   })
 
-  // Format matches: 13-Jun-24
   const formatTableDate = (date: Date) => {
     return date.toLocaleDateString("en-GB", { 
       day: "2-digit", 
@@ -33,7 +35,6 @@ export default function FixedDepositPage() {
   const getMaturityData = (amount: number, rate: number, start: string, months: number) => {
     const startDate = new Date(start)
     const finishDate = new Date(start)
-    // Correct month addition to prevent incorrect year jumps
     finishDate.setMonth(startDate.getMonth() + Number(months))
 
     const diffDays = Math.ceil(Math.abs(finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
@@ -47,24 +48,51 @@ export default function FixedDepositPage() {
     }
   }
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, fdId: string) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setUploadingId(fdId)
+    try {
+      const fileName = `${fdId}-${Date.now()}.${file.name.split('.').pop()}`
+      
+      // Upload to 'fd-slips' bucket
+      const { error: uploadError } = await supabase.storage
+        .from('fd-slips')
+        .upload(fileName, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('fd-slips')
+        .getPublicUrl(fileName)
+
+      // Save the URL to the database
+      await updateFixedDeposit(fdId, { slip_url: publicUrl })
+    } catch (error) {
+      console.error('Upload error:', error)
+      alert('Upload failed. Please ensure the "fd-slips" bucket is public in Supabase.')
+    } finally {
+      setUploadingId(null)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (isSubmitting) return
     setIsSubmitting(true)
 
     const dateObj = new Date(formData.start_date)
-    
-    // Updated payload to match required DB columns
     const payload = {
       amount: Number(formData.amount),
       start_date: formData.start_date,
       interest_rate: Number(formData.interest_rate),
       tenure_months: Number(formData.tenure_months),
-      month: dateObj.toLocaleString('default', { month: 'long' }), // Required
-      year: dateObj.getFullYear().toString(), // Required
+      month: dateObj.toLocaleString('default', { month: 'long' }),
+      year: dateObj.getFullYear().toString(),
       status: "Active",
-      society_id: society?.id || "default_society", // Required
-      member_id: 1 // Required; replace with actual logic if needed
+      society_id: society?.id || "default_society",
+      member_id: 1
     }
 
     try {
@@ -77,7 +105,7 @@ export default function FixedDepositPage() {
       setFormData({ ...formData, amount: "" })
     } catch (err: any) {
       console.error("Save failed:", err)
-      alert("Error saving deposit. Please check connection.") // Alert for
+      alert("Error saving deposit. Please check connection.")
     } finally {
       setIsSubmitting(false)
     }
@@ -92,7 +120,6 @@ export default function FixedDepositPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* ENTRY FORM - FIXED SAVING */}
         <Card className="lg:col-span-1 h-fit shadow-sm border-[#e2e8f0] rounded-xl bg-white">
           <CardHeader className="border-b px-5 py-4">
             <CardTitle className="text-[15px] flex items-center gap-2 text-[#065f46] font-bold">
@@ -129,13 +156,7 @@ export default function FixedDepositPage() {
           </CardContent>
         </Card>
 
-        {/* HISTORY TABLE */}
         <Card className="lg:col-span-3 shadow-sm border-[#e2e8f0] rounded-xl overflow-hidden bg-white">
-          <CardHeader className="bg-white border-b py-4 px-6">
-            <CardTitle className="text-[15px] font-bold flex items-center gap-2 text-slate-600">
-              <Clock size={18} className="text-slate-400" /> Deposit History
-            </CardTitle>
-          </CardHeader>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-[#f8fafc] text-[11px] uppercase font-bold text-slate-500 border-b">
@@ -146,11 +167,12 @@ export default function FixedDepositPage() {
                   <th className="p-4 text-center">Tenure</th>
                   <th className="p-4 text-center">Finish Date (Auto)</th>
                   <th className="p-4 text-center">Maturity Est.</th>
+                  <th className="p-4 text-center">FD Slip</th>
                   <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {fixedDeposits.map((fd) => {
+                {fixedDeposits.map((fd: any) => {
                   const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
                   return (
                     <tr key={fd.id} className="hover:bg-slate-50/50 transition-colors">
@@ -163,28 +185,35 @@ export default function FixedDepositPage() {
                       <td className="p-4 text-center font-bold text-slate-700 text-[14px]">৳{fd.amount.toLocaleString()}</td>
                       <td className="p-4 text-center font-bold text-[#2563eb] text-[14px]">{fd.interest_rate}%</td>
                       <td className="p-4 text-center text-slate-500 font-medium text-[13px]">{fd.tenure_months} Months</td>
-                      {/* FIXED: Font and size matches Principal column */}
                       <td className="p-4 text-center text-slate-700 font-bold text-[14px]">{m.finishDateStr}</td>
                       <td className="p-4 text-center">
                         <div className="bg-[#022c22] text-[#34d399] px-3 py-1.5 rounded-lg inline-block font-bold text-[13px]">
                           ৳{m.total.toLocaleString()}
                         </div>
                       </td>
+                      {/* FD SLIP UPLOAD / VIEW */}
+                      <td className="p-4 text-center">
+                        {fd.slip_url ? (
+                          <a href={fd.slip_url} target="_blank" rel="noreferrer" className="text-[#059669] font-bold text-[13px] hover:underline flex items-center justify-center gap-1">
+                            <FileText size={14} /> View Slip
+                          </a>
+                        ) : (
+                          <div className="flex justify-center">
+                            <input type="file" className="hidden" ref={fileInputRef} onChange={(e) => handleFileUpload(e, fd.id)} />
+                            <button 
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={uploadingId === fd.id}
+                              className="text-slate-400 hover:text-[#059669] transition-colors"
+                            >
+                              {uploadingId === fd.id ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
+                            </button>
+                          </div>
+                        )}
+                      </td>
                       <td className="p-4 text-right">
-                        <div className="flex justify-end gap-3">
-                          {/* UPDATED: Edit/Delete text buttons */}
-                          <button 
-                            onClick={() => { setEditingId(fd.id); setFormData({ amount: fd.amount.toString(), start_date: fd.start_date, interest_rate: fd.interest_rate.toString(), tenure_months: fd.tenure_months.toString() }) }}
-                            className="text-[#2563eb] font-bold text-[13px] hover:underline"
-                          >
-                            Edit
-                          </button>
-                          <button 
-                            onClick={() => deleteFixedDeposit(fd.id)}
-                            className="text-[#ef4444] font-bold text-[13px] hover:underline"
-                          >
-                            Delete
-                          </button>
+                        <div className="flex justify-end gap-3 font-bold text-[13px]">
+                          <button onClick={() => { setEditingId(fd.id); setFormData({ amount: fd.amount.toString(), start_date: fd.start_date, interest_rate: fd.interest_rate.toString(), tenure_months: fd.tenure_months.toString() }) }} className="text-[#2563eb] hover:underline">Edit</button>
+                          <button onClick={() => deleteFixedDeposit(fd.id)} className="text-[#ef4444] hover:underline">Delete</button>
                         </div>
                       </td>
                     </tr>

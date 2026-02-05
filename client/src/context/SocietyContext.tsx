@@ -10,7 +10,7 @@ interface SocietyContextType {
   currentUser: any
   members: any[]
   transactions: any[]
-  fixedDeposits: any[] // Added for FD tracking
+  fixedDeposits: any[]
   societyTotalFund: number
   isLoading: boolean
   login: (email: string, pass: string) => Promise<boolean>
@@ -70,7 +70,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         .select("*")
         .order("created_at", { ascending: false })
 
-      // Fetch Fixed Deposits
+      // Fetch Fixed Deposits (Ensures slip_url is included)
       const { data: fdData, error: fdError } = await supabase
         .from("fixed_deposits")
         .select("*")
@@ -98,7 +98,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       setTransactions(enrichedTransData)
       setFixedDeposits(fdData || [])
     } catch (err) {
-      console.error("[v0] Data refresh failed:", err)
+      console.error("[SocietyContext] Data refresh failed:", err)
     }
   }
 
@@ -109,19 +109,29 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   // --- Fixed Deposit CRUD Operations ---
   const addFixedDeposit = async (data: any) => {
     const { error } = await supabase.from("fixed_deposits").insert([data])
-    if (error) throw error
+    if (error) {
+      console.error("Supabase Add FD Error:", error.message)
+      throw error
+    }
     await refreshData()
   }
 
   const updateFixedDeposit = async (id: string, data: any) => {
     const { error } = await supabase.from("fixed_deposits").update(data).eq("id", id)
-    if (error) throw error
+    if (error) {
+      console.error("Supabase Update FD Error:", error.message)
+      throw error
+    }
     await refreshData()
   }
 
   const deleteFixedDeposit = async (id: string) => {
+    if (!window.confirm("Delete this deposit permanently?")) return
     const { error } = await supabase.from("fixed_deposits").delete().eq("id", id)
-    if (error) throw error
+    if (error) {
+      console.error("Supabase Delete FD Error:", error.message)
+      throw error
+    }
     await refreshData()
   }
 

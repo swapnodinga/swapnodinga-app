@@ -106,82 +106,76 @@ export default function FixedDepositPage() {
   }
 
   return (
-    // Added px-12 for better side spacing
-    <div className="p-6 px-12 space-y-6 max-w-[1600px] mx-auto min-h-screen font-sans">
-      <div className="flex justify-between items-center mb-4">
+    // Tightened horizontal padding to fit the screen
+    <div className="p-4 px-2 space-y-6 max-w-full mx-auto min-h-screen font-sans">
+      <div className="flex justify-between items-center mb-2 px-2">
         <h1 className="text-2xl font-bold flex items-center gap-2 text-[#0f172a]">
           <Banknote className="text-[#059669]" size={28} /> Society Treasury Ledger
         </h1>
       </div>
 
-      {/* Increased gap to gap-12 to fix the "not matched" spacing */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
+      {/* Reduced gap from 12 to 4 to prevent the table from being pushed off-screen */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         
         {/* ENTRY FORM */}
         <Card className="lg:col-span-1 h-fit shadow-sm border-[#e2e8f0] rounded-xl bg-white">
-          <CardHeader className="border-b px-5 py-4">
-            <CardTitle className="text-[16px] font-bold text-[#065f46] flex items-center gap-2">
-              <Plus size={18} className="bg-[#ecfdf5] rounded p-0.5" /> New Bank Entry
+          <CardHeader className="border-b px-4 py-3">
+            <CardTitle className="text-[15px] font-bold text-[#065f46] flex items-center gap-2">
+              <Plus size={16} className="bg-[#ecfdf5] rounded p-0.5" /> New Bank Entry
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-6 space-y-5 px-5">
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-1.5">
-                <Label className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Start Date</Label>
-                <Input type="date" required className="h-11 border-slate-200" value={formData.start_date} onChange={(e) => setFormData({...formData, start_date: e.target.value})} />
+          <CardContent className="pt-4 space-y-4 px-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase font-bold text-slate-400">Start Date</Label>
+                <Input type="date" required className="h-10 border-slate-200 text-sm" value={formData.start_date} onChange={(e) => setFormData({...formData, start_date: e.target.value})} />
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Principal Amount (৳)</Label>
-                <Input type="number" required className="h-11 border-slate-200" placeholder="0" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} />
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase font-bold text-slate-400">Principal Amount (৳)</Label>
+                <Input type="number" required className="h-10 border-slate-200 text-sm" placeholder="0" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Rate (%)</Label>
-                  <Input type="number" step="0.001" className="h-11 border-slate-200" value={formData.interest_rate} onChange={(e) => setFormData({...formData, interest_rate: e.target.value})} />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase font-bold text-slate-400">Rate (%)</Label>
+                  <Input type="number" step="0.001" className="h-10 border-slate-200 text-sm" value={formData.interest_rate} onChange={(e) => setFormData({...formData, interest_rate: e.target.value})} />
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Tenure (M)</Label>
-                  <Input type="number" required className="h-11 border-slate-200" value={formData.tenure_months} onChange={(e) => setFormData({...formData, tenure_months: e.target.value})} />
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase font-bold text-slate-400">Tenure (M)</Label>
+                  <Input type="number" required className="h-10 border-slate-200 text-sm" value={formData.tenure_months} onChange={(e) => setFormData({...formData, tenure_months: e.target.value})} />
                 </div>
               </div>
 
-              {/* Added Slip Upload to New Entry */}
-              <div className="space-y-1.5">
-                <Label className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Attach FD Slip</Label>
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase font-bold text-slate-400">Attach FD Slip</Label>
                 <Input 
                   type="file" 
                   accept="image/*,.pdf" 
-                  className="h-11 border-slate-200 text-[12px] pt-2 cursor-pointer" 
+                  className="h-10 border-slate-200 text-[11px] pt-1.5 cursor-pointer" 
                   onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                 />
               </div>
 
-              <Button type="submit" disabled={isSubmitting} className="w-full font-bold h-11 bg-[#059669] hover:bg-[#047857] text-white transition-colors">
+              <Button type="submit" disabled={isSubmitting} className="w-full font-bold h-10 bg-[#059669] hover:bg-[#047857] text-white">
                 {isSubmitting ? "Processing..." : "Save Deposit"}
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        {/* HISTORY TABLE */}
+        {/* HISTORY TABLE - Optimized spacing */}
         <Card className="lg:col-span-3 shadow-sm border-[#e2e8f0] rounded-xl overflow-hidden bg-white">
-          <CardHeader className="border-b px-6 py-4 bg-[#fcfdfe]">
-            <CardTitle className="text-[16px] font-bold text-slate-700 flex items-center gap-2">
-               Deposit History
-            </CardTitle>
-          </CardHeader>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-[#f8fafc] text-[11px] uppercase font-bold text-slate-500 border-b">
+              <thead className="bg-[#f8fafc] text-[10px] uppercase font-bold text-slate-500 border-b">
                 <tr>
-                  <th className="p-5 text-left">Period / Status</th>
-                  <th className="p-5 text-center">Principal (BDT)</th>
-                  <th className="p-5 text-center">Rate (%)</th>
-                  <th className="p-5 text-center">Tenure</th>
-                  <th className="p-5 text-center">Finish Date (Auto)</th>
-                  <th className="p-5 text-center">Maturity Est.</th>
-                  <th className="p-5 text-center">FD Slip</th>
-                  <th className="p-5 text-right">Actions</th>
+                  <th className="p-3 text-left">Period / Status</th>
+                  <th className="p-3 text-center">Principal (BDT)</th>
+                  <th className="p-3 text-center">Rate (%)</th>
+                  <th className="p-3 text-center">Tenure</th>
+                  <th className="p-3 text-center">Finish Date</th>
+                  <th className="p-3 text-center">Maturity Est.</th>
+                  <th className="p-3 text-center">FD Slip</th>
+                  <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -189,39 +183,38 @@ export default function FixedDepositPage() {
                   const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
                   return (
                     <tr key={fd.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-5">
-                        <div className="font-bold text-slate-800 text-[14px]">{m.startDateStr}</div>
-                        <Badge variant="outline" className={`text-[10px] mt-1.5 font-bold ${m.isFinished ? "text-[#059669] bg-[#ecfdf5]" : "text-[#2563eb] bg-[#eff6ff]"} border-none`}>
+                      <td className="p-3">
+                        <div className="font-bold text-slate-800 text-[13px]">{m.startDateStr}</div>
+                        <Badge variant="outline" className={`text-[9px] font-bold ${m.isFinished ? "text-[#059669] bg-[#ecfdf5]" : "text-[#2563eb] bg-[#eff6ff]"} border-none`}>
                           {m.isFinished ? "FINISHED" : "ACTIVE"}
                         </Badge>
                       </td>
-                      <td className="p-5 text-center font-bold text-slate-700 text-[15px]">৳{fd.amount.toLocaleString()}</td>
-                      <td className="p-5 text-center font-bold text-[#2563eb] text-[15px]">{fd.interest_rate}%</td>
-                      <td className="p-5 text-center text-slate-500 font-medium text-[14px]">{fd.tenure_months} Months</td>
-                      <td className="p-5 text-center text-slate-700 font-bold text-[14px]">{m.finishDateStr}</td>
-                      <td className="p-5 text-center">
-                        <div className="bg-[#022c22] text-[#34d399] px-4 py-2 rounded-lg inline-block font-bold text-[14px]">
+                      <td className="p-3 text-center font-bold text-slate-700 text-[14px]">৳{fd.amount.toLocaleString()}</td>
+                      <td className="p-3 text-center font-bold text-[#2563eb] text-[14px]">{fd.interest_rate}%</td>
+                      <td className="p-3 text-center text-slate-500 font-medium text-[13px]">{fd.tenure_months}M</td>
+                      <td className="p-3 text-center text-slate-700 font-bold text-[13px]">{m.finishDateStr}</td>
+                      <td className="p-3 text-center">
+                        <div className="bg-[#022c22] text-[#34d399] px-2.5 py-1.5 rounded-lg inline-block font-bold text-[13px]">
                           ৳{m.total.toLocaleString()}
                         </div>
                       </td>
                       
-                      {/* FD Slip Column with consistent styling */}
-                      <td className="p-5 text-center">
+                      <td className="p-3 text-center">
                         {fd.slip_url ? (
-                          <a href={fd.slip_url} target="_blank" rel="noreferrer" className="text-[#059669] font-bold text-[12px] hover:underline flex flex-col items-center gap-1">
-                            <FileText size={20} /> View Slip
+                          <a href={fd.slip_url} target="_blank" rel="noreferrer" className="text-[#059669] font-bold text-[11px] hover:underline flex flex-col items-center">
+                            <FileText size={18} /> View Slip
                           </a>
                         ) : (
                           <div className="flex justify-center">
-                            <label className="cursor-pointer text-slate-400 hover:text-[#059669] transition-colors p-2 rounded-full hover:bg-slate-100">
-                              {uploadingId === fd.id ? <Loader2 className="animate-spin" size={20} /> : <><Upload size={20} /><input type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => handleRowUpload(e, fd.id)} /></>}
+                            <label className="cursor-pointer text-slate-400 hover:text-[#059669] p-1.5 rounded-full hover:bg-slate-100">
+                              {uploadingId === fd.id ? <Loader2 className="animate-spin" size={18} /> : <><Upload size={18} /><input type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => handleRowUpload(e, fd.id)} /></>}
                             </label>
                           </div>
                         )}
                       </td>
 
-                      <td className="p-5 text-right">
-                        <div className="flex justify-end gap-4 font-bold text-[13px]">
+                      <td className="p-3 text-right">
+                        <div className="flex justify-end gap-3 font-bold text-[12px]">
                           <button onClick={() => { setEditingId(fd.id); setFormData({ amount: fd.amount.toString(), start_date: fd.start_date, interest_rate: fd.interest_rate.toString(), tenure_months: fd.tenure_months.toString() }) }} className="text-[#2563eb] hover:underline">Edit</button>
                           <button onClick={() => deleteFixedDeposit(fd.id)} className="text-[#ef4444] hover:underline">Delete</button>
                         </div>

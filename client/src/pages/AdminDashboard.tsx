@@ -95,74 +95,71 @@ export default function AdminDashboard() {
 
   useEffect(() => { fetchDashboardStats(); }, [selectedYear]);
 
+  // Financial Number Formatter component for consistency
+  const CurrencyDisplay = ({ value, colorClass = "text-slate-900" }: { value: number, colorClass?: string }) => (
+    <span className={`${colorClass} font-mono font-bold tracking-tighter text-2xl lg:text-3xl`}>
+      ৳{Math.round(value).toLocaleString()}
+    </span>
+  );
+
   return (
-    <div className="p-6 space-y-6 bg-slate-50/50 min-h-screen">
+    <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen font-sans">
       {/* HEADER */}
-      <div className="flex justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+      <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Society Administration</h1>
-          <p className="text-[10px] font-bold text-emerald-600 mt-0.5 uppercase tracking-[0.2em]">Treasury Command Center</p>
+          <h1 className="text-xl font-extrabold text-slate-900 uppercase tracking-tight">Society Administration</h1>
+          <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Financial Command Center</p>
         </div>
         <Select value={selectedYear} onValueChange={setSelectedYear}>
-          <SelectTrigger className="w-[140px] font-bold shadow-none border-slate-200 rounded-xl h-11">
+          <SelectTrigger className="w-[120px] font-bold border-slate-200 rounded-xl h-10 shadow-none">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="rounded-xl border-slate-200">
-            {[2024, 2025, 2026, 2027].map(y => <SelectItem key={y} value={y.toString()} className="font-bold">{y}</SelectItem>)}
+          <SelectContent className="rounded-xl">
+            {[2024, 2025, 2026, 2027].map(y => <SelectItem key={y} value={y.toString()} className="font-semibold">{y}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
 
-      {/* STAT CARDS - Uniform Style */}
+      {/* STAT CARDS - BANKING STYLE */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard 
-          title="Net Society Value" 
-          value={`৳${Math.round(stats.totalFund).toLocaleString()}`} 
-          icon={Landmark} 
-          className="bg-white border-b-4 border-slate-900 rounded-2xl shadow-sm" 
-        />
-        <StatCard 
-          title="Total Installments" 
-          value={`৳${Math.round(stats.totalInstalments).toLocaleString()}`} 
-          icon={PiggyBank} 
-          className="bg-white border-b-4 border-emerald-500 rounded-2xl shadow-sm" 
-        />
-        <StatCard 
-          title="Active FD Capital" 
-          value={`৳${Math.round(stats.totalFixedDeposits).toLocaleString()}`} 
-          icon={Wallet} 
-          className="bg-white border-b-4 border-blue-500 rounded-2xl shadow-sm" 
-        />
-        <StatCard 
-          title="Realized Interest" 
-          value={`৳${Math.round(stats.totalInterest).toLocaleString()}`} 
-          icon={TrendingUp} 
-          className="bg-white border-b-4 border-purple-500 rounded-2xl shadow-sm" 
-        />
+        {[
+          { title: "Net Society Value", val: stats.totalFund, icon: Landmark, border: "border-slate-900" },
+          { title: "Total Installments", val: stats.totalInstalments, icon: PiggyBank, border: "border-emerald-500" },
+          { title: "Active FD Capital", val: stats.totalFixedDeposits, icon: Wallet, border: "border-blue-500" },
+          { title: "Realized Interest", val: stats.totalInterest, icon: TrendingUp, border: "border-purple-500" }
+        ].map((item, idx) => (
+          <div key={idx} className={`bg-white p-5 rounded-2xl border border-slate-100 border-b-4 ${item.border} shadow-sm flex flex-col justify-between h-32`}>
+            <div className="flex justify-between items-start">
+              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">{item.title}</span>
+              <item.icon className="h-4 w-4 text-slate-300" />
+            </div>
+            <CurrencyDisplay value={item.val} />
+          </div>
+        ))}
       </div>
 
       {/* CHARTS */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white border border-slate-200">
+        <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
           <CardHeader className="border-b bg-slate-50/50 py-4 px-6">
-            <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Capital Mix Analysis</CardTitle>
+            <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Asset Composition</CardTitle>
           </CardHeader>
-          <CardContent className="h-[420px] pt-14 pb-4"> {/* Increased top padding significantly */}
+          <CardContent className="h-[400px] pt-16"> 
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={[
                 { label: 'ACTIVE FD', val: stats.totalFixedDeposits, color: '#3b82f6' },
                 { label: 'INSTALLMENTS', val: stats.totalInstalments, color: '#10b981' },
                 { label: 'INTEREST', val: stats.totalInterest, color: '#8b5cf6' },
                 { label: 'NET VALUE', val: stats.totalFund, color: '#0f172a' }
-              ]} margin={{ top: 40, bottom: 10 }}> {/* Margin increased to stop clipping */}
+              ]} margin={{ top: 40, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontWeight: '800' }} />
-                <Bar dataKey="val" radius={[8, 8, 0, 0]} barSize={55}>
+                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: '700' }} />
+                <Bar dataKey="val" radius={[6, 6, 0, 0]} barSize={50}>
                   <LabelList 
                     dataKey="val" 
                     position="top" 
                     formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} 
-                    style={{ fontSize: '11px', fontWeight: '900', fill: '#1e293b' }} 
+                    style={{ fontSize: '11px', fontWeight: '800', fill: '#475569', fontFamily: 'monospace' }} 
                     offset={15} 
                   />
                   <Cell fill="#3b82f6" /><Cell fill="#10b981" /><Cell fill="#8b5cf6" /><Cell fill="#0f172a" />
@@ -172,30 +169,30 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white border border-slate-200">
+        <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
           <CardHeader className="border-b bg-slate-50/50 py-4 px-6">
-            <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Member Equity Leaderboard</CardTitle>
+            <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Equity by Member</CardTitle>
           </CardHeader>
-          <CardContent className="h-[420px] pt-14 pb-4">
+          <CardContent className="h-[400px] pt-16">
             {memberChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={memberChartData} margin={{ top: 40, bottom: 10 }}>
+                <BarChart data={memberChartData} margin={{ top: 40, bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="displayName" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 9, fontWeight: '800' }} interval={0} />
-                  <Tooltip cursor={{fill: '#f8fafc'}} formatter={(v: any) => `৳${Math.round(v).toLocaleString()}`} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }} />
-                  <Bar dataKey="total" fill="#10b981" radius={[8, 8, 0, 0]} barSize={40}>
+                  <XAxis dataKey="displayName" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: '700' }} interval={0} />
+                  <Tooltip cursor={{fill: '#f8fafc'}} formatter={(v: any) => `৳${Math.round(v).toLocaleString()}`} />
+                  <Bar dataKey="total" fill="#0f172a" radius={[6, 6, 0, 0]} barSize={35}>
                     <LabelList 
                       dataKey="total" 
                       position="top" 
                       formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} 
-                      style={{ fontSize: '10px', fontWeight: '900', fill: '#059669' }} 
+                      style={{ fontSize: '10px', fontWeight: '800', fill: '#0f172a', fontFamily: 'monospace' }} 
                       offset={15} 
                     />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-slate-400 font-bold uppercase text-xs tracking-widest">No Data Found</div>
+              <div className="h-full flex items-center justify-center text-slate-300 font-bold uppercase text-xs tracking-widest">No Activity Records</div>
             )}
           </CardContent>
         </Card>

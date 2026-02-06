@@ -11,6 +11,12 @@ import {
 } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+// 10 Distinct Professional Colors for Members
+const MEMBER_COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', 
+  '#06b6d4', '#f472b6', '#6366f1', '#14b8a6', '#f97316'
+];
+
 export default function AdminDashboard() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [stats, setStats] = useState({
@@ -95,104 +101,92 @@ export default function AdminDashboard() {
 
   useEffect(() => { fetchDashboardStats(); }, [selectedYear]);
 
-  // Financial Number Formatter component for consistency
-  const CurrencyDisplay = ({ value, colorClass = "text-slate-900" }: { value: number, colorClass?: string }) => (
-    <span className={`${colorClass} font-mono font-bold tracking-tighter text-2xl lg:text-3xl`}>
-      ৳{Math.round(value).toLocaleString()}
-    </span>
-  );
-
   return (
-    <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen font-sans">
+    <div className="p-6 space-y-6 bg-[#fcfdfe] min-h-screen">
       {/* HEADER */}
-      <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+      <div className="flex justify-between items-center bg-white p-5 rounded-xl shadow-sm border border-slate-200">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-900 uppercase tracking-tight">Society Administration</h1>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Financial Command Center</p>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Society Dashboard</h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Financial Summary</p>
         </div>
         <Select value={selectedYear} onValueChange={setSelectedYear}>
-          <SelectTrigger className="w-[120px] font-bold border-slate-200 rounded-xl h-10 shadow-none">
+          <SelectTrigger className="w-[130px] font-bold border-slate-200 rounded-lg">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="rounded-xl">
-            {[2024, 2025, 2026, 2027].map(y => <SelectItem key={y} value={y.toString()} className="font-semibold">{y}</SelectItem>)}
+          <SelectContent>
+            {[2024, 2025, 2026, 2027].map(y => <SelectItem key={y} value={y.toString()} className="font-bold">{y}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
 
-      {/* STAT CARDS - BANKING STYLE */}
+      {/* STAT CARDS - Colored backgrounds, No Black, Hover Effects */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { title: "Net Society Value", val: stats.totalFund, icon: Landmark, border: "border-slate-900" },
-          { title: "Total Installments", val: stats.totalInstalments, icon: PiggyBank, border: "border-emerald-500" },
-          { title: "Active FD Capital", val: stats.totalFixedDeposits, icon: Wallet, border: "border-blue-500" },
-          { title: "Realized Interest", val: stats.totalInterest, icon: TrendingUp, border: "border-purple-500" }
+          { title: "Net Society Value", val: stats.totalFund, icon: Landmark, bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", hover: "hover:bg-blue-100" },
+          { title: "Total Installments", val: stats.totalInstalments, icon: PiggyBank, bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", hover: "hover:bg-emerald-100" },
+          { title: "Active FD Capital", val: stats.totalFixedDeposits, icon: Wallet, bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200", hover: "hover:bg-indigo-100" },
+          { title: "Realized Interest", val: stats.totalInterest, icon: TrendingUp, bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200", hover: "hover:bg-purple-100" }
         ].map((item, idx) => (
-          <div key={idx} className={`bg-white p-5 rounded-2xl border border-slate-100 border-b-4 ${item.border} shadow-sm flex flex-col justify-between h-32`}>
+          <div key={idx} className={`${item.bg} ${item.hover} ${item.border} border p-5 rounded-2xl transition-all duration-200 cursor-default group h-32 flex flex-col justify-between shadow-sm`}>
             <div className="flex justify-between items-start">
-              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">{item.title}</span>
-              <item.icon className="h-4 w-4 text-slate-300" />
+              <span className="text-[11px] font-black uppercase text-slate-900 tracking-wider">{item.title}</span>
+              <item.icon className={`h-4 w-4 ${item.text} opacity-60`} />
             </div>
-            <CurrencyDisplay value={item.val} />
+            <h2 className={`text-2xl font-bold ${item.text} tracking-tighter`}>
+              ৳{Math.round(item.val).toLocaleString()}
+            </h2>
           </div>
         ))}
       </div>
 
-      {/* CHARTS */}
+      {/* CHARTS - Sharp Corners & Shadows */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
-          <CardHeader className="border-b bg-slate-50/50 py-4 px-6">
-            <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Asset Composition</CardTitle>
+        {/* Capital Mix Analysis */}
+        <Card className="border-slate-200 shadow-sm rounded-xl overflow-hidden bg-white">
+          <CardHeader className="border-b bg-slate-50/30 py-4">
+            <CardTitle className="text-[11px] font-black uppercase text-slate-900 tracking-widest px-2">Capital Mix Analysis</CardTitle>
           </CardHeader>
-          <CardContent className="h-[400px] pt-16"> 
+          <CardContent className="h-[420px] pt-16">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={[
                 { label: 'ACTIVE FD', val: stats.totalFixedDeposits, color: '#3b82f6' },
                 { label: 'INSTALLMENTS', val: stats.totalInstalments, color: '#10b981' },
                 { label: 'INTEREST', val: stats.totalInterest, color: '#8b5cf6' },
-                { label: 'NET VALUE', val: stats.totalFund, color: '#0f172a' }
-              ]} margin={{ top: 40, bottom: 20 }}>
+                { label: 'NET VALUE', val: stats.totalFund, color: '#6366f1' }
+              ]} margin={{ top: 20, bottom: 20, left: 10, right: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: '700' }} />
-                <Bar dataKey="val" radius={[6, 6, 0, 0]} barSize={50}>
-                  <LabelList 
-                    dataKey="val" 
-                    position="top" 
-                    formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} 
-                    style={{ fontSize: '11px', fontWeight: '800', fill: '#475569', fontFamily: 'monospace' }} 
-                    offset={15} 
-                  />
-                  <Cell fill="#3b82f6" /><Cell fill="#10b981" /><Cell fill="#8b5cf6" /><Cell fill="#0f172a" />
+                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 'bold' }} />
+                <Bar dataKey="val" radius={0} barSize={50} style={{ filter: 'drop-shadow(0px 2px 2px rgba(0,0,0,0.1))' }}>
+                  <LabelList dataKey="val" position="top" formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} style={{ fontSize: '11px', fontWeight: 'bold', fill: '#1e293b' }} offset={10} />
+                  <Cell fill="#3b82f6" /><Cell fill="#10b981" /><Cell fill="#8b5cf6" /><Cell fill="#6366f1" />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
-          <CardHeader className="border-b bg-slate-50/50 py-4 px-6">
-            <CardTitle className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Equity by Member</CardTitle>
+        {/* Member Equity Leaderboard - 10 Colors */}
+        <Card className="border-slate-200 shadow-sm rounded-xl overflow-hidden bg-white">
+          <CardHeader className="border-b bg-slate-50/30 py-4">
+            <CardTitle className="text-[11px] font-black uppercase text-slate-900 tracking-widest px-2">Member Equity Statement</CardTitle>
           </CardHeader>
-          <CardContent className="h-[400px] pt-16">
+          <CardContent className="h-[420px] pt-16">
             {memberChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={memberChartData} margin={{ top: 40, bottom: 20 }}>
+                <BarChart data={memberChartData} margin={{ top: 20, bottom: 20, left: 10, right: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="displayName" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: '700' }} interval={0} />
-                  <Tooltip cursor={{fill: '#f8fafc'}} formatter={(v: any) => `৳${Math.round(v).toLocaleString()}`} />
-                  <Bar dataKey="total" fill="#0f172a" radius={[6, 6, 0, 0]} barSize={35}>
-                    <LabelList 
-                      dataKey="total" 
-                      position="top" 
-                      formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} 
-                      style={{ fontSize: '10px', fontWeight: '800', fill: '#0f172a', fontFamily: 'monospace' }} 
-                      offset={15} 
-                    />
+                  <XAxis dataKey="displayName" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 9, fontWeight: 'bold' }} interval={0} />
+                  <Tooltip cursor={{fill: '#f8fafc'}} />
+                  <Bar dataKey="total" radius={0} barSize={35} style={{ filter: 'drop-shadow(0px 2px 2px rgba(0,0,0,0.1))' }}>
+                    <LabelList dataKey="total" position="top" formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#334155' }} offset={10} />
+                    {memberChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={MEMBER_COLORS[index % MEMBER_COLORS.length]} />
+                    ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-slate-300 font-bold uppercase text-xs tracking-widest">No Activity Records</div>
+              <div className="h-full flex items-center justify-center text-slate-400 font-bold uppercase text-xs tracking-widest">No Records Found</div>
             )}
           </CardContent>
         </Card>

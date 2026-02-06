@@ -16,9 +16,26 @@ export default function ReportsPage() {
   const [stats, setStats] = useState({ totalFund: 0, totalInstalments: 0, totalFD: 0, totalInterest: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
-  const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
   useEffect(() => { fetchReportData(); }, []);
+
+  const getMaturityData = (amount: number, rate: number, start: string, months: number) => {
+    const startDate = new Date(start);
+    const finishDate = new Date(start);
+    finishDate.setMonth(startDate.getMonth() + Number(months));
+    
+    // Accurate daily calculation to match FixedDepositPage logic
+    const diffDays = Math.ceil(Math.abs(finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const interest = (amount * rate * diffDays) / (365 * 100);
+    
+    const isFinished = finishDate <= new Date();
+    
+    return {
+      interest,
+      total: amount + interest,
+      isFinished,
+      finishDateStr: finishDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).replace(/ /g, "-")
+    };
+  };
 
   const fetchReportData = async () => {
     setIsLoading(true);
@@ -27,39 +44,34 @@ export default function ReportsPage() {
       const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
       const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 
-      let finishedFdPrincipal = 0;
       let totalEarnedInterest = 0;
+      let finishedFdPrincipal = 0;
 
       const processedFds = (deposits || []).map(fd => {
-        const principal = Number(fd.amount || 0);
-        const tenure = Number(fd.tenure_months || 0);
-        const rate = Number(fd.interest_rate || 0);
-        
-        const monthIndex = monthsList.indexOf(fd.month);
-        const startDate = new Date(Number(fd.year), monthIndex, 1);
-        const maturityDate = new Date(startDate);
-        maturityDate.setMonth(startDate.getMonth() + tenure);
-        
-        const isFinished = maturityDate <= new Date(); 
-        const calculatedInterest = (principal * (rate / 100) * (tenure / 12));
+        const m = getMaturityData(
+          Number(fd.amount), 
+          Number(fd.interest_rate), 
+          fd.start_date, 
+          Number(fd.tenure_months)
+        );
 
-        if (isFinished) {
-          finishedFdPrincipal += principal;
-          totalEarnedInterest += calculatedInterest;
+        if (m.isFinished) {
+          totalEarnedInterest += m.interest;
+          finishedFdPrincipal += Number(fd.amount);
         }
 
         return {
           ...fd,
-          status: isFinished ? "FINISHED" : "ACTIVE",
-          displayInterest: calculatedInterest,
-          earnedInterest: isFinished ? calculatedInterest : 0,
-          total: principal + (isFinished ? calculatedInterest : 0),
-          tenure_display: `${tenure} Months`
+          status: m.isFinished ? "FINISHED" : "ACTIVE",
+          displayInterest: m.interest,
+          total: m.isFinished ? (Number(fd.amount) + m.interest) : Number(fd.amount),
+          tenure_display: `${fd.tenure_months} Months`,
+          finishDate: m.finishDateStr
         };
       });
 
       const tInst = installments?.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
-      const tFD = processedFds.reduce((s, d) => s + Number(d.amount || 0), 0) || 0;
+      const tFD = processedFds.reduce((s, d) => s + (d.status === "ACTIVE" ? Number(d.amount) : 0), 0) || 0;
 
       const memberEquity = (members || [])
         .filter(m => (m.full_name || "").toLowerCase() !== "admin")
@@ -69,9 +81,10 @@ export default function ReportsPage() {
           
           const mContribution = installments?.filter(i => 
             Number(i.member_id) === Number(mId) || 
-            (i.memberName?.trim().toLowerCase() === mName.toLowerCase() && mName !== "")
+            (i.memberName?.trim().toLowerCase() === mName.toLowerCase())
           ).reduce((sum, i) => sum + Number(i.amount || 0), 0) || 0;
 
+          // Member gets share of interest based on their contribution to total pool
           const mInterestShare = finishedFdPrincipal > 0 
             ? (totalEarnedInterest / finishedFdPrincipal) * mContribution 
             : 0;
@@ -92,7 +105,7 @@ export default function ReportsPage() {
         totalInstalments: tInst, 
         totalFD: tFD, 
         totalInterest: totalEarnedInterest, 
-        totalFund: tInst + tFD + totalEarnedInterest 
+        totalFund: tInst + totalEarnedInterest // Total liquid value
       });
     } catch (e) { 
       console.error(e); 
@@ -109,77 +122,57 @@ export default function ReportsPage() {
   if (isLoading) return <div className="flex h-64 items-center justify-center"><Calculator className="animate-spin h-8 w-8 text-emerald-600" /></div>;
 
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto bg-slate-50/50 min-h-screen print:bg-white print:p-0 print:m-0">
-      {/* GLOBAL PRINT STYLE TO REMOVE SIDEBARS */}
+    <div className="p-4 px-6 space-y-6 max-w-full mx-auto bg-slate-50/50 min-h-screen print:bg-white print:p-0 print:m-0">
       <style jsx global>{`
         @media print {
-          /* Hide sidebar, navigation, and other UI elements from the parent layout */
-          nav, aside, header, .print-hidden, [role="navigation"], .sidebar {
-            display: none !important;
-          }
-          /* Ensure the content takes full width */
-          body, main, .max-w-7xl {
-            width: 100% !important;
-            max-width: 100% !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            background: white !important;
-          }
-          /* Reset card shadows for cleaner printing */
-          .shadow-md {
-            box-shadow: none !important;
-            border: 1px solid #e2e8f0 !important;
-          }
+          nav, aside, header, .print-hidden, [role="navigation"], .sidebar { display: none !important; }
+          body, main, .max-w-full { width: 100% !important; padding: 0 !important; margin: 0 !important; }
         }
       `}</style>
 
       <div className="flex justify-between items-center print:hidden">
-        <h1 className="text-3xl font-bold text-emerald-900 uppercase tracking-tight">Financial Reports</h1>
-        <Button onClick={() => window.print()} className="bg-emerald-700 hover:bg-emerald-800 shadow-sm font-bold">
-            <Printer size={16} className="mr-2" /> Print Full Report
+        <h1 className="text-2xl font-bold text-emerald-900 uppercase tracking-tight">Society Financial Report</h1>
+        <Button onClick={() => window.print()} className="bg-emerald-700 hover:bg-emerald-800 font-bold shadow-none">
+            <Printer size={16} className="mr-2" /> Print Report
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-white print:gap-2">
-        <StatBox title="Total Society Fund" value={stats.totalFund} bg="bg-slate-900 print:bg-slate-100 print:text-black" />
-        <StatBox title="Total Instalments" value={stats.totalInstalments} bg="bg-emerald-600 print:bg-emerald-50 print:text-black" />
-        <StatBox title="Fixed Deposits" value={stats.totalFD} bg="bg-blue-600 print:bg-blue-50 print:text-black" />
-        <StatBox title="Interest Earned" value={stats.totalInterest} bg="bg-purple-600 print:bg-purple-50 print:text-black" />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:gap-2">
+        <StatBox title="Net Society Value" value={stats.totalFund} bg="bg-slate-900 text-white" />
+        <StatBox title="Total Instalments" value={stats.totalInstalments} bg="bg-emerald-600 text-white" />
+        <StatBox title="Active FD Capital" value={stats.totalFD} bg="bg-blue-600 text-white" />
+        <StatBox title="Realized Interest" value={stats.totalInterest} bg="bg-purple-600 text-white" />
       </div>
 
-      <Card className="border-none shadow-md overflow-hidden bg-white print:border print:border-slate-200">
-        <CardHeader className="border-b p-6 print:p-4">
-          <CardTitle className="text-lg flex items-center gap-2 font-bold text-slate-800">
-            <Landmark className="h-5 w-5 text-amber-600" /> Society Investment Portfolio
+      <Card className="border-none shadow-sm rounded-xl overflow-hidden bg-white border border-slate-200">
+        <CardHeader className="border-b p-4 bg-slate-50/50">
+          <CardTitle className="text-md flex items-center gap-2 font-bold text-slate-800 uppercase tracking-wide">
+            <Landmark className="h-4 w-4 text-amber-600" /> Investment Ledger
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader className="bg-slate-50">
-              <TableRow>
-                <TableHead className="px-6 font-bold text-slate-600">Investment Source</TableHead>
-                <TableHead className="font-bold text-center text-slate-600">Tenure</TableHead>
-                <TableHead className="text-right font-bold text-slate-600">Principal Amount</TableHead>
-                <TableHead className="text-right font-bold text-slate-600">Interest Earned</TableHead>
-                <TableHead className="text-right font-bold text-slate-600">Total Value</TableHead>
-                <TableHead className="text-center px-6 font-bold text-slate-600">Status</TableHead>
+              <TableRow className="text-[11px] uppercase">
+                <TableHead className="px-6 font-bold">Entry Month</TableHead>
+                <TableHead className="font-bold text-center">Finish Date</TableHead>
+                <TableHead className="text-right font-bold">Principal</TableHead>
+                <TableHead className="text-right font-bold">Interest</TableHead>
+                <TableHead className="text-right font-bold">Total</TableHead>
+                <TableHead className="text-center px-6 font-bold">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {societyFds.map((fd, idx) => (
                 <TableRow key={idx} className="hover:bg-slate-50/50 border-b last:border-none">
-                  <TableCell className="px-6 font-semibold text-slate-700">Fixed Deposit ({fd.month} {fd.year})</TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-1.5 text-slate-500 font-bold text-xs uppercase">
-                      <Clock size={14} className="print:hidden"/>{fd.tenure_display}
-                    </div>
-                  </TableCell>
+                  <TableCell className="px-6 font-bold text-slate-700 text-sm">FD: {fd.month} {fd.year}</TableCell>
+                  <TableCell className="text-center text-xs font-bold text-slate-500">{fd.finishDate}</TableCell>
                   <TableCell className="text-right font-mono text-slate-600">৳{(fd.amount || 0).toLocaleString()}</TableCell>
                   <TableCell className="text-right font-mono text-emerald-600">৳{Math.round(fd.displayInterest).toLocaleString()}</TableCell>
                   <TableCell className="text-right font-mono font-bold text-slate-900">৳{Math.round(fd.total).toLocaleString()}</TableCell>
                   <TableCell className="text-center px-6">
-                    <Badge variant="outline" className={`font-black uppercase text-[9px] px-2 py-0.5 ${
-                      fd.status === "FINISHED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
+                    <Badge variant="outline" className={`font-black uppercase text-[9px] border-none ${
+                      fd.status === "FINISHED" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"
                     }`}>
                       {fd.status}
                     </Badge>
@@ -191,43 +184,34 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-none shadow-md overflow-hidden bg-white print:border print:border-slate-200">
-        <CardHeader className="bg-emerald-900 text-white p-6 flex flex-col md:flex-row justify-between items-center gap-4 print:bg-white print:text-black print:border-b">
-          <CardTitle className="text-lg flex items-center gap-2 font-bold uppercase tracking-wider">
-            <Users className="h-5 w-5 text-emerald-400 print:text-emerald-700" /> Member Equity Statement
+      <Card className="border-none shadow-sm rounded-xl overflow-hidden bg-white border border-slate-200">
+        <CardHeader className="bg-emerald-900 text-white p-4 print:bg-white print:text-black print:border-b">
+          <CardTitle className="text-md flex items-center gap-2 font-bold uppercase tracking-wider">
+            <Users className="h-4 w-4 text-emerald-400 print:text-emerald-700" /> Member Equity Statement
           </CardTitle>
-          <div className="relative w-full md:w-80 print:hidden">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-300" />
-            <Input 
-              placeholder="Search by name or SCS ID..." 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
-              className="pl-9 bg-emerald-800/50 border-emerald-700 text-white placeholder:text-emerald-400 focus:ring-emerald-500" 
-            />
-          </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader className="bg-slate-100">
-              <TableRow>
-                <TableHead className="px-6 font-bold text-slate-700">Member Identity</TableHead>
-                <TableHead className="text-right font-bold text-slate-700">Total Instalments</TableHead>
-                <TableHead className="text-right font-bold text-slate-700">Interest Dividends</TableHead>
-                <TableHead className="text-right px-6 font-bold text-emerald-900">Net Equity Value</TableHead>
+              <TableRow className="text-[11px] uppercase">
+                <TableHead className="px-6 font-bold">Member Details</TableHead>
+                <TableHead className="text-right font-bold">Contribution</TableHead>
+                <TableHead className="text-right font-bold">Dividends</TableHead>
+                <TableHead className="text-right px-6 font-bold text-emerald-900">Net Equity</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredMembers.map((row) => (
                 <TableRow key={row.id} className="hover:bg-emerald-50/30 border-b last:border-none">
-                  <TableCell className="px-6 py-5">
-                    <div className="font-bold text-slate-900 text-base">{row.name}</div>
-                    <div className="text-[10px] text-emerald-600 font-bold uppercase font-mono mt-0.5 tracking-widest">{row.display_id}</div>
+                  <TableCell className="px-6 py-4">
+                    <div className="font-bold text-slate-900 text-sm">{row.name}</div>
+                    <div className="text-[9px] text-emerald-600 font-bold uppercase font-mono tracking-tighter">{row.display_id}</div>
                   </TableCell>
-                  <TableCell className="text-right font-mono text-slate-700 font-medium">৳{row.inst.toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-mono text-emerald-600 font-medium">
+                  <TableCell className="text-right font-mono text-slate-700 text-sm">৳{row.inst.toLocaleString()}</TableCell>
+                  <TableCell className="text-right font-mono text-emerald-600 text-sm">
                     + ৳{row.interestShare.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}
                   </TableCell>
-                  <TableCell className="text-right font-mono font-bold text-emerald-900 px-6 text-xl">
+                  <TableCell className="text-right font-mono font-bold text-emerald-900 px-6 text-lg">
                     ৳{row.totalEquity.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}
                   </TableCell>
                 </TableRow>
@@ -237,9 +221,8 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
       
-      {/* Footer for printed page */}
-      <div className="hidden print:block text-right pt-10 text-xs text-slate-400">
-        Generated on: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}
+      <div className="hidden print:block text-right pt-6 text-[10px] text-slate-400 font-mono">
+        Official Report | Generated: {new Date().toLocaleString()}
       </div>
     </div>
   );
@@ -247,9 +230,9 @@ export default function ReportsPage() {
 
 function StatBox({ title, value, bg }: any) {
   return (
-    <div className={`${bg} p-6 rounded-2xl shadow-lg border-b-4 border-black/10 print:border-none print:shadow-none print:border print:border-slate-200`}>
-      <p className="text-[10px] font-bold uppercase opacity-75 mb-1 tracking-widest">{title}</p>
-      <h2 className="text-3xl font-black font-mono">৳{Math.round(value).toLocaleString()}</h2>
+    <div className={`${bg} p-5 rounded-xl shadow-sm border border-black/5`}>
+      <p className="text-[9px] font-bold uppercase opacity-80 mb-1 tracking-widest">{title}</p>
+      <h2 className="text-2xl font-black font-mono">৳{Math.round(value).toLocaleString()}</h2>
     </div>
   );
 }

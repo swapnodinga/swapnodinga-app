@@ -3,14 +3,36 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Landmark, PiggyBank, Wallet, TrendingUp, Activity, PieChart } from "lucide-react";
 import { 
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
+  ResponsiveContainer, BarChart, Bar, XAxis, 
   CartesianGrid, Cell, LabelList, Tooltip, LineChart, Line, PieChart as RePie, Pie
 } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const MEMBER_PALETTE = ['#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#14b8a6', '#4ade80', '#fb7185'];
+
+// Custom Label component to guarantee one-line vertical text
+const VerticalNameLabel = (props: any) => {
+  const { x, y, width, value } = props;
+  return (
+    <text
+      x={x + width / 2}
+      y={y + 10} // Positioned near the bottom inside the bar
+      fill="#ffffff"
+      textAnchor="start"
+      transform={`rotate(-90, ${x + width / 2}, ${y + 10})`}
+      style={{ 
+        fontSize: '11px', 
+        fontWeight: '700', 
+        textShadow: '1px 1px 2px rgba(0,0,0,0.6)',
+        letterSpacing: '0.02em',
+        pointerEvents: 'none'
+      }}
+    >
+      {value}
+    </text>
+  );
+};
 
 export default function AdminDashboard() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
@@ -127,10 +149,10 @@ export default function AdminDashboard() {
 
       {/* MAIN GRAPHS ROW */}
       <div className="grid grid-cols-12 gap-6">
-        {/* CAPITAL MIX - SMALLER */}
+        {/* CAPITAL MIX */}
         <Card className="col-span-12 lg:col-span-4 border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
           <CardHeader className="py-4 px-6 bg-slate-50/30 border-b"><CardTitle className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Capital Mix Analysis</CardTitle></CardHeader>
-          <CardContent className="h-[350px] pt-12">
+          <CardContent className="h-[400px] pt-12">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart 
                 data={[
@@ -152,35 +174,27 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* MEMBER EQUITY - BIGGER */}
+        {/* MEMBER EQUITY */}
         <Card className="col-span-12 lg:col-span-8 border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
           <CardHeader className="py-4 px-6 bg-slate-50/30 border-b"><CardTitle className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Member Equity Statement</CardTitle></CardHeader>
-          <CardContent className="h-[350px] pt-12">
+          <CardContent className="h-[400px] pt-12 pb-4">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={memberChartData} margin={{ top: 20, bottom: 5, left: 10, right: 10 }}>
-                {/* DEFINING THE SHADOW FILTER */}
+              <BarChart data={memberChartData} margin={{ top: 25, bottom: 5, left: 10, right: 10 }}>
                 <defs>
                   <filter id="barShadow" x="-20%" y="-20%" width="140%" height="140%">
                     <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
                     <feOffset dx="2" dy="4" result="offsetblur" />
-                    <feComponentTransfer>
-                      <feFuncA type="linear" slope="0.3" />
-                    </feComponentTransfer>
-                    <feMerge>
-                      <feMergeNode />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
+                    <feComponentTransfer><feFuncA type="linear" slope="0.3" /></feComponentTransfer>
+                    <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
                   </filter>
                 </defs>
-                
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis hide /> 
                 <Tooltip cursor={{fill: 'transparent'}} />
-                
                 <Bar 
                   dataKey="total" 
                   radius={[6, 6, 0, 0]} 
-                  barSize={45} 
+                  barSize={42} 
                   style={{ filter: 'url(#barShadow)' }}
                 >
                   <LabelList 
@@ -190,21 +204,9 @@ export default function AdminDashboard() {
                     style={{ fontSize: '11px', fontWeight: '800', fill: '#0f172a' }} 
                     offset={12} 
                   />
-                  {/* MEMBER NAME - ONE LINE VERTICAL */}
-                  <LabelList
-                    dataKey="displayName"
-                    position="insideBottom"
-                    angle={-90}
-                    offset={25}
-                    style={{ 
-                      fill: '#ffffff', 
-                      fontSize: '10px', 
-                      fontWeight: '700',
-                      textShadow: '1px 1px 3px rgba(0,0,0,0.6)',
-                      pointerEvents: 'none',
-                      whiteSpace: 'nowrap'
-                    }}
-                  />
+                  {/* NEW CUSTOM VERTICAL LABEL COMPONENT */}
+                  <LabelList dataKey="displayName" content={<VerticalNameLabel />} />
+                  
                   {memberChartData.map((_, i) => <Cell key={i} fill={MEMBER_PALETTE[i % 10]} />)}
                 </Bar>
               </BarChart>
@@ -213,7 +215,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* BOTTOM ROW: DONUT & TREND */}
+      {/* BOTTOM ROW */}
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
           <CardHeader className="py-4 px-6 bg-slate-50/30 border-b"><CardTitle className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Treasury Liquidity</CardTitle></CardHeader>

@@ -4,29 +4,30 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
-  ResponsiveContainer, BarChart, Bar, XAxis, 
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Cell, LabelList, Tooltip, LineChart, Line, PieChart as RePie, Pie
 } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const MEMBER_PALETTE = ['#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#14b8a6', '#4ade80', '#fb7185'];
 
-// Custom Label component to guarantee one-line vertical text
+// Custom Label component for vertical text inside the bar
 const VerticalNameLabel = (props: any) => {
-  const { x, y, width, value } = props;
+  const { x, y, width, height, value } = props;
+  // Reduced font size and adjusted positioning to stay inside the bar
   return (
     <text
       x={x + width / 2}
-      y={y + 10} // Positioned near the bottom inside the bar
+      y={y + height - 15} 
       fill="#ffffff"
       textAnchor="start"
-      transform={`rotate(-90, ${x + width / 2}, ${y + 10})`}
+      transform={`rotate(-90, ${x + width / 2}, ${y + height - 15})`}
       style={{ 
-        fontSize: '11px', 
-        fontWeight: '700', 
-        textShadow: '1px 1px 2px rgba(0,0,0,0.6)',
-        letterSpacing: '0.02em',
-        pointerEvents: 'none'
+        fontSize: '10px', 
+        fontWeight: '600', 
+        textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
+        pointerEvents: 'none',
+        textTransform: 'uppercase'
       }}
     >
       {value}
@@ -152,7 +153,7 @@ export default function AdminDashboard() {
         {/* CAPITAL MIX */}
         <Card className="col-span-12 lg:col-span-4 border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
           <CardHeader className="py-4 px-6 bg-slate-50/30 border-b"><CardTitle className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Capital Mix Analysis</CardTitle></CardHeader>
-          <CardContent className="h-[400px] pt-12">
+          <CardContent className="h-[380px] pt-12">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart 
                 data={[
@@ -165,8 +166,9 @@ export default function AdminDashboard() {
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 'bold' }} interval={0} />
-                <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={40} style={{ filter: 'drop-shadow(2px 4px 6px rgba(0,0,0,0.15))' }}>
-                  <LabelList dataKey="val" position="top" formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} style={{ fontSize: '11px', fontWeight: 'bold', fill: '#1e293b' }} offset={10} />
+                <YAxis hide domain={[0, 'dataMax + 100000']} />
+                <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={40}>
+                  <LabelList dataKey="val" position="top" formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#1e293b' }} offset={10} />
                   <Cell fill="#3b82f6" /><Cell fill="#10b981" /><Cell fill="#8b5cf6" /><Cell fill="#0f172a" />
                 </Bar>
               </BarChart>
@@ -177,36 +179,27 @@ export default function AdminDashboard() {
         {/* MEMBER EQUITY */}
         <Card className="col-span-12 lg:col-span-8 border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
           <CardHeader className="py-4 px-6 bg-slate-50/30 border-b"><CardTitle className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Member Equity Statement</CardTitle></CardHeader>
-          <CardContent className="h-[400px] pt-12 pb-4">
+          <CardContent className="h-[380px] pt-12 pb-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={memberChartData} margin={{ top: 25, bottom: 5, left: 10, right: 10 }}>
-                <defs>
-                  <filter id="barShadow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
-                    <feOffset dx="2" dy="4" result="offsetblur" />
-                    <feComponentTransfer><feFuncA type="linear" slope="0.3" /></feComponentTransfer>
-                    <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
-                  </filter>
-                </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis hide /> 
+                {/* Domain set with padding to prevent bars from hitting the top too hard */}
+                <YAxis hide domain={[0, 'dataMax + 50000']} />
                 <Tooltip cursor={{fill: 'transparent'}} />
                 <Bar 
                   dataKey="total" 
                   radius={[6, 6, 0, 0]} 
-                  barSize={42} 
-                  style={{ filter: 'url(#barShadow)' }}
+                  barSize={44} 
                 >
                   <LabelList 
                     dataKey="total" 
                     position="top" 
                     formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} 
-                    style={{ fontSize: '11px', fontWeight: '800', fill: '#0f172a' }} 
-                    offset={12} 
+                    style={{ fontSize: '10px', fontWeight: '800', fill: '#0f172a' }} 
+                    offset={10} 
                   />
-                  {/* NEW CUSTOM VERTICAL LABEL COMPONENT */}
                   <LabelList dataKey="displayName" content={<VerticalNameLabel />} />
-                  
                   {memberChartData.map((_, i) => <Cell key={i} fill={MEMBER_PALETTE[i % 10]} />)}
                 </Bar>
               </BarChart>

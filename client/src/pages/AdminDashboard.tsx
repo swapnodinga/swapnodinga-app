@@ -125,16 +125,16 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* MAIN GRAPHS ROW: REBALANCED GRID (4/12 vs 8/12) */}
+      {/* MAIN GRAPHS ROW */}
       <div className="grid grid-cols-12 gap-6">
-        {/* CAPITAL MIX - SMALLER (col-span-4) */}
+        {/* CAPITAL MIX - SMALLER */}
         <Card className="col-span-12 lg:col-span-4 border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
           <CardHeader className="py-4 px-6 bg-slate-50/30 border-b"><CardTitle className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Capital Mix Analysis</CardTitle></CardHeader>
-          <CardContent className="h-[400px] pt-12">
+          <CardContent className="h-[350px] pt-12">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart 
                 data={[
-                  { label: 'ACTIVE FD', val: stats.totalFixedDeposits, color: '#3b82f6' },
+                  { label: 'FD', val: stats.totalFixedDeposits, color: '#3b82f6' },
                   { label: 'INST.', val: stats.totalInstalments, color: '#10b981' },
                   { label: 'INT.', val: stats.totalInterest, color: '#8b5cf6' },
                   { label: 'NET', val: stats.totalFund, color: '#0f172a' }
@@ -143,7 +143,7 @@ export default function AdminDashboard() {
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 'bold' }} interval={0} />
-                <Bar dataKey="val" radius={0} barSize={45}>
+                <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={40} style={{ filter: 'drop-shadow(2px 4px 6px rgba(0,0,0,0.15))' }}>
                   <LabelList dataKey="val" position="top" formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} style={{ fontSize: '11px', fontWeight: 'bold', fill: '#1e293b' }} offset={10} />
                   <Cell fill="#3b82f6" /><Cell fill="#10b981" /><Cell fill="#8b5cf6" /><Cell fill="#0f172a" />
                 </Bar>
@@ -152,35 +152,57 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* MEMBER EQUITY - BIGGER (col-span-8) */}
+        {/* MEMBER EQUITY - BIGGER */}
         <Card className="col-span-12 lg:col-span-8 border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
           <CardHeader className="py-4 px-6 bg-slate-50/30 border-b"><CardTitle className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Member Equity Statement</CardTitle></CardHeader>
-          <CardContent className="h-[400px] pt-12">
+          <CardContent className="h-[350px] pt-12">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={memberChartData} margin={{ top: 20, bottom: 10, left: 10, right: 10 }}>
+              <BarChart data={memberChartData} margin={{ top: 20, bottom: 5, left: 10, right: 10 }}>
+                {/* DEFINING THE SHADOW FILTER */}
+                <defs>
+                  <filter id="barShadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
+                    <feOffset dx="2" dy="4" result="offsetblur" />
+                    <feComponentTransfer>
+                      <feFuncA type="linear" slope="0.3" />
+                    </feComponentTransfer>
+                    <feMerge>
+                      <feMergeNode />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+                
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis hide /> {/* Hidden to prioritize vertical names inside bars */}
+                <XAxis hide /> 
                 <Tooltip cursor={{fill: 'transparent'}} />
-                <Bar dataKey="total" radius={[4, 4, 0, 0]} barSize={50}>
+                
+                <Bar 
+                  dataKey="total" 
+                  radius={[6, 6, 0, 0]} 
+                  barSize={45} 
+                  style={{ filter: 'url(#barShadow)' }}
+                >
                   <LabelList 
                     dataKey="total" 
                     position="top" 
                     formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} 
-                    style={{ fontSize: '11px', fontWeight: 'bold', fill: '#1e293b' }} 
-                    offset={10} 
+                    style={{ fontSize: '11px', fontWeight: '800', fill: '#0f172a' }} 
+                    offset={12} 
                   />
-                  {/* VERTICAL ROTATED NAMES INSIDE BARS */}
+                  {/* MEMBER NAME - ONE LINE VERTICAL */}
                   <LabelList
                     dataKey="displayName"
                     position="insideBottom"
                     angle={-90}
-                    offset={30}
+                    offset={25}
                     style={{ 
                       fill: '#ffffff', 
-                      fontSize: '11px', 
-                      fontWeight: 'bold',
-                      textShadow: '0px 1px 2px rgba(0,0,0,0.5)',
-                      pointerEvents: 'none'
+                      fontSize: '10px', 
+                      fontWeight: '700',
+                      textShadow: '1px 1px 3px rgba(0,0,0,0.6)',
+                      pointerEvents: 'none',
+                      whiteSpace: 'nowrap'
                     }}
                   />
                   {memberChartData.map((_, i) => <Cell key={i} fill={MEMBER_PALETTE[i % 10]} />)}

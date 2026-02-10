@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSociety } from "@/context/SocietyContext";
@@ -15,8 +17,6 @@ export default function MemberDashboard() {
     myInstallments: 0
   });
 
-  const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
   useEffect(() => {
     const fetchMemberData = async () => {
       if (!currentUser || !currentUser.id) return;
@@ -25,12 +25,10 @@ export default function MemberDashboard() {
         const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
         const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 
-        // Logic to group by MTDR and take only the latest entry principal [cite: 2026-02-10]
         const groupedDeposits = (deposits || []).reduce((groups: any, fd: any) => {
           const key = fd.mtdr_no || "Unassigned";
           if (!groups[key]) groups[key] = [];
           groups[key].push(fd);
-          // Sort by date descending so index 0 is the latest entry
           groups[key].sort((a: any, b: any) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
           return groups;
         }, {});
@@ -38,14 +36,12 @@ export default function MemberDashboard() {
         let totalGlobalPrincipal = 0;
         let finishedInterest = 0;
         let totalFinishedPrincipalForShare = 0;
+        const now = new Date();
 
-        // Calculate based on grouped logic
         Object.values(groupedDeposits).forEach((group: any) => {
-          // Add latest principal of this group to Total Fixed Deposit
           const latestFd = group[0];
           totalGlobalPrincipal += Number(latestFd.amount || 0);
 
-          // Calculate interest for all entries in the group that are finished
           group.forEach((fd: any) => {
             const principal = Number(fd.amount || 0);
             const tenure = Number(fd.tenure_months || 0);
@@ -55,7 +51,8 @@ export default function MemberDashboard() {
             const maturityDate = new Date(startDate);
             maturityDate.setMonth(startDate.getMonth() + tenure);
 
-            if (maturityDate <= new Date()) {
+            // Improved comparison logic to ensure all matured interest is caught
+            if (maturityDate <= now) {
               const interest = (principal * (rate / 100) * (tenure / 12));
               finishedInterest += interest;
               totalFinishedPrincipalForShare += principal;
@@ -69,7 +66,6 @@ export default function MemberDashboard() {
           .filter(inst => inst.member_id === currentUser.id)
           .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-        // Share calculation
         const myInterestShare = totalFinishedPrincipalForShare > 0 
           ? (finishedInterest / totalFinishedPrincipalForShare) * myInstallments 
           : 0;
@@ -77,7 +73,6 @@ export default function MemberDashboard() {
         setLocalStats({
           societyFixedDeposit: totalGlobalPrincipal,
           societyDepositInterest: finishedInterest,
-          // UPDATED: Total Installments + Total Interest (Excluding FD Principal) [cite: 2026-02-10]
           societyTotalFund: societyTotalInstalments + finishedInterest,
           myAccumulatedInterest: myInterestShare,
           myInstallments: myInstallments
@@ -119,7 +114,7 @@ export default function MemberDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatCard 
             title="MY TOTAL SAVINGS" 
-            value={`৳${myTotalSavings.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`} 
+            value={`৳${myTotalSavings.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`} 
             icon={Wallet} 
             className={unifiedCardStyle}
             valueClassName={`${amountFontStyle} text-3xl`} 
@@ -133,7 +128,7 @@ export default function MemberDashboard() {
           />
           <StatCard 
             title="ACCUMULATED INTEREST" 
-            value={`৳${localStats.myAccumulatedInterest.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`} 
+            value={`৳${localStats.myAccumulatedInterest.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`} 
             icon={Percent} 
             className={unifiedCardStyle}
             valueClassName={`${amountFontStyle} text-3xl text-emerald-600`}
@@ -152,8 +147,8 @@ export default function MemberDashboard() {
             valueClassName={`${amountFontStyle} text-2xl`}
           />
           <StatCard 
-            title="DEPOSIT INTEREST" 
-            value={`৳${localStats.societyDepositInterest.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`} 
+            title="REALIZED INTEREST" 
+            value={`৳${localStats.societyDepositInterest.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} 
             icon={TrendingUp} 
             className={unifiedCardStyle}
             valueClassName={`${amountFontStyle} text-2xl`}
@@ -164,7 +159,7 @@ export default function MemberDashboard() {
               <Building2 className="h-4 w-4 text-emerald-500 opacity-50" />
             </div>
             <div className="font-sans font-extrabold text-white text-3xl md:text-4xl tracking-tight">
-              ৳{localStats.societyTotalFund.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+              ৳{localStats.societyTotalFund.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </div>
             <p className="text-[9px] text-emerald-500/60 font-medium uppercase mt-1">Collective Pool</p>
           </Card>

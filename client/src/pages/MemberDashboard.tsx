@@ -77,7 +77,8 @@ export default function MemberDashboard() {
         setLocalStats({
           societyFixedDeposit: totalGlobalPrincipal,
           societyDepositInterest: finishedInterest,
-          societyTotalFund: societyTotalInstalments + totalGlobalPrincipal + finishedInterest,
+          // UPDATED: Total Installments + Total Interest (Excluding FD Principal) [cite: 2026-02-10]
+          societyTotalFund: societyTotalInstalments + finishedInterest,
           myAccumulatedInterest: myInterestShare,
           myInstallments: myInstallments
         });

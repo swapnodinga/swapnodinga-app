@@ -50,6 +50,7 @@ export default function FixedDepositPage() {
     }
   }
 
+  // Refined Summary Calculations
   const stats = fixedDeposits.reduce((acc: any, fd: any) => {
     const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
     acc.totalPrincipal += Number(fd.amount)
@@ -150,6 +151,7 @@ export default function FixedDepositPage() {
         </h1>
       </div>
 
+      {/* 4 Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 px-2">
         <Card className="border-none shadow-sm bg-white">
           <CardContent className="p-4 flex items-center gap-3">
@@ -193,6 +195,7 @@ export default function FixedDepositPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* ENTRY FORM */}
         <Card className="lg:col-span-1 h-fit shadow-sm border-[#e2e8f0] rounded-xl bg-white">
           <CardHeader className="border-b px-4 py-3">
             <CardTitle className="text-[15px] font-bold text-[#065f46] flex items-center gap-2">
@@ -230,6 +233,7 @@ export default function FixedDepositPage() {
           </CardContent>
         </Card>
 
+        {/* HISTORY TABLE */}
         <Card className="lg:col-span-3 shadow-sm border-[#e2e8f0] rounded-xl overflow-hidden bg-white">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

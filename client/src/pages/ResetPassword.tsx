@@ -28,12 +28,24 @@ export default function ResetPassword() {
 
     try {
       setLoading(true);
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
 
-      if (error) throw error;
+      // 1. Update the password for the current session user [cite: 2026-02-10]
+      const { error: updateError } = await supabase.auth.updateUser({ 
+        password: newPassword 
+      });
 
-      toast({ title: "Success", description: "Password updated successfully." });
-      setLocation("/"); // Redirect to login/home
+      if (updateError) throw updateError;
+
+      // 2. CRITICAL: Sign out immediately after update to clear old session data [cite: 2026-02-10]
+      await supabase.auth.signOut();
+
+      toast({ 
+        title: "Success", 
+        description: "Password updated successfully. Please login with your new password." 
+      });
+      
+      // Redirect to login page
+      setLocation("/"); 
     } catch (error: any) {
       toast({ variant: "destructive", title: "Update Failed", description: error.message });
     } finally {

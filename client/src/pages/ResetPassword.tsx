@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -29,22 +29,30 @@ export default function ResetPassword() {
     try {
       setLoading(true);
 
-      // 1. Update the password for the current session user [cite: 2026-02-10]
-      const { error: updateError } = await supabase.auth.updateUser({ 
+      // 1. Verify session exists from the recovery link
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Link expired. Please request a new one from the login page.");
+
+      // 2. Update Supabase Internal Auth (Encrypts password) [cite: 2026-02-10]
+      const { error: authError } = await supabase.auth.updateUser({ 
         password: newPassword 
       });
+      if (authError) throw authError;
 
-      if (updateError) throw updateError;
+      // 3. Keep your custom table in sync so your data is consistent [cite: 2026-02-10]
+      const { error: tableError } = await supabase
+        .from('members') 
+        .update({ password: newPassword })
+        .eq('email', user.email);
 
-      // 2. CRITICAL: Sign out immediately after update to clear old session data [cite: 2026-02-10]
+      // 4. Logout to force a clean login with the new credentials
       await supabase.auth.signOut();
 
       toast({ 
         title: "Success", 
-        description: "Password updated successfully. Please login with your new password." 
+        description: "Password updated successfully. Please login now." 
       });
       
-      // Redirect to login page
       setLocation("/"); 
     } catch (error: any) {
       toast({ variant: "destructive", title: "Update Failed", description: error.message });
@@ -67,23 +75,11 @@ export default function ResetPassword() {
           <form onSubmit={handleUpdatePassword} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="password">New Password</Label>
-              <Input 
-                id="password" 
-                type="password" 
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-              />
+              <Input id="password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm">Confirm Password</Label>
-              <Input 
-                id="confirm" 
-                type="password" 
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
+              <Input id="confirm" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
             </div>
             <Button type="submit" className="w-full bg-emerald-800 hover:bg-emerald-900" disabled={loading}>
               {loading ? <Loader2 className="animate-spin mr-2" size={18} /> : "Update Password"}

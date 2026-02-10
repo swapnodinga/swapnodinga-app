@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Banknote, Upload, FileText, Loader2, Plus, TrendingUp, Wallet, CheckCircle2, RotateCw, Hash } from "lucide-react"
+import { Banknote, Upload, FileText, Loader2, Plus, TrendingUp, Wallet, RotateCw, Hash } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function FixedDepositPage() {
@@ -52,7 +52,6 @@ export default function FixedDepositPage() {
     }
   }
 
-  // GROUPING LOGIC BY MTDR NO
   const groupedDeposits = fixedDeposits.reduce((groups: any, fd: any) => {
     const key = fd.mtdr_no || "Unassigned"
     if (!groups[key]) groups[key] = []
@@ -63,9 +62,7 @@ export default function FixedDepositPage() {
 
   const mtdrKeys = Object.keys(groupedDeposits)
 
-  // REVISED STATS LOGIC: Sums the latest principal for EVERY MTDR certificate
   const stats = Object.values(groupedDeposits).reduce((acc: any, group: any) => {
-    // 1. Calculate Interest for every single row in the group
     group.forEach((fd: any) => {
       const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
       if (m.isFinished) {
@@ -73,22 +70,17 @@ export default function FixedDepositPage() {
       }
     })
 
-    // 2. Identify the most recent certificate for this MTDR No
     const latestFd = group[0]
     const latestM = getMaturityData(latestFd.amount, latestFd.interest_rate, latestFd.start_date, latestFd.tenure_months)
     
-    // Always add the latest principal to the "Total Principal" pool
     acc.overallPrincipal += Number(latestFd.amount)
 
-    // Sub-categorize for the other UI cards
     if (!latestM.isFinished) {
       acc.activePrincipalCount += 1
-    } else {
-      acc.totalFinishedPrincipal += Number(latestFd.amount)
     }
 
     return acc
-  }, { overallPrincipal: 0, totalFinishedPrincipal: 0, totalRealizedInterest: 0, activePrincipalCount: 0 })
+  }, { overallPrincipal: 0, totalRealizedInterest: 0, activePrincipalCount: 0 })
 
   const uploadFile = async (file: File) => {
     const fileExt = file.name.split('.').pop()
@@ -179,23 +171,13 @@ export default function FixedDepositPage() {
         </h1>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 px-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 px-2">
         <Card className="border-none shadow-sm bg-white border-l-4 border-emerald-500">
           <CardContent className="p-4 flex items-center gap-3">
             <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600"><Wallet size={20} /></div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Total Principal</p>
               <h3 className="text-lg font-bold text-slate-800">৳{stats.overallPrincipal.toLocaleString()}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-slate-100 rounded-lg text-slate-500"><CheckCircle2 size={20} /></div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Finished MTDR Amount</p>
-              <h3 className="text-lg font-bold text-slate-600">৳{stats.totalFinishedPrincipal.toLocaleString()}</h3>
             </div>
           </CardContent>
         </Card>
@@ -286,9 +268,6 @@ export default function FixedDepositPage() {
                         <h3 className="font-bold text-slate-700 flex items-center gap-2">
                             <Hash size={16} className="text-emerald-500"/> Interest Accrual History
                         </h3>
-                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">
-                            Total Growth: ৳{deposits.reduce((acc: number, d: any) => acc + getMaturityData(d.amount, d.interest_rate, d.start_date, d.tenure_months).interest, 0).toLocaleString()}
-                        </Badge>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">

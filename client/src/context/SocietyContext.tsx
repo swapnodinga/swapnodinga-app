@@ -182,7 +182,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, pass: string) => {
     try {
-      // Fetch user data based on email and password
       const { data: memberData } = await supabase
         .from("members")
         .select("*")
@@ -191,7 +190,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         .single()
 
       if (memberData) {
-        // Enforce admin approval requirement
         if (memberData.status !== 'active') {
           console.log("Login denied: Member not approved by admin");
           return false;
@@ -215,11 +213,22 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (userData: any) => {
     try {
-      // Injects required fields to prevent "Registration Failed" due to DB constraints
+      // 1. Fetch current members to determine next ID
+      const { data: currentMembers } = await supabase.from("members").select("id")
+      
+      // 2. Logic for sequential ID and Society ID (e.g., 10 -> 11, SCS-010 -> SCS-011)
+      const lastId = currentMembers && currentMembers.length > 0 
+        ? Math.max(...currentMembers.map(m => m.id)) 
+        : 0;
+      
+      const nextId = lastId + 1;
+      const nextSocietyId = `SCS-${String(nextId).padStart(3, '0')}`;
+
       const payload = {
         ...userData,
-        society_id: "PENDING", 
-        status: "pending",     // Default status to block login until approval
+        id: nextId,
+        society_id: nextSocietyId, 
+        status: "pending",
         fixed_deposit_amount: 0,
         fixed_deposit_interest: 0,
         is_admin: false
@@ -236,7 +245,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   }
 
   const approveMember = async (id: string) => {
-    // Updates status to 'active' to allow member to log in
     await supabase.from("members").update({ status: "active" }).eq("id", id)
     await refreshData()
   }

@@ -66,10 +66,10 @@ export default function FixedDepositPage() {
   const uploadFile = async (file: File) => {
     const fileExt = file.name.split('.').pop()
     const fileName = `fd-${Date.now()}.${fileExt}`
-    // STRICT FIX: Bucket name set to 'fixed_deposits' based on your schema
-    const { error: uploadError } = await supabase.storage.from('fixed_deposits').upload(fileName, file)
+    // FIX: Reverted to 'fd-slips' as per your working configuration
+    const { error: uploadError } = await supabase.storage.from('fd-slips').upload(fileName, file)
     if (uploadError) throw uploadError
-    const { data: { publicUrl } } = supabase.storage.from('fixed_deposits').getPublicUrl(fileName)
+    const { data: { publicUrl } } = supabase.storage.from('fd-slips').getPublicUrl(fileName)
     return publicUrl
   }
 

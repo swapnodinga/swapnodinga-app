@@ -57,15 +57,15 @@ export default function FixedDepositPage() {
     const key = fd.mtdr_no || "Unassigned"
     if (!groups[key]) groups[key] = []
     groups[key].push(fd)
-    // Sort within group by date (latest first)
     groups[key].sort((a: any, b: any) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
     return groups
   }, {})
 
   const mtdrKeys = Object.keys(groupedDeposits)
 
-  // STATS LOGIC: Principal only sums the newest entry of each MTDR group if it is Active
+  // REVISED STATS LOGIC: Sums the latest principal for EVERY MTDR certificate
   const stats = Object.values(groupedDeposits).reduce((acc: any, group: any) => {
+    // 1. Calculate Interest for every single row in the group
     group.forEach((fd: any) => {
       const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
       if (m.isFinished) {
@@ -73,18 +73,22 @@ export default function FixedDepositPage() {
       }
     })
 
-    // Take the latest record of this MTDR to check active principal
+    // 2. Identify the most recent certificate for this MTDR No
     const latestFd = group[0]
     const latestM = getMaturityData(latestFd.amount, latestFd.interest_rate, latestFd.start_date, latestFd.tenure_months)
     
+    // Always add the latest principal to the "Total Principal" pool
+    acc.overallPrincipal += Number(latestFd.amount)
+
+    // Sub-categorize for the other UI cards
     if (!latestM.isFinished) {
-      acc.totalActivePrincipal += Number(latestFd.amount)
+      acc.activePrincipalCount += 1
     } else {
       acc.totalFinishedPrincipal += Number(latestFd.amount)
     }
 
     return acc
-  }, { totalActivePrincipal: 0, totalFinishedPrincipal: 0, totalRealizedInterest: 0 })
+  }, { overallPrincipal: 0, totalFinishedPrincipal: 0, totalRealizedInterest: 0, activePrincipalCount: 0 })
 
   const uploadFile = async (file: File) => {
     const fileExt = file.name.split('.').pop()
@@ -181,7 +185,7 @@ export default function FixedDepositPage() {
             <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600"><Wallet size={20} /></div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Total Principal</p>
-              <h3 className="text-lg font-bold text-slate-800">৳{stats.totalActivePrincipal.toLocaleString()}</h3>
+              <h3 className="text-lg font-bold text-slate-800">৳{stats.overallPrincipal.toLocaleString()}</h3>
             </div>
           </CardContent>
         </Card>
@@ -211,7 +215,7 @@ export default function FixedDepositPage() {
             <div className="p-2 bg-orange-50 rounded-lg text-orange-600"><RotateCw size={20} /></div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Active Running</p>
-              <h3 className="text-lg font-bold text-slate-800">{mtdrKeys.length} Records</h3>
+              <h3 className="text-lg font-bold text-slate-800">{stats.activePrincipalCount} Certificates</h3>
             </div>
           </CardContent>
         </Card>

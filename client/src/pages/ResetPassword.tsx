@@ -1,3 +1,5 @@
+"use client"
+
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLocation } from "wouter";
@@ -29,30 +31,24 @@ export default function ResetPassword() {
     try {
       setLoading(true);
 
-      // 1. Verify session exists from the recovery link
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) throw new Error("Link expired. Please request a new one from the login page.");
+      if (userError || !user) throw new Error("Session expired. Please request a new reset link.");
 
-      // 2. Update Supabase Internal Auth (Encrypts password) [cite: 2026-02-10]
-      const { error: authError } = await supabase.auth.updateUser({ 
-        password: newPassword 
-      });
+      // 1. Update Supabase Internal Auth
+      const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
       if (authError) throw authError;
 
-      // 3. Keep your custom table in sync so your data is consistent [cite: 2026-02-10]
+      // 2. Update your custom 'members' table for your login logic
       const { error: tableError } = await supabase
         .from('members') 
         .update({ password: newPassword })
         .eq('email', user.email);
 
-      // 4. Logout to force a clean login with the new credentials
+      if (tableError) throw tableError;
+
       await supabase.auth.signOut();
 
-      toast({ 
-        title: "Success", 
-        description: "Password updated successfully. Please login now." 
-      });
-      
+      toast({ title: "Success", description: "Password updated. Please login now." });
       setLocation("/"); 
     } catch (error: any) {
       toast({ variant: "destructive", title: "Update Failed", description: error.message });

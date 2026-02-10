@@ -191,10 +191,8 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (memberData) {
         if (memberData.status !== 'active') {
-          console.log("Login denied: Member not approved by admin");
           return false;
         }
-
         setCurrentUser(memberData)
         localStorage.setItem("user", JSON.stringify(memberData))
         return true
@@ -213,10 +211,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (userData: any) => {
     try {
-      // 1. Fetch current members to determine next ID
       const { data: currentMembers } = await supabase.from("members").select("id")
-      
-      // 2. Logic for sequential ID and Society ID (e.g., 10 -> 11, SCS-010 -> SCS-011)
       const lastId = currentMembers && currentMembers.length > 0 
         ? Math.max(...currentMembers.map(m => m.id)) 
         : 0;

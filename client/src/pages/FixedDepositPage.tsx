@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Banknote, Upload, FileText, Loader2, Plus, TrendingUp, Wallet, PieChart } from "lucide-react"
+import { Banknote, Upload, FileText, Loader2, Plus, TrendingUp, Wallet, CheckCircle2, RotateCw } from "lucide-react"
 
 export default function FixedDepositPage() {
   const { fixedDeposits, addFixedDeposit, updateFixedDeposit, deleteFixedDeposit, currentUser } = useSociety()
@@ -40,29 +40,59 @@ export default function FixedDepositPage() {
     const interest = (amount * rate * diffDays) / (365 * 100)
     
     return {
+      startDate,
+      finishDate,
       startDateStr: formatTableDate(startDate), 
       finishDateStr: formatTableDate(finishDate),
+      interest: Math.round(interest),
       total: Math.round(amount + interest),
       isFinished: finishDate <= new Date()
     }
   }
 
-  // Summary Calculations
+  // Updated 4-Card Summary Calculations
   const stats = fixedDeposits.reduce((acc: any, fd: any) => {
     const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
     acc.totalPrincipal += Number(fd.amount)
-    acc.totalMaturity += m.total
-    if (!m.isFinished) acc.activeCount += 1
+    
+    if (m.isFinished) {
+      acc.totalFinished += Number(fd.amount)
+      acc.totalRealizedInterest += m.interest
+    } else {
+      acc.totalActive += Number(fd.amount)
+    }
     return acc
-  }, { totalPrincipal: 0, totalMaturity: 0, activeCount: 0 })
+  }, { totalPrincipal: 0, totalFinished: 0, totalRealizedInterest: 0, totalActive: 0 })
 
   const uploadFile = async (file: File) => {
     const fileExt = file.name.split('.').pop()
     const fileName = `fd-${Date.now()}.${fileExt}`
-    const { error: uploadError } = await supabase.storage.from('fd-slips').upload(fileName, file)
+    const { error: uploadError } = await supabase.storage.from('fixed_deposits').upload(fileName, file)
     if (uploadError) throw uploadError
-    const { data: { publicUrl } } = supabase.storage.from('fd-slips').getPublicUrl(fileName)
+    const { data: { publicUrl } } = supabase.storage.from('fixed_deposits').getPublicUrl(fileName)
     return publicUrl
+  }
+
+  const handleReinvest = async (fd: any) => {
+    const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
+    const newStartDate = m.finishDate.toISOString().split("T")[0]
+    
+    const payload = {
+      amount: Number(fd.amount),
+      start_date: newStartDate,
+      interest_rate: Number(fd.interest_rate),
+      tenure_months: 3,
+      month: m.finishDate.toLocaleString('default', { month: 'long' }),
+      year: m.finishDate.getFullYear().toString(),
+      status: "Active",
+      society_id: currentUser?.society_id,
+      member_id: currentUser?.id,
+      slip_url: fd.slip_url
+    }
+
+    if(confirm(`Reinvest Principal ৳${fd.amount.toLocaleString()} for another 3 months?`)) {
+        await addFixedDeposit(payload)
+    }
   }
 
   const handleRowUpload = async (event: React.ChangeEvent<HTMLInputElement>, fdId: string) => {
@@ -97,13 +127,12 @@ export default function FixedDepositPage() {
         month: dateObj.toLocaleString('default', { month: 'long' }),
         year: dateObj.getFullYear().toString(),
         status: "Active",
-        society_id: currentUser?.society_id || "SOC_01",
+        society_id: currentUser?.society_id,
         member_id: currentUser?.id,
         slip_url: slipUrl || undefined
       }
 
       editingId ? await updateFixedDeposit(editingId, payload) : await addFixedDeposit(payload)
-      
       setEditingId(null)
       setSelectedFile(null)
       setFormData({ ...formData, amount: "" })
@@ -122,40 +151,44 @@ export default function FixedDepositPage() {
         </h1>
       </div>
 
-      {/* TOP SUMMARY CARTS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 px-2">
-        <Card className="border-none shadow-sm bg-white overflow-hidden">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600">
-              <Wallet size={24} />
-            </div>
+      {/* 4 REVISED SUMMARY CARTS */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 px-2">
+        <Card className="border-none shadow-sm bg-white">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 bg-slate-100 rounded-lg text-slate-600"><Wallet size={20} /></div>
             <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Principal</p>
-              <h3 className="text-xl font-bold text-slate-800">৳{stats.totalPrincipal.toLocaleString()}</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Total Principal</p>
+              <h3 className="text-lg font-bold text-slate-800">৳{stats.totalPrincipal.toLocaleString()}</h3>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm bg-white overflow-hidden">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="p-3 bg-blue-50 rounded-xl text-blue-600">
-              <TrendingUp size={24} />
-            </div>
+        <Card className="border-none shadow-sm bg-white">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><CheckCircle2 size={20} /></div>
             <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Est. Maturity Value</p>
-              <h3 className="text-xl font-bold text-slate-800">৳{stats.totalMaturity.toLocaleString()}</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Finished FD</p>
+              <h3 className="text-lg font-bold text-slate-800">৳{stats.totalFinished.toLocaleString()}</h3>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm bg-white overflow-hidden">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="p-3 bg-orange-50 rounded-xl text-orange-600">
-              <PieChart size={24} />
-            </div>
+        <Card className="border-none shadow-sm bg-white">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600"><TrendingUp size={20} /></div>
             <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Deposits</p>
-              <h3 className="text-xl font-bold text-slate-800">{stats.activeCount} Records</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Realized Interest</p>
+              <h3 className="text-lg font-bold text-emerald-700">৳{stats.totalRealizedInterest.toLocaleString()}</h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm bg-white border-l-4 border-orange-400">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 bg-orange-50 rounded-lg text-orange-600"><RotateCw size={20} /></div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Active Running</p>
+              <h3 className="text-lg font-bold text-slate-800">৳{stats.totalActive.toLocaleString()}</h3>
             </div>
           </CardContent>
         </Card>
@@ -189,19 +222,12 @@ export default function FixedDepositPage() {
                   <Input type="number" required className="h-10 border-slate-200 text-sm" value={formData.tenure_months} onChange={(e) => setFormData({...formData, tenure_months: e.target.value})} />
                 </div>
               </div>
-
               <div className="space-y-1">
                 <Label className="text-[10px] uppercase font-bold text-slate-400">Attach FD Slip</Label>
-                <Input 
-                  type="file" 
-                  accept="image/*,.pdf" 
-                  className="h-10 border-slate-200 text-[11px] pt-1.5 cursor-pointer" 
-                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                />
+                <Input type="file" accept="image/*,.pdf" className="h-10 border-slate-200 text-[11px] pt-1.5 cursor-pointer" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
               </div>
-
               <Button type="submit" disabled={isSubmitting} className="w-full font-bold h-10 bg-[#059669] hover:bg-[#047857] text-white">
-                {isSubmitting ? "Processing..." : "Save Deposit"}
+                {isSubmitting ? "Processing..." : editingId ? "Update Entry" : "Save Deposit"}
               </Button>
             </form>
           </CardContent>
@@ -214,12 +240,10 @@ export default function FixedDepositPage() {
               <thead className="bg-[#f8fafc] text-[10px] uppercase font-bold text-slate-500 border-b">
                 <tr>
                   <th className="p-3 text-left">Period / Status</th>
-                  <th className="p-3 text-center">Principal (BDT)</th>
-                  <th className="p-3 text-center">Rate (%)</th>
-                  <th className="p-3 text-center">Tenure</th>
+                  <th className="p-3 text-center">Principal</th>
                   <th className="p-3 text-center">Finish Date</th>
-                  <th className="p-3 text-center">Maturity Est.</th>
-                  <th className="p-3 text-center">FD Slip</th>
+                  <th className="p-3 text-center">Maturity (Interest)</th>
+                  <th className="p-3 text-center">Slip</th>
                   <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -227,41 +251,46 @@ export default function FixedDepositPage() {
                 {fixedDeposits.map((fd: any) => {
                   const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
                   return (
-                    <tr key={fd.id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={fd.id} className={`transition-colors ${m.isFinished ? 'bg-emerald-50/30' : 'hover:bg-slate-50/50'}`}>
                       <td className="p-3">
                         <div className="font-bold text-slate-800 text-[13px]">{m.startDateStr}</div>
-                        <Badge variant="outline" className={`text-[9px] font-bold ${m.isFinished ? "text-[#059669] bg-[#ecfdf5]" : "text-[#2563eb] bg-[#eff6ff]"} border-none`}>
-                          {m.isFinished ? "FINISHED" : "ACTIVE"}
+                        <Badge variant="outline" className={`text-[9px] font-bold ${m.isFinished ? "text-white bg-[#059669]" : "text-[#2563eb] bg-[#eff6ff]"} border-none`}>
+                          {m.isFinished ? "MATURED" : "ACTIVE"}
                         </Badge>
                       </td>
                       <td className="p-3 text-center font-bold text-slate-700 text-[14px]">৳{fd.amount.toLocaleString()}</td>
-                      <td className="p-3 text-center font-bold text-[#2563eb] text-[14px]">{fd.interest_rate}%</td>
-                      <td className="p-3 text-center text-slate-500 font-medium text-[13px]">{fd.tenure_months}M</td>
-                      <td className="p-3 text-center text-slate-700 font-bold text-[13px]">{m.finishDateStr}</td>
+                      <td className="p-3 text-center text-slate-700 font-bold text-[13px]">
+                        {m.finishDateStr}
+                        <div className="text-[10px] text-slate-400 font-medium">{fd.tenure_months} Months @ {fd.interest_rate}%</div>
+                      </td>
                       <td className="p-3 text-center">
-                        <div className="bg-[#022c22] text-[#34d399] px-2.5 py-1.5 rounded-lg inline-block font-bold text-[13px]">
-                          ৳{m.total.toLocaleString()}
-                        </div>
+                        <div className="text-slate-800 font-bold text-[13px]">৳{m.total.toLocaleString()}</div>
+                        <div className="text-[10px] text-emerald-600 font-bold">+৳{m.interest.toLocaleString()} Int.</div>
                       </td>
                       
                       <td className="p-3 text-center">
                         {fd.slip_url ? (
-                          <a href={fd.slip_url} target="_blank" rel="noreferrer" className="text-[#059669] font-bold text-[11px] hover:underline flex flex-col items-center">
-                            <FileText size={18} /> View Slip
+                          <a href={fd.slip_url} target="_blank" rel="noreferrer" className="text-[#059669] hover:underline flex flex-col items-center">
+                            <FileText size={18} />
                           </a>
                         ) : (
-                          <div className="flex justify-center">
-                            <label className="cursor-pointer text-slate-400 hover:text-[#059669] p-1.5 rounded-full hover:bg-slate-100">
-                              {uploadingId === fd.id ? <Loader2 className="animate-spin" size={18} /> : <><Upload size={18} /><input type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => handleRowUpload(e, fd.id)} /></>}
-                            </label>
-                          </div>
+                          <label className="cursor-pointer text-slate-300 hover:text-[#059669]">
+                            {uploadingId === fd.id ? <Loader2 className="animate-spin" size={16} /> : <><Upload size={16} /><input type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => handleRowUpload(e, fd.id)} /></>}
+                          </label>
                         )}
                       </td>
 
                       <td className="p-3 text-right">
-                        <div className="flex justify-end gap-3 font-bold text-[12px]">
-                          <button onClick={() => { setEditingId(fd.id); setFormData({ amount: fd.amount.toString(), start_date: fd.start_date, interest_rate: fd.interest_rate.toString(), tenure_months: fd.tenure_months.toString() }) }} className="text-[#2563eb] hover:underline">Edit</button>
-                          <button onClick={() => deleteFixedDeposit(fd.id)} className="text-[#ef4444] hover:underline">Delete</button>
+                        <div className="flex flex-col items-end gap-1">
+                          {m.isFinished && (
+                            <button onClick={() => handleReinvest(fd)} className="flex items-center gap-1 text-[11px] bg-emerald-600 text-white px-2 py-1 rounded font-bold hover:bg-emerald-700">
+                              <RotateCw size={12} /> Reinvest
+                            </button>
+                          )}
+                          <div className="flex gap-3 font-bold text-[11px]">
+                            <button onClick={() => { setEditingId(fd.id); setFormData({ amount: fd.amount.toString(), start_date: fd.start_date, interest_rate: fd.interest_rate.toString(), tenure_months: fd.tenure_months.toString() }) }} className="text-[#2563eb]">Edit</button>
+                            <button onClick={() => confirm("Delete record?") && deleteFixedDeposit(fd.id)} className="text-[#ef4444]">Delete</button>
+                          </div>
                         </div>
                       </td>
                     </tr>

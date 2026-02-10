@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useSociety } from "@/context/SocietyContext";
 import { cn } from "@/lib/utils";
@@ -14,10 +14,19 @@ import { Button } from "@/components/ui/button";
 import logo from "@assets/generated_images/SwapnoDinga_Logo_Update.png";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { currentUser, logout } = useSociety();
+  const { currentUser, logout, members, transactions } = useSociety();
   const [location, setLocation] = useLocation();
   const isMobile = useMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Calculate notification counts for Admin
+  const pendingMembersCount = useMemo(() => 
+    members.filter(m => m.status === 'pending').length, 
+  [members]);
+
+  const pendingPaymentsCount = useMemo(() => 
+    transactions.filter(t => t.status === 'Pending').length, 
+  [transactions]);
 
   const publicPaths = ["/", "/about", "/project", "/policy", "/contact", "/reset-password"];
 
@@ -35,11 +44,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
 
-  // Restored full Admin Menu items as per screenshot
   const adminLinks = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/admin/members", label: "Manage Members", icon: Users },
-    { href: "/admin/payments", label: "Verify Payments", icon: ShieldCheck },
+    { href: "/admin/members", label: "Manage Members", icon: Users, badge: pendingMembersCount },
+    { href: "/admin/payments", label: "Verify Payments", icon: ShieldCheck, badge: pendingPaymentsCount },
     { href: "/admin/reports", label: "Reports", icon: FileText },
     { href: "/admin/deposits", label: "Fixed Deposits", icon: PiggyBank },
     { href: "/admin/interest", label: "Interest Records", icon: LineChart },
@@ -78,13 +86,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {(currentUser?.is_admin ? adminLinks : memberLinks).map((link) => (
                   <Link key={link.href} href={link.href}>
                     <a className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
+                      "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all",
                       location === link.href ? "bg-[#065f46] text-white" : "text-white/70 hover:text-white hover:bg-white/5"
                     )}>
-                      <link.icon size={20} className={cn(location === link.href ? "text-white" : "text-white/40")} />
-                      <span className={cn("underline underline-offset-4 font-medium", location !== link.href && "text-white/70")}>
-                        {link.label}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <link.icon size={20} className={cn(location === link.href ? "text-white" : "text-white/40")} />
+                        <span className={cn("underline underline-offset-4 font-medium", location !== link.href && "text-white/70")}>
+                          {link.label}
+                        </span>
+                      </div>
+                      {'badge' in link && (link as any).badge > 0 && (
+                        <span className="bg-white text-[#1a4d3c] text-[10px] font-bold h-5 w-5 flex items-center justify-center rounded-full shadow-sm">
+                          {(link as any).badge}
+                        </span>
+                      )}
                     </a>
                   </Link>
                 ))}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
@@ -11,10 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const MEMBER_PALETTE = ['#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#14b8a6', '#4ade80', '#fb7185'];
 
-// Custom Label component for vertical text inside the bar
 const VerticalNameLabel = (props: any) => {
   const { x, y, width, height, value } = props;
-  if (!value || height < 40) return null; 
+  if (!value || height < 30) return null; 
 
   return (
     <text
@@ -44,11 +43,23 @@ export default function AdminDashboard() {
     totalInterest: 0,
     totalFund: 0
   });
-  const [memberChartData, setMemberChartData] = useState([]);
+  const [memberChartData, setMemberChartData] = useState<any[]>([]);
   const [monthlyTrend, setMonthlyTrend] = useState([]);
 
-  // SHARED DOMAIN: This ensures bars of the same value have the exact same pixel height
-  const GLOBAL_CHART_MAX = 3000000; 
+  // Calculate a shared dynamic maximum so both charts use the same scale
+  const sharedMax = useMemo(() => {
+    const capitalValues = [stats.totalFixedDeposits, stats.totalInstalments, stats.totalInterest, stats.totalFund];
+    const memberValues = memberChartData.map(d => d.total);
+    const absoluteMax = Math.max(...capitalValues, ...memberValues, 1000);
+    return absoluteMax * 1.15; // Add 15% padding for the top labels
+  }, [stats, memberChartData]);
+
+  const capitalMixData = [
+    { label: 'FIXED DEPOSIT', val: stats.totalFixedDeposits, color: '#3b82f6' },
+    { label: 'INSTALLMENTS', val: stats.totalInstalments, color: '#10b981' },
+    { label: 'INTEREST', val: stats.totalInterest, color: '#8b5cf6' },
+    { label: 'NET VALUE', val: stats.totalFund, color: '#0f172a' }
+  ];
 
   const getMaturityData = (amount: number, rate: number, start: string, months: number) => {
     const startDate = new Date(start);
@@ -112,7 +123,7 @@ export default function AdminDashboard() {
           total: data.amount + (totalFinishedPrincipal > 0 ? (totalRealizedInterest / totalFinishedPrincipal) * data.amount : 0)
       })).filter(item => item.total > 0).sort((a, b) => b.total - a.total);
 
-      setMemberChartData(chartData as any);
+      setMemberChartData(chartData);
     } catch (e) { console.error(e); }
   };
 
@@ -125,16 +136,12 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen font-sans">
-      {/* SVG Shadow definition */}
       <svg width="0" height="0" style={{ position: 'absolute' }}>
         <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
           <feOffset dx="1" dy="2" result="offsetblur" />
           <feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer>
-          <feMerge> 
-            <feMergeNode/>
-            <feMergeNode in="SourceGraphic"/> 
-          </feMerge>
+          <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
       </svg>
 
@@ -172,18 +179,10 @@ export default function AdminDashboard() {
           <CardHeader className="py-4 px-6 bg-slate-50/30 border-b"><CardTitle className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Capital Mix Analysis</CardTitle></CardHeader>
           <CardContent className="h-[380px] pt-12 pb-4">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart 
-                data={[
-                  { label: 'FIXED DEPOSIT', val: stats.totalFixedDeposits, color: '#3b82f6' },
-                  { label: 'INSTALLMENTS', val: stats.totalInstalments, color: '#10b981' },
-                  { label: 'INTEREST', val: stats.totalInterest, color: '#8b5cf6' },
-                  { label: 'NET VALUE', val: stats.totalFund, color: '#0f172a' }
-                ]} 
-                margin={{ top: 25, bottom: 5, left: 10, right: 10 }}
-              >
+              <BarChart data={capitalMixData} margin={{ top: 25, bottom: 5, left: 10, right: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis hide />
-                <YAxis hide domain={[0, GLOBAL_CHART_MAX]} />
+                <YAxis hide domain={[0, sharedMax]} />
                 <Tooltip cursor={{fill: 'transparent'}} />
                 <Bar dataKey="val" radius={[6, 6, 0, 0]} barSize={44} style={{ filter: 'url(#shadow)' }}>
                   <LabelList dataKey="val" position="top" formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} style={{ fontSize: '10px', fontWeight: '800', fill: '#1e293b' }} offset={10} />
@@ -203,21 +202,10 @@ export default function AdminDashboard() {
               <BarChart data={memberChartData} margin={{ top: 25, bottom: 5, left: 10, right: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis hide /> 
-                <YAxis hide domain={[0, GLOBAL_CHART_MAX]} />
+                <YAxis hide domain={[0, sharedMax]} />
                 <Tooltip cursor={{fill: 'transparent'}} />
-                <Bar 
-                  dataKey="total" 
-                  radius={[6, 6, 0, 0]} 
-                  barSize={44} 
-                  style={{ filter: 'url(#shadow)' }}
-                >
-                  <LabelList 
-                    dataKey="total" 
-                    position="top" 
-                    formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} 
-                    style={{ fontSize: '10px', fontWeight: '800', fill: '#0f172a' }} 
-                    offset={10} 
-                  />
+                <Bar dataKey="total" radius={[6, 6, 0, 0]} barSize={44} style={{ filter: 'url(#shadow)' }}>
+                  <LabelList dataKey="total" position="top" formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} style={{ fontSize: '10px', fontWeight: '800', fill: '#0f172a' }} offset={10} />
                   <LabelList dataKey="displayName" content={<VerticalNameLabel />} />
                   {memberChartData.map((_, i) => <Cell key={i} fill={MEMBER_PALETTE[i % 10]} />)}
                 </Bar>
@@ -227,7 +215,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* BOTTOM ROW (Liquidity & Trends) */}
+      {/* LIQUIDITY & TRENDS */}
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
           <CardHeader className="py-4 px-6 bg-slate-50/30 border-b"><CardTitle className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Treasury Liquidity</CardTitle></CardHeader>

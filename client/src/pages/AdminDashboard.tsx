@@ -14,6 +14,8 @@ const MEMBER_PALETTE = ['#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '
 // Custom Label component for vertical text inside the bar
 const VerticalNameLabel = (props: any) => {
   const { x, y, width, height, value } = props;
+  if (!value || height < 30) return null; // Don't render if bar is too short
+
   return (
     <text
       x={x + width / 2}
@@ -120,6 +122,21 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen font-sans">
+      {/* SVG filter for bar shadows */}
+      <svg width="0" height="0" style={{ position: 'absolute' }}>
+        <filter id="barShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
+          <feOffset dx="2" dy="2" result="offsetblur" />
+          <feComponentTransfer>
+            <feFuncA type="linear" slope="0.3" />
+          </feComponentTransfer>
+          <feMerge>
+            <feMergeNode />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </svg>
+
       {/* HEADER */}
       <div className="flex justify-between items-center bg-white p-5 rounded-xl shadow-sm border border-slate-200">
         <div>
@@ -156,10 +173,10 @@ export default function AdminDashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart 
                 data={[
-                  { label: 'FD', val: stats.totalFixedDeposits, color: '#3b82f6' },
-                  { label: 'INST.', val: stats.totalInstalments, color: '#10b981' },
-                  { label: 'INT.', val: stats.totalInterest, color: '#8b5cf6' },
-                  { label: 'NET', val: stats.totalFund, color: '#0f172a' }
+                  { label: 'FIXED DEPOSIT', val: stats.totalFixedDeposits, color: '#3b82f6' },
+                  { label: 'INSTALLMENTS', val: stats.totalInstalments, color: '#10b981' },
+                  { label: 'INTEREST', val: stats.totalInterest, color: '#8b5cf6' },
+                  { label: 'NET VALUE', val: stats.totalFund, color: '#0f172a' }
                 ]} 
                 margin={{ top: 25, bottom: 5, left: 10, right: 10 }}
               >
@@ -167,7 +184,7 @@ export default function AdminDashboard() {
                 <XAxis hide />
                 <YAxis hide domain={[0, 'dataMax + 100000']} />
                 <Tooltip cursor={{fill: 'transparent'}} />
-                <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={44}>
+                <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={44} style={{ filter: 'url(#barShadow)' }}>
                   <LabelList dataKey="val" position="top" formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#1e293b' }} offset={10} />
                   <LabelList dataKey="label" content={<VerticalNameLabel />} />
                   <Cell fill="#3b82f6" /><Cell fill="#10b981" /><Cell fill="#8b5cf6" /><Cell fill="#0f172a" />
@@ -185,12 +202,13 @@ export default function AdminDashboard() {
               <BarChart data={memberChartData} margin={{ top: 25, bottom: 5, left: 10, right: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis hide /> 
-                <YAxis hide domain={[0, 'dataMax + 50000']} />
+                <YAxis hide domain={[0, 'dataMax + 100000']} />
                 <Tooltip cursor={{fill: 'transparent'}} />
                 <Bar 
                   dataKey="total" 
                   radius={[6, 6, 0, 0]} 
                   barSize={44} 
+                  style={{ filter: 'url(#barShadow)' }}
                 >
                   <LabelList 
                     dataKey="total" 
@@ -208,7 +226,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* BOTTOM ROW (Liquidity & Trends) remains the same */}
+      {/* BOTTOM ROW (Liquidity & Trends) */}
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
           <CardHeader className="py-4 px-6 bg-slate-50/30 border-b"><CardTitle className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Treasury Liquidity</CardTitle></CardHeader>

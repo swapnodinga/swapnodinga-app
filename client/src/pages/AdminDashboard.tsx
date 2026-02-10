@@ -14,7 +14,6 @@ const MEMBER_PALETTE = ['#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '
 // Custom Label component for vertical text inside the bar
 const VerticalNameLabel = (props: any) => {
   const { x, y, width, height, value } = props;
-  // Reduced font size and adjusted positioning to stay inside the bar
   return (
     <text
       x={x + width / 2}
@@ -153,7 +152,7 @@ export default function AdminDashboard() {
         {/* CAPITAL MIX */}
         <Card className="col-span-12 lg:col-span-4 border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
           <CardHeader className="py-4 px-6 bg-slate-50/30 border-b"><CardTitle className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Capital Mix Analysis</CardTitle></CardHeader>
-          <CardContent className="h-[380px] pt-12">
+          <CardContent className="h-[380px] pt-12 pb-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart 
                 data={[
@@ -162,13 +161,15 @@ export default function AdminDashboard() {
                   { label: 'INT.', val: stats.totalInterest, color: '#8b5cf6' },
                   { label: 'NET', val: stats.totalFund, color: '#0f172a' }
                 ]} 
-                margin={{ top: 20, bottom: 20, left: 0, right: 0 }}
+                margin={{ top: 25, bottom: 5, left: 10, right: 10 }}
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 'bold' }} interval={0} />
+                <XAxis hide />
                 <YAxis hide domain={[0, 'dataMax + 100000']} />
-                <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={40}>
+                <Tooltip cursor={{fill: 'transparent'}} />
+                <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={44}>
                   <LabelList dataKey="val" position="top" formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#1e293b' }} offset={10} />
+                  <LabelList dataKey="label" content={<VerticalNameLabel />} />
                   <Cell fill="#3b82f6" /><Cell fill="#10b981" /><Cell fill="#8b5cf6" /><Cell fill="#0f172a" />
                 </Bar>
               </BarChart>
@@ -184,7 +185,6 @@ export default function AdminDashboard() {
               <BarChart data={memberChartData} margin={{ top: 25, bottom: 5, left: 10, right: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis hide /> 
-                {/* Domain set with padding to prevent bars from hitting the top too hard */}
                 <YAxis hide domain={[0, 'dataMax + 50000']} />
                 <Tooltip cursor={{fill: 'transparent'}} />
                 <Bar 
@@ -208,7 +208,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* BOTTOM ROW */}
+      {/* BOTTOM ROW (Liquidity & Trends) remains the same */}
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
           <CardHeader className="py-4 px-6 bg-slate-50/30 border-b"><CardTitle className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Treasury Liquidity</CardTitle></CardHeader>

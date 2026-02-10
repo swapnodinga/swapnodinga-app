@@ -17,6 +17,20 @@ export default function MemberDashboard() {
     myInstallments: 0
   });
 
+  // Admin-synced helper function for interest calculation
+  const getMaturityData = (amount: number, rate: number, start: string, months: number) => {
+    const startDate = new Date(start);
+    const finishDate = new Date(start);
+    finishDate.setMonth(startDate.getMonth() + Number(months));
+    
+    // Exact day-based calculation as per Admin logic
+    const diffDays = Math.ceil(Math.abs(finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const interest = (amount * rate * diffDays) / (365 * 100);
+    const isFinished = finishDate <= new Date();
+    
+    return { interest, isFinished };
+  };
+
   useEffect(() => {
     const fetchMemberData = async () => {
       if (!currentUser || !currentUser.id) return;
@@ -25,6 +39,7 @@ export default function MemberDashboard() {
         const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
         const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 
+        // Logic to group by MTDR and take only the latest entry principal
         const groupedDeposits = (deposits || []).reduce((groups: any, fd: any) => {
           const key = fd.mtdr_no || "Unassigned";
           if (!groups[key]) groups[key] = [];
@@ -33,31 +48,25 @@ export default function MemberDashboard() {
           return groups;
         }, {});
 
-        let totalGlobalPrincipal = 0;
-        let finishedInterest = 0;
-        let totalFinishedPrincipalForShare = 0;
-        const now = new Date();
+        let totalActivePrincipal = 0;
+        let totalFinishedPrincipal = 0; 
+        let totalRealizedInterest = 0; 
 
+        // Apply same loop logic as Admin Dashboard
+        (deposits || []).forEach(fd => {
+          const m = getMaturityData(Number(fd.amount), Number(fd.interest_rate), fd.start_date, Number(fd.tenure_months));
+          if (m.isFinished) { 
+            totalRealizedInterest += m.interest; 
+            totalFinishedPrincipal += Number(fd.amount); 
+          } else { 
+            totalActivePrincipal += Number(fd.amount); 
+          }
+        });
+
+        // Fixed Global Principal logic for the display card
+        let totalGlobalPrincipalForDisplay = 0;
         Object.values(groupedDeposits).forEach((group: any) => {
-          const latestFd = group[0];
-          totalGlobalPrincipal += Number(latestFd.amount || 0);
-
-          group.forEach((fd: any) => {
-            const principal = Number(fd.amount || 0);
-            const tenure = Number(fd.tenure_months || 0);
-            const rate = Number(fd.interest_rate || 0);
-            
-            const startDate = new Date(fd.start_date);
-            const maturityDate = new Date(startDate);
-            maturityDate.setMonth(startDate.getMonth() + tenure);
-
-            if (maturityDate <= now) {
-              // Round individual interest to match Admin Dashboard's precision
-              const interest = Math.round(principal * (rate / 100) * (tenure / 12));
-              finishedInterest += interest;
-              totalFinishedPrincipalForShare += principal;
-            }
-          });
+          totalGlobalPrincipalForDisplay += Number(group[0].amount || 0);
         });
 
         const societyTotalInstalments = (installments || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
@@ -66,15 +75,15 @@ export default function MemberDashboard() {
           .filter(inst => inst.member_id === currentUser.id)
           .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-        // Calculate member share based on the same rounded interest pool
-        const myInterestShare = totalFinishedPrincipalForShare > 0 
-          ? (finishedInterest / totalFinishedPrincipalForShare) * myInstallments 
+        // Member share calculation synced with Admin's formula
+        const myInterestShare = totalFinishedPrincipal > 0 
+          ? (totalRealizedInterest / totalFinishedPrincipal) * myInstallments 
           : 0;
 
         setLocalStats({
-          societyFixedDeposit: totalGlobalPrincipal,
-          societyDepositInterest: finishedInterest,
-          societyTotalFund: societyTotalInstalments + finishedInterest,
+          societyFixedDeposit: totalActivePrincipal, // Synced with "Active FD Capital"
+          societyDepositInterest: totalRealizedInterest,
+          societyTotalFund: societyTotalInstalments + totalRealizedInterest,
           myAccumulatedInterest: myInterestShare,
           myInstallments: myInstallments
         });
@@ -149,7 +158,7 @@ export default function MemberDashboard() {
           />
           <StatCard 
             title="REALIZED INTEREST" 
-            value={`৳${localStats.societyDepositInterest.toLocaleString()}`} 
+            value={`৳${Math.round(localStats.societyDepositInterest).toLocaleString()}`} 
             icon={TrendingUp} 
             className={unifiedCardStyle}
             valueClassName={`${amountFontStyle} text-2xl`}
@@ -160,7 +169,7 @@ export default function MemberDashboard() {
               <Building2 className="h-4 w-4 text-emerald-500 opacity-50" />
             </div>
             <div className="font-sans font-extrabold text-white text-3xl md:text-4xl tracking-tight">
-              ৳{localStats.societyTotalFund.toLocaleString()}
+              ৳{Math.round(localStats.societyTotalFund).toLocaleString()}
             </div>
             <p className="text-[9px] text-emerald-500/60 font-medium uppercase mt-1">Collective Pool</p>
           </Card>

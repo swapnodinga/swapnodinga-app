@@ -51,9 +51,9 @@ export default function MemberDashboard() {
             const maturityDate = new Date(startDate);
             maturityDate.setMonth(startDate.getMonth() + tenure);
 
-            // Improved comparison logic to ensure all matured interest is caught
             if (maturityDate <= now) {
-              const interest = (principal * (rate / 100) * (tenure / 12));
+              // Round individual interest to match Admin Dashboard's precision
+              const interest = Math.round(principal * (rate / 100) * (tenure / 12));
               finishedInterest += interest;
               totalFinishedPrincipalForShare += principal;
             }
@@ -66,6 +66,7 @@ export default function MemberDashboard() {
           .filter(inst => inst.member_id === currentUser.id)
           .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
+        // Calculate member share based on the same rounded interest pool
         const myInterestShare = totalFinishedPrincipalForShare > 0 
           ? (finishedInterest / totalFinishedPrincipalForShare) * myInstallments 
           : 0;
@@ -114,7 +115,7 @@ export default function MemberDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatCard 
             title="MY TOTAL SAVINGS" 
-            value={`৳${myTotalSavings.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`} 
+            value={`৳${Math.round(myTotalSavings).toLocaleString()}`} 
             icon={Wallet} 
             className={unifiedCardStyle}
             valueClassName={`${amountFontStyle} text-3xl`} 
@@ -128,7 +129,7 @@ export default function MemberDashboard() {
           />
           <StatCard 
             title="ACCUMULATED INTEREST" 
-            value={`৳${localStats.myAccumulatedInterest.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`} 
+            value={`৳${Math.round(localStats.myAccumulatedInterest).toLocaleString()}`} 
             icon={Percent} 
             className={unifiedCardStyle}
             valueClassName={`${amountFontStyle} text-3xl text-emerald-600`}
@@ -148,7 +149,7 @@ export default function MemberDashboard() {
           />
           <StatCard 
             title="REALIZED INTEREST" 
-            value={`৳${localStats.societyDepositInterest.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} 
+            value={`৳${localStats.societyDepositInterest.toLocaleString()}`} 
             icon={TrendingUp} 
             className={unifiedCardStyle}
             valueClassName={`${amountFontStyle} text-2xl`}
@@ -159,7 +160,7 @@ export default function MemberDashboard() {
               <Building2 className="h-4 w-4 text-emerald-500 opacity-50" />
             </div>
             <div className="font-sans font-extrabold text-white text-3xl md:text-4xl tracking-tight">
-              ৳{localStats.societyTotalFund.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              ৳{localStats.societyTotalFund.toLocaleString()}
             </div>
             <p className="text-[9px] text-emerald-500/60 font-medium uppercase mt-1">Collective Pool</p>
           </Card>

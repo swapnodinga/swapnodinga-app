@@ -14,7 +14,7 @@ const MEMBER_PALETTE = ['#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '
 // Custom Label component for vertical text inside the bar
 const VerticalNameLabel = (props: any) => {
   const { x, y, width, height, value } = props;
-  if (!value || height < 30) return null; // Don't render if bar is too short
+  if (!value || height < 40) return null; 
 
   return (
     <text
@@ -26,7 +26,7 @@ const VerticalNameLabel = (props: any) => {
       style={{ 
         fontSize: '10px', 
         fontWeight: '600', 
-        textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
+        textShadow: '1px 1px 2px rgba(0,0,0,0.6)',
         pointerEvents: 'none',
         textTransform: 'uppercase'
       }}
@@ -46,6 +46,9 @@ export default function AdminDashboard() {
   });
   const [memberChartData, setMemberChartData] = useState([]);
   const [monthlyTrend, setMonthlyTrend] = useState([]);
+
+  // SHARED DOMAIN: This ensures bars of the same value have the exact same pixel height
+  const GLOBAL_CHART_MAX = 3000000; 
 
   const getMaturityData = (amount: number, rate: number, start: string, months: number) => {
     const startDate = new Date(start);
@@ -122,17 +125,15 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen font-sans">
-      {/* SVG filter for bar shadows */}
+      {/* SVG Shadow definition */}
       <svg width="0" height="0" style={{ position: 'absolute' }}>
-        <filter id="barShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
-          <feOffset dx="2" dy="2" result="offsetblur" />
-          <feComponentTransfer>
-            <feFuncA type="linear" slope="0.3" />
-          </feComponentTransfer>
-          <feMerge>
-            <feMergeNode />
-            <feMergeNode in="SourceGraphic" />
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
+          <feOffset dx="1" dy="2" result="offsetblur" />
+          <feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer>
+          <feMerge> 
+            <feMergeNode/>
+            <feMergeNode in="SourceGraphic"/> 
           </feMerge>
         </filter>
       </svg>
@@ -182,10 +183,10 @@ export default function AdminDashboard() {
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis hide />
-                <YAxis hide domain={[0, 'dataMax + 100000']} />
+                <YAxis hide domain={[0, GLOBAL_CHART_MAX]} />
                 <Tooltip cursor={{fill: 'transparent'}} />
-                <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={44} style={{ filter: 'url(#barShadow)' }}>
-                  <LabelList dataKey="val" position="top" formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#1e293b' }} offset={10} />
+                <Bar dataKey="val" radius={[6, 6, 0, 0]} barSize={44} style={{ filter: 'url(#shadow)' }}>
+                  <LabelList dataKey="val" position="top" formatter={(v: any) => `৳${(v/1000).toFixed(0)}k`} style={{ fontSize: '10px', fontWeight: '800', fill: '#1e293b' }} offset={10} />
                   <LabelList dataKey="label" content={<VerticalNameLabel />} />
                   <Cell fill="#3b82f6" /><Cell fill="#10b981" /><Cell fill="#8b5cf6" /><Cell fill="#0f172a" />
                 </Bar>
@@ -202,13 +203,13 @@ export default function AdminDashboard() {
               <BarChart data={memberChartData} margin={{ top: 25, bottom: 5, left: 10, right: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis hide /> 
-                <YAxis hide domain={[0, 'dataMax + 100000']} />
+                <YAxis hide domain={[0, GLOBAL_CHART_MAX]} />
                 <Tooltip cursor={{fill: 'transparent'}} />
                 <Bar 
                   dataKey="total" 
                   radius={[6, 6, 0, 0]} 
                   barSize={44} 
-                  style={{ filter: 'url(#barShadow)' }}
+                  style={{ filter: 'url(#shadow)' }}
                 >
                   <LabelList 
                     dataKey="total" 

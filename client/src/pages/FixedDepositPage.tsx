@@ -9,34 +9,25 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { 
   Banknote, Upload, FileText, Loader2, Plus, 
-  TrendingUp, Calendar, Info, ChevronRight, History 
+  TrendingUp, Calendar, Info, ChevronRight, History, 
+  Trash2, Edit, AlertTriangle 
 } from "lucide-react"
 
 export default function FixedDepositPage() {
   const { fixedDeposits, addFixedDeposit, updateFixedDeposit, deleteFixedDeposit, currentUser } = useSociety()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   
   const [formData, setFormData] = useState({
-    reference_no: "", // Added MTDR Reference
+    reference_no: "",
     amount: "",
     start_date: new Date().toISOString().split("T")[0],
     interest_rate: "8.265",
     tenure_months: "3"
   })
 
-  // --- 1. CALCULATED SUMMARY STATS ---
-  const stats = useMemo(() => {
-    const totalPrincipal = fixedDeposits.reduce((acc, fd) => acc + Number(fd.amount), 0)
-    const activeCount = fixedDeposits.filter(fd => {
-      const finish = new Date(fd.start_date)
-      finish.setMonth(finish.getMonth() + Number(fd.tenure_months))
-      return finish > new Date()
-    }).length
-    return { totalPrincipal, activeCount }
-  }, [fixedDeposits])
-
-  // --- 2. DATE FORMATTING LOGIC ---
+  // --- DATE FORMATTING LOGIC ---
   const formatTableDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-GB", { 
       day: "2-digit", month: "short", year: "2-digit" 
@@ -49,13 +40,35 @@ export default function FixedDepositPage() {
     finishDate.setMonth(startDate.getMonth() + Number(months))
     const diffDays = Math.ceil(Math.abs(finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
     const interest = (amount * rate * diffDays) / (365 * 100)
+    
+    const today = new Date()
+    const diffToFinish = Math.ceil((finishDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    
     return {
       finishDate,
       finishDateStr: formatTableDate(finishDate.toISOString()),
+      interestAmount: Math.round(interest),
       total: Math.round(amount + interest),
-      isFinished: finishDate <= new Date()
+      isFinished: finishDate <= today,
+      isExpiringSoon: diffToFinish <= 7 && diffToFinish > 0 // Alert if finishing in 7 days
     }
   }
+
+  // --- 1. CALCULATED SUMMARY STATS (Society ID replaced with Total Interest) ---
+  const stats = useMemo(() => {
+    let totalPrincipal = 0
+    let totalInterest = 0
+    let activeCount = 0
+
+    fixedDeposits.forEach(fd => {
+      const m = getMaturityData(Number(fd.amount), Number(fd.interest_rate), fd.start_date, Number(fd.tenure_months))
+      totalPrincipal += Number(fd.amount)
+      totalInterest += m.interestAmount
+      if (!m.isFinished) activeCount++
+    })
+
+    return { totalPrincipal, totalInterest, activeCount }
+  }, [fixedDeposits])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,8 +83,16 @@ export default function FixedDepositPage() {
         member_id: currentUser?.id,
         status: "Active"
       }
-      await addFixedDeposit(payload)
+      
+      if (editingId) {
+        await updateFixedDeposit(editingId, payload)
+      } else {
+        await addFixedDeposit(payload)
+      }
+      
       setShowForm(false)
+      setEditingId(null)
+      setFormData({ reference_no: "", amount: "", start_date: new Date().toISOString().split("T")[0], interest_rate: "8.265", tenure_months: "3" })
     } catch (err: any) {
       alert(err.message)
     } finally {
@@ -79,10 +100,22 @@ export default function FixedDepositPage() {
     }
   }
 
+  const handleEdit = (fd: any) => {
+    setEditingId(fd.id)
+    setFormData({
+      reference_no: fd.reference_no || "",
+      amount: fd.amount.toString(),
+      start_date: fd.start_date,
+      interest_rate: fd.interest_rate.toString(),
+      tenure_months: fd.tenure_months.toString()
+    })
+    setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   return (
     <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto bg-[#f8fafc] min-h-screen">
       
-      {/* HEADER SECTION */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900 flex items-center gap-3">
@@ -90,7 +123,7 @@ export default function FixedDepositPage() {
           </h1>
           <p className="text-slate-500 font-medium ml-12">"MTDR Investment & Fixed Deposit Management"</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-200">
+        <Button onClick={() => { setShowForm(!showForm); setEditingId(null); }} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-200">
           {showForm ? "Close Form" : <><Plus size={18} className="mr-2"/> New Deposit Entry</>}
         </Button>
       </div>
@@ -115,26 +148,30 @@ export default function FixedDepositPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-none shadow-sm bg-white">
+        {/* REPLACED SOCIETY ID WITH TOTAL INTEREST */}
+        <Card className="border-none shadow-sm bg-white border-l-4 border-l-amber-500">
           <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3 bg-amber-50 rounded-xl"><Info className="text-amber-600" /></div>
+            <div className="p-3 bg-amber-50 rounded-xl"><TrendingUp className="text-amber-600" /></div>
             <div>
-              <p className="text-sm font-bold text-slate-500 uppercase">Society ID</p>
-              <h3 className="text-2xl font-black text-slate-800">{currentUser?.society_id || "SCS-000"}</h3>
+              <p className="text-sm font-bold text-slate-500 uppercase">Total Est. Interest</p>
+              <h3 className="text-2xl font-black text-amber-600">৳{stats.totalInterest.toLocaleString()}</h3>
             </div>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* FORM DRAWER (Optional/Collapsible) */}
         {showForm && (
           <Card className="lg:col-span-1 border-none shadow-xl animate-in slide-in-from-left duration-300">
-             <CardHeader className="bg-emerald-600 rounded-t-xl py-4">
-                <CardTitle className="text-white text-lg">Deposit Details</CardTitle>
+             <CardHeader className={`${editingId ? 'bg-blue-600' : 'bg-emerald-600'} rounded-t-xl py-4 transition-colors`}>
+                <CardTitle className="text-white text-lg">{editingId ? 'Update Deposit' : 'Deposit Details'}</CardTitle>
              </CardHeader>
              <CardContent className="p-6 space-y-4">
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-500 uppercase">Start Date</Label>
+                    <Input type="date" required value={formData.start_date} onChange={(e)=>setFormData({...formData, start_date: e.target.value})} />
+                  </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-bold text-slate-500 uppercase">MTDR Reference #</Label>
                     <Input placeholder="e.g. 3957631" required value={formData.reference_no} onChange={(e)=>setFormData({...formData, reference_no: e.target.value})} />
@@ -153,58 +190,75 @@ export default function FixedDepositPage() {
                       <Input type="number" value={formData.tenure_months} onChange={(e)=>setFormData({...formData, tenure_months: e.target.value})} />
                     </div>
                   </div>
-                  <Button type="submit" disabled={isSubmitting} className="w-full bg-slate-900 text-white font-bold h-12">
-                    {isSubmitting ? <Loader2 className="animate-spin" /> : "Confirm & Save"}
+                  <Button type="submit" disabled={isSubmitting} className={`w-full font-bold h-12 ${editingId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-900'} text-white`}>
+                    {isSubmitting ? <Loader2 className="animate-spin" /> : editingId ? "Update Entry" : "Confirm & Save"}
                   </Button>
                 </form>
              </CardContent>
           </Card>
         )}
 
-        {/* LEDGER LIST */}
         <div className={`${showForm ? 'lg:col-span-3' : 'lg:col-span-4'} space-y-4`}>
           {fixedDeposits.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-slate-200">
-               <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                 <History className="text-slate-300" size={32} />
-               </div>
+               <History className="text-slate-300 mx-auto mb-4" size={48} />
                <p className="text-slate-400 font-medium">No fixed deposits recorded yet.</p>
             </div>
           ) : (
             fixedDeposits.map((fd: any) => {
               const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
               return (
-                <Card key={fd.id} className="border-none shadow-sm hover:shadow-md transition-all overflow-hidden group">
+                <Card key={fd.id} className={`border-none shadow-sm hover:shadow-md transition-all overflow-hidden group ${m.isExpiringSoon ? 'ring-2 ring-amber-400' : ''}`}>
                   <div className="flex flex-col md:flex-row items-stretch">
-                    <div className={`w-2 ${m.isFinished ? 'bg-slate-300' : 'bg-emerald-500'}`} />
-                    <div className="flex-1 p-5 grid grid-cols-2 md:grid-cols-5 gap-4 items-center">
+                    <div className={`w-2 ${m.isFinished ? 'bg-slate-300' : m.isExpiringSoon ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                    <div className="flex-1 p-5 grid grid-cols-2 md:grid-cols-6 gap-4 items-center">
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Reference</p>
                         <h4 className="text-md font-bold text-slate-700">MTDR-{fd.reference_no || 'Manual'}</h4>
-                        <Badge variant="outline" className={`mt-1 text-[9px] ${m.isFinished ? 'bg-slate-50' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
-                          {m.isFinished ? 'MATURED' : 'ACTIVE'}
-                        </Badge>
+                        <div className="flex gap-1 mt-1">
+                          <Badge variant="outline" className={`text-[9px] ${m.isFinished ? 'bg-slate-50' : m.isExpiringSoon ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
+                            {m.isFinished ? 'MATURED' : m.isExpiringSoon ? 'FINISHING SOON' : 'ACTIVE'}
+                          </Badge>
+                        </div>
                       </div>
+                      
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Principal</p>
                         <h4 className="text-md font-black text-slate-800">৳{fd.amount.toLocaleString()}</h4>
                       </div>
+
                       <div className="hidden md:block">
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Maturity Date</p>
                         <h4 className="text-sm font-bold text-slate-600">{m.finishDateStr}</h4>
                       </div>
+
                       <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">Maturity Est.</p>
-                        <h4 className="text-md font-black text-emerald-600">৳{m.total.toLocaleString()}</h4>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">Interest Earned</p>
+                        <h4 className="text-md font-bold text-amber-600">৳{m.interestAmount.toLocaleString()}</h4>
                       </div>
-                      <div className="flex justify-end gap-2">
-                         {fd.slip_url && (
-                           <a href={fd.slip_url} target="_blank" rel="noreferrer" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                             <FileText size={20} className="text-slate-400" />
-                           </a>
-                         )}
-                         <Button variant="ghost" size="sm" className="text-slate-400 group-hover:text-blue-600">
-                           <ChevronRight size={20} />
+
+                      {/* REINVESTMENT ALERT COLUMN */}
+                      <div className="flex flex-col items-center justify-center">
+                        {m.isExpiringSoon && (
+                           <div className="flex flex-col items-center animate-pulse">
+                              <AlertTriangle className="text-amber-500" size={18} />
+                              <span className="text-[9px] font-bold text-amber-600">REINVEST NOW</span>
+                           </div>
+                        )}
+                        {!m.isFinished && !m.isExpiringSoon && (
+                           <span className="text-[10px] font-bold text-slate-300">IN PROGRESS</span>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end gap-1">
+                         <Button variant="ghost" size="sm" onClick={() => handleEdit(fd)} className="text-blue-500 hover:bg-blue-50">
+                           <Edit size={16} />
+                         </Button>
+                         <Button variant="ghost" size="sm" onClick={() => deleteFixedDeposit(fd.id)} className="text-red-500 hover:bg-red-50">
+                           <Trash2 size={16} />
+                         </Button>
+                         <Button variant="ghost" size="sm" className="text-slate-300">
+                           <ChevronRight size={18} />
                          </Button>
                       </div>
                     </div>

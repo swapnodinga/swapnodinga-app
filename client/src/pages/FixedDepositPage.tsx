@@ -8,9 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { 
-  Banknote, FileText, Loader2, Plus, 
-  TrendingUp, Calendar, Info, ChevronRight, History, 
-  Trash2, Edit, AlertTriangle, RefreshCw 
+  Banknote, Loader2, Plus, 
+  TrendingUp, Calendar, History, 
+  Trash2, Edit, RefreshCw, ChevronRight 
 } from "lucide-react"
 
 export default function FixedDepositPage() {
@@ -38,36 +38,49 @@ export default function FixedDepositPage() {
     const startDate = new Date(start)
     const finishDate = new Date(start)
     finishDate.setMonth(startDate.getMonth() + Number(months))
+    
+    // Calculate exact days for precision interest
     const diffDays = Math.ceil(Math.abs(finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
     const interest = (amount * rate * diffDays) / (365 * 100)
     
     const today = new Date()
-    const diffToFinish = Math.ceil((finishDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    today.setHours(0, 0, 0, 0) // Normalize today to start of day
+    
+    const finishCompare = new Date(finishDate)
+    finishCompare.setHours(0, 0, 0, 0)
+
+    const diffToFinish = Math.ceil((finishCompare.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     
     return {
       finishDate,
       finishDateStr: formatTableDate(finishDate.toISOString()),
       interestAmount: Math.round(interest),
       total: Math.round(amount + interest),
-      isFinished: finishDate <= today,
+      isFinished: finishCompare <= today,
       isExpiringSoon: diffToFinish <= 7 && diffToFinish > 0 
     }
   }
 
-  // --- CALCULATED SUMMARY STATS ---
+  // --- CALCULATED SUMMARY STATS (Fixed Accounting Logic) ---
   const stats = useMemo(() => {
-    let totalPrincipal = 0
+    let activePrincipal = 0
     let totalInterest = 0
     let activeCount = 0
 
     fixedDeposits.forEach(fd => {
       const m = getMaturityData(Number(fd.amount), Number(fd.interest_rate), fd.start_date, Number(fd.tenure_months))
-      totalPrincipal += Number(fd.amount)
+      
+      // DEEP FIX: Only count principal if the deposit hasn't matured yet
+      // This prevents double-counting when reinvesting
+      if (!m.isFinished) {
+        activePrincipal += Number(fd.amount)
+        activeCount++
+      }
+      
       totalInterest += m.interestAmount
-      if (!m.isFinished) activeCount++
     })
 
-    return { totalPrincipal, totalInterest, activeCount }
+    return { activePrincipal, totalInterest, activeCount }
   }, [fixedDeposits])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,11 +128,11 @@ export default function FixedDepositPage() {
 
   const handleReinvest = (fd: any) => {
     const m = getMaturityData(Number(fd.amount), Number(fd.interest_rate), fd.start_date, Number(fd.tenure_months))
-    setEditingId(null) // This is a NEW entry
+    setEditingId(null)
     setFormData({
-      reference_no: "", // New reference for new entry
-      amount: m.total.toString(), // Principal + Interest
-      start_date: m.finishDate.toISOString().split("T")[0], // Starts when old one finishes
+      reference_no: "", 
+      amount: m.total.toString(), 
+      start_date: m.finishDate.toISOString().split("T")[0], 
       interest_rate: fd.interest_rate.toString(),
       tenure_months: fd.tenure_months.toString()
     })
@@ -128,7 +141,7 @@ export default function FixedDepositPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this MTDR record? This cannot be undone.")) {
+    if (confirm("Delete this MTDR record? This will remove it from the treasury calculations.")) {
       await deleteFixedDeposit(id)
     }
   }
@@ -149,25 +162,25 @@ export default function FixedDepositPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-none shadow-sm bg-white">
+        <Card className="border-none shadow-sm bg-white border-b-4 border-b-emerald-500">
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-emerald-50 rounded-xl"><TrendingUp className="text-emerald-600" /></div>
             <div>
-              <p className="text-sm font-bold text-slate-500 uppercase">Total Principal</p>
-              <h3 className="text-2xl font-black text-slate-800">৳{stats.totalPrincipal.toLocaleString()}</h3>
+              <p className="text-sm font-bold text-slate-500 uppercase">Active Principal</p>
+              <h3 className="text-2xl font-black text-slate-800">৳{stats.activePrincipal.toLocaleString()}</h3>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-none shadow-sm bg-white">
+        <Card className="border-none shadow-sm bg-white border-b-4 border-b-blue-500">
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-blue-50 rounded-xl"><Calendar className="text-blue-600" /></div>
             <div>
-              <p className="text-sm font-bold text-slate-500 uppercase">Active MTDRs</p>
+              <p className="text-sm font-bold text-slate-500 uppercase">Running MTDRs</p>
               <h3 className="text-2xl font-black text-slate-800">{stats.activeCount} Records</h3>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-none shadow-sm bg-white border-l-4 border-l-amber-500">
+        <Card className="border-none shadow-sm bg-white border-b-4 border-b-amber-500">
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-amber-50 rounded-xl"><TrendingUp className="text-amber-600" /></div>
             <div>
@@ -180,7 +193,7 @@ export default function FixedDepositPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {showForm && (
-          <Card className="lg:col-span-1 border-none shadow-xl animate-in slide-in-from-left duration-300">
+          <Card className="lg:col-span-1 border-none shadow-xl animate-in slide-in-from-left duration-300 h-fit">
              <CardHeader className={`${editingId ? 'bg-blue-600' : 'bg-emerald-600'} rounded-t-xl py-4 transition-colors`}>
                 <CardTitle className="text-white text-lg">{editingId ? 'Update Deposit' : 'Deposit Details'}</CardTitle>
              </CardHeader>
@@ -224,7 +237,7 @@ export default function FixedDepositPage() {
             </div>
           ) : (
             fixedDeposits.map((fd: any) => {
-              const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
+              const m = getMaturityData(Number(fd.amount), Number(fd.interest_rate), fd.start_date, Number(fd.tenure_months))
               return (
                 <Card key={fd.id} className={`border-none shadow-sm hover:shadow-md transition-all overflow-hidden group ${m.isExpiringSoon ? 'ring-2 ring-amber-400' : ''}`}>
                   <div className="flex flex-col md:flex-row items-stretch">
@@ -234,7 +247,7 @@ export default function FixedDepositPage() {
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Reference</p>
                         <h4 className="text-md font-bold text-slate-700">MTDR-{fd.reference_no || 'Manual'}</h4>
                         <div className="flex gap-1 mt-1">
-                          <Badge variant="outline" className={`text-[9px] ${m.isFinished ? 'bg-slate-50' : m.isExpiringSoon ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
+                          <Badge variant="outline" className={`text-[9px] ${m.isFinished ? 'bg-slate-50 text-slate-500' : m.isExpiringSoon ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
                             {m.isFinished ? 'MATURED' : m.isExpiringSoon ? 'FINISHING SOON' : 'ACTIVE'}
                           </Badge>
                         </div>
@@ -242,7 +255,7 @@ export default function FixedDepositPage() {
                       
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Principal</p>
-                        <h4 className="text-md font-black text-slate-800">৳{fd.amount.toLocaleString()}</h4>
+                        <h4 className="text-md font-black text-slate-800">৳{Number(fd.amount).toLocaleString()}</h4>
                       </div>
 
                       <div className="hidden md:block">

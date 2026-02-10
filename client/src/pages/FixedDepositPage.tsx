@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Banknote, Upload, FileText, Loader2, Plus } from "lucide-react"
+import { Banknote, Upload, FileText, Loader2, Plus, TrendingUp, Wallet, PieChart } from "lucide-react"
 
 export default function FixedDepositPage() {
   const { fixedDeposits, addFixedDeposit, updateFixedDeposit, deleteFixedDeposit, currentUser } = useSociety()
@@ -46,6 +46,15 @@ export default function FixedDepositPage() {
       isFinished: finishDate <= new Date()
     }
   }
+
+  // Summary Calculations
+  const stats = fixedDeposits.reduce((acc: any, fd: any) => {
+    const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
+    acc.totalPrincipal += Number(fd.amount)
+    acc.totalMaturity += m.total
+    if (!m.isFinished) acc.activeCount += 1
+    return acc
+  }, { totalPrincipal: 0, totalMaturity: 0, activeCount: 0 })
 
   const uploadFile = async (file: File) => {
     const fileExt = file.name.split('.').pop()
@@ -106,7 +115,6 @@ export default function FixedDepositPage() {
   }
 
   return (
-    // Tightened horizontal padding to fit the screen
     <div className="p-4 px-2 space-y-6 max-w-full mx-auto min-h-screen font-sans">
       <div className="flex justify-between items-center mb-2 px-2">
         <h1 className="text-2xl font-bold flex items-center gap-2 text-[#0f172a]">
@@ -114,9 +122,46 @@ export default function FixedDepositPage() {
         </h1>
       </div>
 
-      {/* Reduced gap from 12 to 4 to prevent the table from being pushed off-screen */}
+      {/* TOP SUMMARY CARTS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 px-2">
+        <Card className="border-none shadow-sm bg-white overflow-hidden">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600">
+              <Wallet size={24} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Principal</p>
+              <h3 className="text-xl font-bold text-slate-800">৳{stats.totalPrincipal.toLocaleString()}</h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm bg-white overflow-hidden">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="p-3 bg-blue-50 rounded-xl text-blue-600">
+              <TrendingUp size={24} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Est. Maturity Value</p>
+              <h3 className="text-xl font-bold text-slate-800">৳{stats.totalMaturity.toLocaleString()}</h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm bg-white overflow-hidden">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="p-3 bg-orange-50 rounded-xl text-orange-600">
+              <PieChart size={24} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Deposits</p>
+              <h3 className="text-xl font-bold text-slate-800">{stats.activeCount} Records</h3>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        
         {/* ENTRY FORM */}
         <Card className="lg:col-span-1 h-fit shadow-sm border-[#e2e8f0] rounded-xl bg-white">
           <CardHeader className="border-b px-4 py-3">
@@ -162,7 +207,7 @@ export default function FixedDepositPage() {
           </CardContent>
         </Card>
 
-        {/* HISTORY TABLE - Optimized spacing */}
+        {/* HISTORY TABLE */}
         <Card className="lg:col-span-3 shadow-sm border-[#e2e8f0] rounded-xl overflow-hidden bg-white">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

@@ -40,7 +40,7 @@ export default function AdminPayments() {
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500">
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <ShieldCheck className="text-emerald-600" size={20} />
@@ -49,7 +49,7 @@ export default function AdminPayments() {
           <h1 className="text-3xl font-bold text-emerald-950">Payment Verification</h1>
           <p className="text-slate-500 text-sm">Audit receipts and validate incoming member contributions.</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4">
           <StatCard icon={<Landmark className="text-emerald-600"/>} label="Collected" value={collectedTotal} color="bg-emerald-50" />
           <StatCard icon={<Clock className="text-orange-600"/>} label="Pending" value={pendingTotal} color="bg-orange-50" />
         </div>
@@ -90,12 +90,12 @@ export default function AdminPayments() {
 
 function StatCard({ icon, label, value, color }: any) {
   return (
-    <Card className={`${color} border-none w-44 shadow-sm hover:shadow-md transition-shadow`}>
+    <Card className={`${color} border-none min-w-[180px] w-auto shadow-sm hover:shadow-md transition-shadow`}>
       <CardContent className="p-4 flex items-center gap-4">
-        <div className="bg-white p-2.5 rounded-xl shadow-sm">{icon}</div>
-        <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{label}</p>
-          <p className="text-xl font-bold text-slate-800">৳{value.toLocaleString()}</p>
+        <div className="bg-white p-2.5 rounded-xl shadow-sm flex-shrink-0">{icon}</div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight truncate">{label}</p>
+          <p className="text-lg md:text-xl font-bold text-slate-800 break-words">৳{value.toLocaleString()}</p>
         </div>
       </CardContent>
     </Card>

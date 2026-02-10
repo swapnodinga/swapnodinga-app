@@ -19,45 +19,59 @@ export default function MemberDashboard() {
 
   useEffect(() => {
     const fetchMemberData = async () => {
-      // Ensure we have a valid user ID to filter by
       if (!currentUser || !currentUser.id) return;
 
       try {
         const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
         const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 
+        // Logic to group by MTDR and take only the latest entry principal [cite: 2026-02-10]
+        const groupedDeposits = (deposits || []).reduce((groups: any, fd: any) => {
+          const key = fd.mtdr_no || "Unassigned";
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(fd);
+          // Sort by date descending so index 0 is the latest entry
+          groups[key].sort((a: any, b: any) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+          return groups;
+        }, {});
+
         let totalGlobalPrincipal = 0;
-        let totalFinishedPrincipal = 0; 
-        let finishedInterest = 0; 
+        let finishedInterest = 0;
+        let totalFinishedPrincipalForShare = 0;
 
-        (deposits || []).forEach(fd => {
-          const principal = Number(fd.amount || 0);
-          totalGlobalPrincipal += principal;
-          const tenure = Number(fd.tenure_months || 0);
-          const rate = Number(fd.interest_rate || 0);
-          const monthIndex = monthsList.indexOf(fd.month);
-          const startDate = new Date(Number(fd.year), monthIndex, 1);
-          const maturityDate = new Date(startDate);
-          maturityDate.setMonth(startDate.getMonth() + tenure);
+        // Calculate based on grouped logic
+        Object.values(groupedDeposits).forEach((group: any) => {
+          // Add latest principal of this group to Total Fixed Deposit
+          const latestFd = group[0];
+          totalGlobalPrincipal += Number(latestFd.amount || 0);
 
-          if (maturityDate <= new Date()) {
-            finishedInterest += (principal * (rate / 100) * (tenure / 12));
-            totalFinishedPrincipal += principal;
-          }
+          // Calculate interest for all entries in the group that are finished
+          group.forEach((fd: any) => {
+            const principal = Number(fd.amount || 0);
+            const tenure = Number(fd.tenure_months || 0);
+            const rate = Number(fd.interest_rate || 0);
+            
+            const startDate = new Date(fd.start_date);
+            const maturityDate = new Date(startDate);
+            maturityDate.setMonth(startDate.getMonth() + tenure);
+
+            if (maturityDate <= new Date()) {
+              const interest = (principal * (rate / 100) * (tenure / 12));
+              finishedInterest += interest;
+              totalFinishedPrincipalForShare += principal;
+            }
+          });
         });
 
         const societyTotalInstalments = (installments || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
         
-        // --- FIXED LOGIC START ---
-        // Filter by member_id (UUID) instead of unreliable names
         const myInstallments = (installments || [])
           .filter(inst => inst.member_id === currentUser.id)
           .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-        // --- FIXED LOGIC END ---
 
-        // Calculate Share: (Total Interest / Total Principal) * My Contribution
-        const myInterestShare = totalFinishedPrincipal > 0 
-          ? (finishedInterest / totalFinishedPrincipal) * myInstallments 
+        // Share calculation
+        const myInterestShare = totalFinishedPrincipalForShare > 0 
+          ? (finishedInterest / totalFinishedPrincipalForShare) * myInstallments 
           : 0;
 
         setLocalStats({
@@ -83,8 +97,6 @@ export default function MemberDashboard() {
 
   return (
     <div className="px-4 md:px-8 pb-10 space-y-6 bg-slate-50/30 min-h-screen pt-4">
-      
-      {/* HEADER - FIXED DYNAMIC ID */}
       <div className="flex justify-between items-center bg-[#064e3b] p-5 rounded-2xl shadow-md">
         <div className="flex items-center gap-4">
           <div className="bg-white/10 p-3 rounded-lg">
@@ -140,7 +152,7 @@ export default function MemberDashboard() {
           />
           <StatCard 
             title="DEPOSIT INTEREST" 
-            value={`৳${localStats.societyDepositInterest.toLocaleString()}`} 
+            value={`৳${localStats.societyDepositInterest.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`} 
             icon={TrendingUp} 
             className={unifiedCardStyle}
             valueClassName={`${amountFontStyle} text-2xl`}
@@ -151,7 +163,7 @@ export default function MemberDashboard() {
               <Building2 className="h-4 w-4 text-emerald-500 opacity-50" />
             </div>
             <div className="font-sans font-extrabold text-white text-3xl md:text-4xl tracking-tight">
-              ৳{localStats.societyTotalFund.toLocaleString()}
+              ৳{localStats.societyTotalFund.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
             </div>
             <p className="text-[9px] text-emerald-500/60 font-medium uppercase mt-1">Collective Pool</p>
           </Card>

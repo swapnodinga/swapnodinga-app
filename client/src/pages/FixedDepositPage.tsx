@@ -8,9 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { 
-  Banknote, Upload, FileText, Loader2, Plus, 
+  Banknote, FileText, Loader2, Plus, 
   TrendingUp, Calendar, Info, ChevronRight, History, 
-  Trash2, Edit, AlertTriangle 
+  Trash2, Edit, AlertTriangle, RefreshCw 
 } from "lucide-react"
 
 export default function FixedDepositPage() {
@@ -50,11 +50,11 @@ export default function FixedDepositPage() {
       interestAmount: Math.round(interest),
       total: Math.round(amount + interest),
       isFinished: finishDate <= today,
-      isExpiringSoon: diffToFinish <= 7 && diffToFinish > 0 // Alert if finishing in 7 days
+      isExpiringSoon: diffToFinish <= 7 && diffToFinish > 0 
     }
   }
 
-  // --- 1. CALCULATED SUMMARY STATS (Society ID replaced with Total Interest) ---
+  // --- CALCULATED SUMMARY STATS ---
   const stats = useMemo(() => {
     let totalPrincipal = 0
     let totalInterest = 0
@@ -113,6 +113,26 @@ export default function FixedDepositPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const handleReinvest = (fd: any) => {
+    const m = getMaturityData(Number(fd.amount), Number(fd.interest_rate), fd.start_date, Number(fd.tenure_months))
+    setEditingId(null) // This is a NEW entry
+    setFormData({
+      reference_no: "", // New reference for new entry
+      amount: m.total.toString(), // Principal + Interest
+      start_date: m.finishDate.toISOString().split("T")[0], // Starts when old one finishes
+      interest_rate: fd.interest_rate.toString(),
+      tenure_months: fd.tenure_months.toString()
+    })
+    setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure you want to delete this MTDR record? This cannot be undone.")) {
+      await deleteFixedDeposit(id)
+    }
+  }
+
   return (
     <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto bg-[#f8fafc] min-h-screen">
       
@@ -128,7 +148,6 @@ export default function FixedDepositPage() {
         </Button>
       </div>
 
-      {/* SUMMARY STATS CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="border-none shadow-sm bg-white">
           <CardContent className="p-6 flex items-center gap-4">
@@ -148,7 +167,6 @@ export default function FixedDepositPage() {
             </div>
           </CardContent>
         </Card>
-        {/* REPLACED SOCIETY ID WITH TOTAL INTEREST */}
         <Card className="border-none shadow-sm bg-white border-l-4 border-l-amber-500">
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 bg-amber-50 rounded-xl"><TrendingUp className="text-amber-600" /></div>
@@ -237,15 +255,17 @@ export default function FixedDepositPage() {
                         <h4 className="text-md font-bold text-amber-600">৳{m.interestAmount.toLocaleString()}</h4>
                       </div>
 
-                      {/* REINVESTMENT ALERT COLUMN */}
                       <div className="flex flex-col items-center justify-center">
-                        {m.isExpiringSoon && (
-                           <div className="flex flex-col items-center animate-pulse">
-                              <AlertTriangle className="text-amber-500" size={18} />
-                              <span className="text-[9px] font-bold text-amber-600">REINVEST NOW</span>
-                           </div>
-                        )}
-                        {!m.isFinished && !m.isExpiringSoon && (
+                        {(m.isExpiringSoon || m.isFinished) ? (
+                           <Button 
+                             onClick={() => handleReinvest(fd)}
+                             variant="outline" 
+                             className="flex flex-col h-auto py-1 px-3 border-amber-200 bg-amber-50 hover:bg-amber-100 group/btn"
+                           >
+                              <RefreshCw size={14} className="text-amber-600 group-hover/btn:rotate-180 transition-transform duration-500" />
+                              <span className="text-[9px] font-bold text-amber-700">REINVEST</span>
+                           </Button>
+                        ) : (
                            <span className="text-[10px] font-bold text-slate-300">IN PROGRESS</span>
                         )}
                       </div>
@@ -254,11 +274,8 @@ export default function FixedDepositPage() {
                          <Button variant="ghost" size="sm" onClick={() => handleEdit(fd)} className="text-blue-500 hover:bg-blue-50">
                            <Edit size={16} />
                          </Button>
-                         <Button variant="ghost" size="sm" onClick={() => deleteFixedDeposit(fd.id)} className="text-red-500 hover:bg-red-50">
+                         <Button variant="ghost" size="sm" onClick={() => handleDelete(fd.id)} className="text-red-500 hover:bg-red-50">
                            <Trash2 size={16} />
-                         </Button>
-                         <Button variant="ghost" size="sm" className="text-slate-300">
-                           <ChevronRight size={18} />
                          </Button>
                       </div>
                     </div>

@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Banknote, Upload, FileText, Loader2, Plus, TrendingUp, Wallet, CheckCircle2, RotateCw } from "lucide-react"
+import { Banknote, Upload, FileText, Loader2, Plus, TrendingUp, Wallet, CheckCircle2, RotateCw, Hash } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function FixedDepositPage() {
   const { fixedDeposits, addFixedDeposit, updateFixedDeposit, deleteFixedDeposit, currentUser } = useSociety()
@@ -18,6 +19,7 @@ export default function FixedDepositPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   
   const [formData, setFormData] = useState({
+    mtdr_no: "",
     amount: "",
     start_date: new Date().toISOString().split("T")[0],
     interest_rate: "8.265",
@@ -50,23 +52,43 @@ export default function FixedDepositPage() {
     }
   }
 
-  const stats = fixedDeposits.reduce((acc: any, fd: any) => {
-    const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
-    acc.totalPrincipal += Number(fd.amount)
+  // GROUPING LOGIC BY MTDR NO
+  const groupedDeposits = fixedDeposits.reduce((groups: any, fd: any) => {
+    const key = fd.mtdr_no || "Unassigned"
+    if (!groups[key]) groups[key] = []
+    groups[key].push(fd)
+    // Sort within group by date (latest first)
+    groups[key].sort((a: any, b: any) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
+    return groups
+  }, {})
+
+  const mtdrKeys = Object.keys(groupedDeposits)
+
+  // STATS LOGIC: Principal only sums the newest entry of each MTDR group if it is Active
+  const stats = Object.values(groupedDeposits).reduce((acc: any, group: any) => {
+    group.forEach((fd: any) => {
+      const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
+      if (m.isFinished) {
+        acc.totalRealizedInterest += m.interest
+      }
+    })
+
+    // Take the latest record of this MTDR to check active principal
+    const latestFd = group[0]
+    const latestM = getMaturityData(latestFd.amount, latestFd.interest_rate, latestFd.start_date, latestFd.tenure_months)
     
-    if (m.isFinished) {
-      acc.totalFinished += Number(fd.amount)
-      acc.totalRealizedInterest += m.interest
+    if (!latestM.isFinished) {
+      acc.totalActivePrincipal += Number(latestFd.amount)
     } else {
-      acc.totalActive += Number(fd.amount)
+      acc.totalFinishedPrincipal += Number(latestFd.amount)
     }
+
     return acc
-  }, { totalPrincipal: 0, totalFinished: 0, totalRealizedInterest: 0, totalActive: 0 })
+  }, { totalActivePrincipal: 0, totalFinishedPrincipal: 0, totalRealizedInterest: 0 })
 
   const uploadFile = async (file: File) => {
     const fileExt = file.name.split('.').pop()
     const fileName = `fd-${Date.now()}.${fileExt}`
-    // FIX: Reverted to 'fd-slips' as per your working configuration
     const { error: uploadError } = await supabase.storage.from('fd-slips').upload(fileName, file)
     if (uploadError) throw uploadError
     const { data: { publicUrl } } = supabase.storage.from('fd-slips').getPublicUrl(fileName)
@@ -78,6 +100,7 @@ export default function FixedDepositPage() {
     const newStartDate = m.finishDate.toISOString().split("T")[0]
     
     const payload = {
+      mtdr_no: fd.mtdr_no,
       amount: Number(fd.amount),
       start_date: newStartDate,
       interest_rate: Number(fd.interest_rate),
@@ -90,7 +113,7 @@ export default function FixedDepositPage() {
       slip_url: fd.slip_url
     }
 
-    if(confirm(`Reinvest Principal ৳${fd.amount.toLocaleString()} for another 3 months?`)) {
+    if(confirm(`Reinvest MTDR ${fd.mtdr_no} (৳${fd.amount.toLocaleString()}) for another 3 months?`)) {
         await addFixedDeposit(payload)
     }
   }
@@ -120,6 +143,7 @@ export default function FixedDepositPage() {
 
       const dateObj = new Date(formData.start_date)
       const payload = {
+        mtdr_no: formData.mtdr_no,
         amount: Number(formData.amount),
         start_date: formData.start_date,
         interest_rate: Number(formData.interest_rate),
@@ -135,7 +159,7 @@ export default function FixedDepositPage() {
       editingId ? await updateFixedDeposit(editingId, payload) : await addFixedDeposit(payload)
       setEditingId(null)
       setSelectedFile(null)
-      setFormData({ ...formData, amount: "" })
+      setFormData({ ...formData, amount: "", mtdr_no: "" })
     } catch (err: any) {
       alert("Error: " + err.message)
     } finally {
@@ -152,42 +176,42 @@ export default function FixedDepositPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 px-2">
-        <Card className="border-none shadow-sm bg-white">
+        <Card className="border-none shadow-sm bg-white border-l-4 border-emerald-500">
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-slate-100 rounded-lg text-slate-600"><Wallet size={20} /></div>
+            <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600"><Wallet size={20} /></div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Total Principal</p>
-              <h3 className="text-lg font-bold text-slate-800">৳{stats.totalPrincipal.toLocaleString()}</h3>
+              <h3 className="text-lg font-bold text-slate-800">৳{stats.totalActivePrincipal.toLocaleString()}</h3>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-none shadow-sm bg-white">
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><CheckCircle2 size={20} /></div>
+            <div className="p-2 bg-slate-100 rounded-lg text-slate-500"><CheckCircle2 size={20} /></div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Finished FD</p>
-              <h3 className="text-lg font-bold text-slate-800">৳{stats.totalFinished.toLocaleString()}</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Finished MTDR Amount</p>
+              <h3 className="text-lg font-bold text-slate-600">৳{stats.totalFinishedPrincipal.toLocaleString()}</h3>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-none shadow-sm bg-white">
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600"><TrendingUp size={20} /></div>
+            <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><TrendingUp size={20} /></div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Realized Interest</p>
-              <h3 className="text-lg font-bold text-emerald-700">৳{stats.totalRealizedInterest.toLocaleString()}</h3>
+              <h3 className="text-lg font-bold text-blue-700">৳{stats.totalRealizedInterest.toLocaleString()}</h3>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm bg-white border-l-4 border-orange-400">
+        <Card className="border-none shadow-sm bg-white">
           <CardContent className="p-4 flex items-center gap-3">
             <div className="p-2 bg-orange-50 rounded-lg text-orange-600"><RotateCw size={20} /></div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Active Running</p>
-              <h3 className="text-lg font-bold text-slate-800">৳{stats.totalActive.toLocaleString()}</h3>
+              <h3 className="text-lg font-bold text-slate-800">{mtdrKeys.length} Records</h3>
             </div>
           </CardContent>
         </Card>
@@ -202,6 +226,13 @@ export default function FixedDepositPage() {
           </CardHeader>
           <CardContent className="pt-4 space-y-4 px-4">
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase font-bold text-slate-400">MTDR No</Label>
+                <div className="relative">
+                    <Hash className="absolute left-3 top-2.5 text-slate-400" size={14} />
+                    <Input required className="h-10 pl-8 border-slate-200 text-sm" placeholder="MTDR-3957631" value={formData.mtdr_no} onChange={(e) => setFormData({...formData, mtdr_no: e.target.value})} />
+                </div>
+              </div>
               <div className="space-y-1">
                 <Label className="text-[10px] uppercase font-bold text-slate-400">Start Date</Label>
                 <Input type="date" required className="h-10 border-slate-200 text-sm" value={formData.start_date} onChange={(e) => setFormData({...formData, start_date: e.target.value})} />
@@ -231,72 +262,100 @@ export default function FixedDepositPage() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-3 shadow-sm border-[#e2e8f0] rounded-xl overflow-hidden bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-[#f8fafc] text-[10px] uppercase font-bold text-slate-500 border-b">
-                <tr>
-                  <th className="p-3 text-left">Period / Status</th>
-                  <th className="p-3 text-center">Principal</th>
-                  <th className="p-3 text-center">Finish Date</th>
-                  <th className="p-3 text-center">Maturity (Interest)</th>
-                  <th className="p-3 text-center">Slip</th>
-                  <th className="p-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {fixedDeposits.map((fd: any) => {
-                  const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
-                  return (
-                    <tr key={fd.id} className={`transition-colors ${m.isFinished ? 'bg-emerald-50/30' : 'hover:bg-slate-50/50'}`}>
-                      <td className="p-3">
-                        <div className="font-bold text-slate-800 text-[13px]">{m.startDateStr}</div>
-                        <Badge variant="outline" className={`text-[9px] font-bold ${m.isFinished ? "text-white bg-[#059669]" : "text-[#2563eb] bg-[#eff6ff]"} border-none`}>
-                          {m.isFinished ? "MATURED" : "ACTIVE"}
-                        </Badge>
-                      </td>
-                      <td className="p-3 text-center font-bold text-slate-700 text-[14px]">৳{fd.amount.toLocaleString()}</td>
-                      <td className="p-3 text-center text-slate-700 font-bold text-[13px]">
-                        {m.finishDateStr}
-                        <div className="text-[10px] text-slate-400 font-medium">{fd.tenure_months} Months @ {fd.interest_rate}%</div>
-                      </td>
-                      <td className="p-3 text-center">
-                        <div className="text-slate-800 font-bold text-[13px]">৳{m.total.toLocaleString()}</div>
-                        <div className="text-[10px] text-emerald-600 font-bold">+৳{m.interest.toLocaleString()} Int.</div>
-                      </td>
-                      
-                      <td className="p-3 text-center">
-                        {fd.slip_url ? (
-                          <a href={fd.slip_url} target="_blank" rel="noreferrer" className="text-[#059669] hover:underline flex flex-col items-center">
-                            <FileText size={18} />
-                          </a>
-                        ) : (
-                          <label className="cursor-pointer text-slate-300 hover:text-[#059669]">
-                            {uploadingId === fd.id ? <Loader2 className="animate-spin" size={16} /> : <><Upload size={16} /><input type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => handleRowUpload(e, fd.id)} /></>}
-                          </label>
-                        )}
-                      </td>
+        <div className="lg:col-span-3">
+          {mtdrKeys.length === 0 ? (
+            <Card className="p-12 text-center text-slate-400 border-dashed">No MTDR records found</Card>
+          ) : (
+            <Tabs defaultValue={mtdrKeys[0]} className="w-full">
+              <TabsList className="w-full justify-start bg-slate-100/50 p-1 mb-4 h-auto flex-wrap gap-1">
+                {mtdrKeys.map(key => (
+                  <TabsTrigger key={key} value={key} className="text-[11px] font-bold px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
+                    MTDR: {key}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
 
-                      <td className="p-3 text-right">
-                        <div className="flex flex-col items-end gap-1">
-                          {m.isFinished && (
-                            <button onClick={() => handleReinvest(fd)} className="flex items-center gap-1 text-[11px] bg-emerald-600 text-white px-2 py-1 rounded font-bold hover:bg-emerald-700">
-                              <RotateCw size={12} /> Reinvest
-                            </button>
-                          )}
-                          <div className="flex gap-3 font-bold text-[11px]">
-                            <button onClick={() => { setEditingId(fd.id); setFormData({ amount: fd.amount.toString(), start_date: fd.start_date, interest_rate: fd.interest_rate.toString(), tenure_months: fd.tenure_months.toString() }) }} className="text-[#2563eb]">Edit</button>
-                            <button onClick={() => confirm("Delete record?") && deleteFixedDeposit(fd.id)} className="text-[#ef4444]">Delete</button>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+              {Object.entries(groupedDeposits).map(([mtdrNo, deposits]: [string, any]) => (
+                <TabsContent key={mtdrNo} value={mtdrNo} className="mt-0">
+                  <Card className="shadow-sm border-[#e2e8f0] rounded-xl overflow-hidden bg-white">
+                    <div className="p-4 border-b bg-slate-50/50 flex justify-between items-center">
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                            <Hash size={16} className="text-emerald-500"/> Interest Accrual History
+                        </h3>
+                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">
+                            Total Growth: ৳{deposits.reduce((acc: number, d: any) => acc + getMaturityData(d.amount, d.interest_rate, d.start_date, d.tenure_months).interest, 0).toLocaleString()}
+                        </Badge>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-[#f8fafc] text-[10px] uppercase font-bold text-slate-500 border-b">
+                          <tr>
+                            <th className="p-3 text-left">Period / Status</th>
+                            <th className="p-3 text-center">Principal</th>
+                            <th className="p-3 text-center">Finish Date</th>
+                            <th className="p-3 text-center">Maturity (Interest)</th>
+                            <th className="p-3 text-center">Slip</th>
+                            <th className="p-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {deposits.map((fd: any) => {
+                            const m = getMaturityData(fd.amount, fd.interest_rate, fd.start_date, fd.tenure_months)
+                            return (
+                              <tr key={fd.id} className={`transition-colors ${m.isFinished ? 'bg-slate-50/30' : 'bg-emerald-50/20'}`}>
+                                <td className="p-3">
+                                  <div className="font-bold text-slate-800 text-[13px]">{m.startDateStr}</div>
+                                  <Badge variant="outline" className={`text-[9px] font-bold ${m.isFinished ? "text-slate-500 bg-slate-100" : "text-[#059669] bg-[#ecfdf5]"} border-none`}>
+                                    {m.isFinished ? "MATURED" : "ACTIVE"}
+                                  </Badge>
+                                </td>
+                                <td className="p-3 text-center font-bold text-slate-700 text-[14px]">৳{fd.amount.toLocaleString()}</td>
+                                <td className="p-3 text-center text-slate-700 font-bold text-[13px]">
+                                  {m.finishDateStr}
+                                  <div className="text-[10px] text-slate-400 font-medium">{fd.tenure_months} Months @ {fd.interest_rate}%</div>
+                                </td>
+                                <td className="p-3 text-center">
+                                  <div className="text-slate-800 font-bold text-[13px]">৳{m.total.toLocaleString()}</div>
+                                  <div className="text-[10px] text-emerald-600 font-bold">+৳{m.interest.toLocaleString()} Int.</div>
+                                </td>
+                                
+                                <td className="p-3 text-center">
+                                  {fd.slip_url ? (
+                                    <a href={fd.slip_url} target="_blank" rel="noreferrer" className="text-[#059669] hover:underline flex flex-col items-center">
+                                      <FileText size={18} />
+                                    </a>
+                                  ) : (
+                                    <label className="cursor-pointer text-slate-300 hover:text-[#059669]">
+                                      {uploadingId === fd.id ? <Loader2 className="animate-spin" size={16} /> : <><Upload size={16} /><input type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => handleRowUpload(e, fd.id)} /></>}
+                                    </label>
+                                  )}
+                                </td>
+
+                                <td className="p-3 text-right">
+                                  <div className="flex flex-col items-end gap-1">
+                                    {m.isFinished && fd.id === deposits[0].id && (
+                                      <button onClick={() => handleReinvest(fd)} className="flex items-center gap-1 text-[11px] bg-emerald-600 text-white px-2 py-1 rounded font-bold hover:bg-emerald-700">
+                                        <RotateCw size={12} /> Reinvest
+                                      </button>
+                                    )}
+                                    <div className="flex gap-3 font-bold text-[11px]">
+                                      <button onClick={() => { setEditingId(fd.id); setFormData({ mtdr_no: fd.mtdr_no, amount: fd.amount.toString(), start_date: fd.start_date, interest_rate: fd.interest_rate.toString(), tenure_months: fd.tenure_months.toString() }) }} className="text-[#2563eb]">Edit</button>
+                                      <button onClick={() => confirm("Delete record?") && deleteFixedDeposit(fd.id)} className="text-[#ef4444]">Delete</button>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+                </TabsContent>
+              ))}
+            </Tabs>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -41,7 +41,10 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = useCallback(async () => {
     try {
-      // 1. Fetch standard collections first
+      // 1. Fetch Global Stats via RPC - Prioritized to get the full society total
+      const { data: stats, error: statsError } = await supabase.rpc('get_society_stats')
+      
+      // 2. Standard Data Fetching
       const [membersRes, transRes, fdRes] = await Promise.all([
         supabase.from("members").select("*"),
         supabase.from("Installments").select("*").order("created_at", { ascending: false }),
@@ -52,20 +55,18 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const transData = transRes.data || []
       const fdData = fdRes.data || []
 
-      // 2. Fetch Global Stats via RPC
-      const { data: stats, error: statsError } = await supabase.rpc('get_society_stats')
-      
+      // 3. Set Total Fund with Zero-Protection
       if (!statsError && stats && stats.length > 0) {
-        const total = Number(stats[0].total_installments || 0) + Number(stats[0].total_interest || 0)
-        setSocietyTotalFund(total)
+        const rpcTotal = Number(stats[0].total_installments || 0) + Number(stats[0].total_interest || 0)
+        // If RPC gives us the high value (3,103,630), use it.
+        setSocietyTotalFund(rpcTotal)
       } else {
-        // FALLBACK: If RPC fails or returns 0, calculate from visible data so it's never 0
+        // FALLBACK: Only if RPC fails, calculate from visible data
         const localInstallments = transData
           .filter(t => t.status === 'Approved')
           .reduce((sum, t) => sum + Number(t.amount || 0), 0)
         
         const localInterest = fdData.reduce((sum, f) => {
-          // Re-using the logic to identify finished FDs for interest
           const startDate = new Date(f.start_date)
           const finishDate = new Date(f.start_date)
           finishDate.setMonth(startDate.getMonth() + Number(f.tenure_months))
@@ -75,7 +76,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           }
           return sum
         }, 0)
-
         setSocietyTotalFund(localInstallments + localInterest)
       }
 

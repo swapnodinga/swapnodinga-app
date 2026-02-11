@@ -39,20 +39,9 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [, setLocation] = useLocation()
 
-  // Defined with useCallback to prevent unnecessary re-renders when passed to value
   const refreshData = useCallback(async () => {
     try {
-      // 1. Fetch Global Stats via RPC - Bypasses RLS to show the true total to all users
-      const { data: stats, error: statsError } = await supabase.rpc('get_society_stats')
-      
-      if (!statsError && stats && stats.length > 0) {
-        const total = Number(stats[0].total_installments || 0) + Number(stats[0].total_interest || 0)
-        setSocietyTotalFund(total)
-      } else {
-        console.error("RPC failed:", statsError)
-      }
-
-      // 2. Fetch standard collections
+      // 1. Fetch standard collections first
       const [membersRes, transRes, fdRes] = await Promise.all([
         supabase.from("members").select("*"),
         supabase.from("Installments").select("*").order("created_at", { ascending: false }),
@@ -63,7 +52,33 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const transData = transRes.data || []
       const fdData = fdRes.data || []
 
-      // Create a map for member names to enrich transaction data
+      // 2. Fetch Global Stats via RPC
+      const { data: stats, error: statsError } = await supabase.rpc('get_society_stats')
+      
+      if (!statsError && stats && stats.length > 0) {
+        const total = Number(stats[0].total_installments || 0) + Number(stats[0].total_interest || 0)
+        setSocietyTotalFund(total)
+      } else {
+        // FALLBACK: If RPC fails or returns 0, calculate from visible data so it's never 0
+        const localInstallments = transData
+          .filter(t => t.status === 'Approved')
+          .reduce((sum, t) => sum + Number(t.amount || 0), 0)
+        
+        const localInterest = fdData.reduce((sum, f) => {
+          // Re-using the logic to identify finished FDs for interest
+          const startDate = new Date(f.start_date)
+          const finishDate = new Date(f.start_date)
+          finishDate.setMonth(startDate.getMonth() + Number(f.tenure_months))
+          if (finishDate <= new Date()) {
+            const diffDays = Math.ceil(Math.abs(finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+            return sum + (Number(f.amount) * Number(f.interest_rate) * diffDays) / (365 * 100)
+          }
+          return sum
+        }, 0)
+
+        setSocietyTotalFund(localInstallments + localInterest)
+      }
+
       const nameMap: { [key: string]: string } = {}
       membersData.forEach((m) => {
         nameMap[String(m.id)] = m.full_name || m.memberName || "No Name"
@@ -89,9 +104,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         try {
           const parsedUser = JSON.parse(savedUser)
           setCurrentUser(parsedUser)
-          // Data will refresh via the next useEffect once currentUser is set
         } catch (e) {
-          console.error("Failed to parse user session")
           localStorage.removeItem("user")
         }
       }
@@ -126,10 +139,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         return true
       }
       return false
-    } catch (err) { 
-      console.error("Login error:", err)
-      return false 
-    }
+    } catch (err) { return false }
   }
 
   const logout = () => {
@@ -145,25 +155,12 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const lastId = currentMembers && currentMembers.length > 0 ? Math.max(...currentMembers.map(m => m.id)) : 0
       const nextId = lastId + 1
       const nextSocietyId = `SCS-${String(nextId).padStart(3, '0')}`
-      
-      const payload = { 
-        ...userData, 
-        id: nextId, 
-        society_id: nextSocietyId, 
-        status: "pending", 
-        fixed_deposit_amount: 0, 
-        fixed_deposit_interest: 0, 
-        is_admin: false 
-      }
-      
+      const payload = { ...userData, id: nextId, society_id: nextSocietyId, status: "pending", fixed_deposit_amount: 0, fixed_deposit_interest: 0, is_admin: false }
       const { error } = await supabase.from("members").insert([payload])
       if (error) throw error
       await refreshData()
       return true
-    } catch (err) { 
-      console.error("Registration error:", err)
-      return false 
-    }
+    } catch (err) { return false }
   }
 
   const approveMember = async (id: string) => {
@@ -200,7 +197,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`
       await supabase.storage.from("payments").upload(fileName, file)
       const { data: urlData } = supabase.storage.from("payments").getPublicUrl(fileName)
-      
       await supabase.from("Installments").insert([{
         member_id: currentUser.id,
         memberName: currentUser.full_name || currentUser.memberName,
@@ -213,10 +209,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         created_at: new Date().toISOString(),
       }])
       await refreshData()
-    } catch (err) { 
-      console.error("Submit error:", err)
-      throw err 
-    }
+    } catch (err) { throw err }
   }
 
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected") => {
@@ -225,9 +218,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         status, 
         approved_at: status === "Approved" ? new Date().toISOString() : null 
       }).eq("id", transaction.id)
-      
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
-      
       if (memberObj?.email) {
         await emailjs.send("service_b8gcj9p", "template_vi2p4ul", {
           member_name: memberObj.full_name,
@@ -237,16 +228,10 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           status,
           proof_url: transaction.payment_proof_url,
         }, "nKSxYmGpgjuB2J4tF")
-        
-        // As per instructions: delete proof from bucket once processed
-        if (transaction.proofPath) {
-          await supabase.storage.from("payments").remove([transaction.proofPath])
-        }
+        if (transaction.proofPath) await supabase.storage.from("payments").remove([transaction.proofPath])
       }
       await refreshData()
-    } catch (err) { 
-      console.error("Approve error:", err) 
-    }
+    } catch (err) { console.error(err) }
   }
 
   const addFixedDeposit = async (data: any) => {
@@ -260,7 +245,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   }
 
   const deleteFixedDeposit = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this deposit record?")) return
+    if (!window.confirm("Delete this?")) return
     await supabase.from("fixed_deposits").delete().eq("id", id)
     await refreshData()
   }

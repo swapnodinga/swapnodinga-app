@@ -41,10 +41,18 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = useCallback(async () => {
     try {
-      // 1. Fetch Global Stats via RPC - Prioritized to get the full society total
+      // 1. Fetch High-Level Stats via RPC (Bypasses RLS)
       const { data: stats, error: statsError } = await supabase.rpc('get_society_stats')
       
-      // 2. Standard Data Fetching
+      if (!statsError && stats && stats.length > 0) {
+        const total = Number(stats[0].total_installments || 0) + Number(stats[0].total_interest || 0)
+        // Only update if we get a valid number to prevent the "৳0" flicker
+        if (total > 0) {
+          setSocietyTotalFund(total)
+        }
+      }
+
+      // 2. Fetch all other collections in parallel
       const [membersRes, transRes, fdRes] = await Promise.all([
         supabase.from("members").select("*"),
         supabase.from("Installments").select("*").order("created_at", { ascending: false }),
@@ -55,35 +63,13 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const transData = transRes.data || []
       const fdData = fdRes.data || []
 
-      // 3. Set Total Fund with Zero-Protection
-      if (!statsError && stats && stats.length > 0) {
-        const rpcTotal = Number(stats[0].total_installments || 0) + Number(stats[0].total_interest || 0)
-        // If RPC gives us the high value (3,103,630), use it.
-        setSocietyTotalFund(rpcTotal)
-      } else {
-        // FALLBACK: Only if RPC fails, calculate from visible data
-        const localInstallments = transData
-          .filter(t => t.status === 'Approved')
-          .reduce((sum, t) => sum + Number(t.amount || 0), 0)
-        
-        const localInterest = fdData.reduce((sum, f) => {
-          const startDate = new Date(f.start_date)
-          const finishDate = new Date(f.start_date)
-          finishDate.setMonth(startDate.getMonth() + Number(f.tenure_months))
-          if (finishDate <= new Date()) {
-            const diffDays = Math.ceil(Math.abs(finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-            return sum + (Number(f.amount) * Number(f.interest_rate) * diffDays) / (365 * 100)
-          }
-          return sum
-        }, 0)
-        setSocietyTotalFund(localInstallments + localInterest)
-      }
-
+      // Create a map for member names
       const nameMap: { [key: string]: string } = {}
       membersData.forEach((m) => {
         nameMap[String(m.id)] = m.full_name || m.memberName || "No Name"
       })
 
+      // Enrich transactions with member names
       const enrichedTransData = transData.map((trans) => ({
         ...trans,
         memberName: nameMap[String(trans.member_id)] || trans.memberName || `Member #${trans.member_id}`,

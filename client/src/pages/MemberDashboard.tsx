@@ -1,170 +1,168 @@
 "use client"
 
-import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import { useSociety } from "@/context/SocietyContext";
-import { StatCard } from "@/components/StatCard";
-import { Card } from "@/components/ui/card";
-import { Wallet, PiggyBank, Percent, LandPlot, TrendingUp, Building2, User } from "lucide-react";
+import React from "react"
+import { useSociety } from "@/context/SocietyContext"
+import { 
+  TrendingUp, 
+  History, 
+  Wallet, 
+  Building2, 
+  PieChart, 
+  ArrowUpRight 
+} from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export default function MemberDashboard() {
-  // Pulling the RPC-synced total directly from Context
-  const { currentUser, societyTotalFund } = useSociety();
-  const [localStats, setLocalStats] = useState({
-    societyFixedDeposit: 0,
-    societyDepositInterest: 0,
-    myAccumulatedInterest: 0,
-    myInstallments: 0
-  });
+  const { 
+    currentUser, 
+    transactions, 
+    societyTotalFund, 
+    isLoading 
+  } = useSociety()
 
-  // Admin-synced helper function for interest calculation - UNCHANGED [cite: 2026-02-10]
-  const getMaturityData = (amount: number, rate: number, start: string, months: number) => {
-    const startDate = new Date(start);
-    const finishDate = new Date(start);
-    finishDate.setMonth(startDate.getMonth() + Number(months));
-    const diffDays = Math.ceil(Math.abs(finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const interest = (amount * rate * diffDays) / (365 * 100);
-    const isFinished = finishDate <= new Date();
-    return { interest, isFinished };
-  };
+  // Filter personal transactions for the history list
+  const myTransactions = transactions
+    .filter(t => String(t.member_id) === String(currentUser?.id))
+    .slice(0, 5)
 
-  useEffect(() => {
-    const fetchMemberData = async () => {
-      if (!currentUser || !currentUser.id) return;
+  // Calculate Personal Contribution (This is okay to do locally as it's user-specific)
+  const myTotalPaid = transactions
+    .filter(t => String(t.member_id) === String(currentUser?.id) && t.status === "Approved")
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0)
 
-      try {
-        const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
-        const { data: deposits } = await supabase.from('fixed_deposits').select('*');
-
-        // Logic to group by MTDR and take only latest entry - UNCHANGED [cite: 2026-02-10]
-        const groupedDeposits = (deposits || []).reduce((groups: any, fd: any) => {
-          const key = fd.mtdr_no || "Unassigned";
-          if (!groups[key]) groups[key] = [];
-          groups[key].push(fd);
-          groups[key].sort((a: any, b: any) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
-          return groups;
-        }, {});
-
-        let totalActivePrincipal = 0;
-        let totalFinishedPrincipal = 0; 
-        let totalRealizedInterest = 0; 
-
-        (deposits || []).forEach(fd => {
-          const m = getMaturityData(Number(fd.amount), Number(fd.interest_rate), fd.start_date, Number(fd.tenure_months));
-          if (m.isFinished) { 
-            totalRealizedInterest += m.interest; 
-            totalFinishedPrincipal += Number(fd.amount); 
-          } else { 
-            totalActivePrincipal += Number(fd.amount); 
-          }
-        });
-
-        const myInstallments = (installments || [])
-          .filter(inst => inst.member_id === currentUser.id)
-          .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-
-        // Member share calculation formula - UNCHANGED [cite: 2026-02-10]
-        const myInterestShare = totalFinishedPrincipal > 0 
-          ? (totalRealizedInterest / totalFinishedPrincipal) * myInstallments 
-          : 0;
-
-        setLocalStats({
-          societyFixedDeposit: totalActivePrincipal,
-          societyDepositInterest: totalRealizedInterest,
-          myAccumulatedInterest: myInterestShare,
-          myInstallments: myInstallments
-        });
-      } catch (error) {
-        console.error("Error calculating member stats:", error);
-      }
-    };
-
-    fetchMemberData();
-  }, [currentUser]);
-
-  if (!currentUser) return null;
-
-  const myTotalSavings = localStats.myInstallments + localStats.myAccumulatedInterest;
-  const amountFontStyle = "font-sans font-bold text-slate-900 tracking-tight leading-none";
-  const unifiedCardStyle = "min-h-[130px] flex flex-col bg-white border border-slate-200 border-t-4 border-t-emerald-600 shadow-sm rounded-xl px-5 justify-center hover:shadow-md transition-shadow";
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-[150px] w-full rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Skeleton className="h-[120px] rounded-xl" />
+          <Skeleton className="h-[120px] rounded-xl" />
+          <Skeleton className="h-[120px] rounded-xl" />
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="px-4 md:px-8 pb-10 space-y-6 bg-slate-50/30 min-h-screen pt-4">
-      <div className="flex justify-between items-center bg-[#064e3b] p-5 rounded-2xl shadow-md">
-        <div className="flex items-center gap-4">
-          <div className="bg-white/10 p-3 rounded-lg">
-            <User className="w-6 h-6 text-emerald-300" />
-          </div>
-          <div>
-            <h1 className="text-lg md:text-xl font-bold text-white uppercase">
-              {currentUser.full_name || currentUser.name || currentUser.memberName}
-            </h1>
-            <p className="text-emerald-300/80 text-[10px] font-medium tracking-widest uppercase">
-              ID: {currentUser.society_id || "PENDING"} 
-            </p>
-          </div>
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            Welcome back, {currentUser?.full_name || "Member"}
+          </h1>
+          <p className="text-slate-500 mt-1">Here is your society capital overview.</p>
+        </div>
+        <div className="bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-100">
+          <span className="text-emerald-700 font-medium flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            ID: {currentUser?.society_id}
+          </span>
         </div>
       </div>
 
-      {/* Personal Equity - UNCHANGED */}
-      <div className="space-y-3">
-        <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest ml-1">Personal Equity Overview</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatCard 
-            title="MY TOTAL SAVINGS" 
-            value={`৳${Math.round(myTotalSavings).toLocaleString()}`} 
-            icon={Wallet} 
-            className={unifiedCardStyle}
-            valueClassName={`${amountFontStyle} text-3xl`} 
-          />
-          <StatCard 
-            title="MONTHLY INSTALMENTS" 
-            value={`৳${localStats.myInstallments.toLocaleString()}`} 
-            icon={PiggyBank} 
-            className={unifiedCardStyle}
-            valueClassName={`${amountFontStyle} text-3xl`}
-          />
-          <StatCard 
-            title="ACCUMULATED INTEREST" 
-            value={`৳${Math.round(localStats.myAccumulatedInterest).toLocaleString()}`} 
-            icon={Percent} 
-            className={unifiedCardStyle}
-            valueClassName={`${amountFontStyle} text-3xl text-emerald-600`}
-          />
-        </div>
-      </div>
-
-      {/* Society Capital Status */}
-      <div className="space-y-3">
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Society Capital Status</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatCard 
-            title="FIXED DEPOSIT" 
-            value={`৳${localStats.societyFixedDeposit.toLocaleString()}`} 
-            icon={LandPlot} 
-            className={unifiedCardStyle}
-            valueClassName={`${amountFontStyle} text-2xl`}
-          />
-          <StatCard 
-            title="REALIZED INTEREST" 
-            value={`৳${Math.round(localStats.societyDepositInterest).toLocaleString()}`} 
-            icon={TrendingUp} 
-            className={unifiedCardStyle}
-            valueClassName={`${amountFontStyle} text-2xl`}
-          />
-          <Card className="bg-[#022c22] text-white shadow-md border-none rounded-xl min-h-[130px] flex flex-col justify-center px-6">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Society Total Fund</span>
-              <Building2 className="h-4 w-4 text-emerald-500 opacity-50" />
-            </div>
-            <div className="font-sans font-extrabold text-white text-3xl md:text-4xl tracking-tight">
-              {/* This now pulls directly from Context to ensure ৳3,103,630 is shown */}
+      {/* Capital Status Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* SOCIETY TOTAL FUND - FIXED VALUE FROM CONTEXT */}
+        <Card className="relative overflow-hidden border-none bg-slate-900 text-white shadow-2xl">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-emerald-400" />
+              SOCIETY TOTAL FUND
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-4xl font-black tracking-tighter">
               ৳{Math.round(societyTotalFund).toLocaleString()}
             </div>
-            <p className="text-[9px] text-emerald-500/60 font-medium uppercase mt-1">Collective Pool</p>
-          </Card>
-        </div>
+            <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+              <TrendingUp className="h-3 w-3 text-emerald-400" />
+              COLLECTIVE POOL
+            </p>
+          </CardContent>
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <Building2 className="h-20 w-20" />
+          </div>
+        </Card>
+
+        {/* PERSONAL CONTRIBUTION */}
+        <Card className="border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-blue-500" />
+              MY CONTRIBUTION
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900">
+              ৳{myTotalPaid.toLocaleString()}
+            </div>
+            <p className="text-xs text-slate-400 mt-2">Total approved installments</p>
+          </CardContent>
+        </Card>
+
+        {/* PERFORMANCE / STATUS */}
+        <Card className="border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+              <PieChart className="h-4 w-4 text-purple-500" />
+              PORTFOLIO SHARE
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900">
+              {societyTotalFund > 0 
+                ? ((myTotalPaid / societyTotalFund) * 100).toFixed(2) 
+                : "0"}%
+            </div>
+            <p className="text-xs text-slate-400 mt-2">Your stake in the society</p>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Recent Activity Section */}
+      <Card className="border-slate-100 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div className="flex items-center gap-2">
+            <History className="h-5 w-5 text-slate-400" />
+            <CardTitle>Recent Payments</CardTitle>
+          </div>
+          <button className="text-sm text-emerald-600 font-semibold flex items-center gap-1 hover:underline">
+            View All <ArrowUpRight className="h-4 w-4" />
+          </button>
+        </CardHeader>
+        <CardContent>
+          {myTransactions.length > 0 ? (
+            <div className="space-y-4">
+              {myTransactions.map((tx) => (
+                <div key={tx.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100">
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-slate-900">{tx.month} Installment</span>
+                    <span className="text-xs text-slate-500">
+                      {new Date(tx.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="font-bold text-slate-900">৳{tx.amount.toLocaleString()}</span>
+                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                      tx.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : 
+                      tx.status === 'Pending' ? 'bg-amber-100 text-amber-700' : 
+                      'bg-rose-100 text-rose-700'
+                    }`}>
+                      {tx.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-slate-400">
+              No recent payment activity found.
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
-  );
+  )
 }

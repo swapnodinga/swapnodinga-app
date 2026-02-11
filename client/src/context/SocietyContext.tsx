@@ -41,35 +41,30 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = useCallback(async () => {
     try {
-      // 1. Fetch High-Level Stats via RPC (Bypasses RLS)
+      // 1. Fetch High-Permission Fund Stats first
       const { data: stats, error: statsError } = await supabase.rpc('get_society_stats')
       
-      if (!statsError && stats && stats.length > 0) {
-        const total = Number(stats[0].total_installments || 0) + Number(stats[0].total_interest || 0)
-        // Only update if we get a valid number to prevent the "৳0" flicker
-        if (total > 0) {
-          setSocietyTotalFund(total)
-        }
-      }
-
-      // 2. Fetch all other collections in parallel
+      // 2. Fetch standard collections
       const [membersRes, transRes, fdRes] = await Promise.all([
         supabase.from("members").select("*"),
         supabase.from("Installments").select("*").order("created_at", { ascending: false }),
         supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
       ])
 
+      if (!statsError && stats && stats.length > 0) {
+        const total = Number(stats[0].total_installments || 0) + Number(stats[0].total_interest || 0)
+        if (total > 0) setSocietyTotalFund(total)
+      }
+
       const membersData = membersRes.data || []
       const transData = transRes.data || []
       const fdData = fdRes.data || []
 
-      // Create a map for member names
       const nameMap: { [key: string]: string } = {}
       membersData.forEach((m) => {
         nameMap[String(m.id)] = m.full_name || m.memberName || "No Name"
       })
 
-      // Enrich transactions with member names
       const enrichedTransData = transData.map((trans) => ({
         ...trans,
         memberName: nameMap[String(trans.member_id)] || trans.memberName || `Member #${trans.member_id}`,
@@ -80,46 +75,34 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       setFixedDeposits(fdData)
     } catch (err) {
       console.error("[SocietyContext] Refresh failed:", err)
-    }
-  }, [])
-
-  useEffect(() => {
-    const initSession = async () => {
-      const savedUser = localStorage.getItem("user")
-      if (savedUser) {
-        try {
-          const parsedUser = JSON.parse(savedUser)
-          setCurrentUser(parsedUser)
-        } catch (e) {
-          localStorage.removeItem("user")
-        }
-      }
+    } finally {
       setIsLoading(false)
     }
-    initSession()
   }, [])
 
   useEffect(() => {
-    if (currentUser) {
-      refreshData()
+    const savedUser = localStorage.getItem("user")
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser))
+      } catch (e) {
+        localStorage.removeItem("user")
+      }
+    } else {
+      setIsLoading(false)
     }
+  }, [])
+
+  useEffect(() => {
+    if (currentUser) refreshData()
   }, [currentUser, refreshData])
 
   const login = async (email: string, pass: string) => {
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pass })
       if (authError) throw authError
-
-      const { data, error: dbError } = await supabase
-        .from("members")
-        .select("*")
-        .eq("email", email.trim())
-        .eq("password", pass)
-        .single()
-
-      if (dbError || !data) return false
-      
-      if (data.status === 'active') {
+      const { data } = await supabase.from("members").select("*").eq("email", email.trim()).eq("password", pass).single()
+      if (data && data.status === 'active') {
         setCurrentUser(data)
         localStorage.setItem("user", JSON.stringify(data))
         return true
@@ -200,18 +183,14 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected") => {
     try {
-      await supabase.from("Installments").update({ 
-        status, 
-        approved_at: status === "Approved" ? new Date().toISOString() : null 
-      }).eq("id", transaction.id)
+      await supabase.from("Installments").update({ status, approved_at: status === "Approved" ? new Date().toISOString() : null }).eq("id", transaction.id)
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
       if (memberObj?.email) {
         await emailjs.send("service_b8gcj9p", "template_vi2p4ul", {
           member_name: memberObj.full_name,
           member_email: memberObj.email,
           amount: transaction.amount,
-          month: transaction.month,
-          status,
+          month: transaction.month, status,
           proof_url: transaction.payment_proof_url,
         }, "nKSxYmGpgjuB2J4tF")
         if (transaction.proofPath) await supabase.storage.from("payments").remove([transaction.proofPath])

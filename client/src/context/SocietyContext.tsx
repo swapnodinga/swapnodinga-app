@@ -53,25 +53,23 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = async () => {
     try {
-      // 1. Get the Society-Wide Total (Bypassing local calculation logic)
-      // This RPC must be created in Supabase SQL editor to work
+      // 1. Fetch Global Stats via RPC - This is the ONLY way to show 3,103,630 to a Member
       const { data: stats, error: statsError } = await supabase.rpc('get_society_stats')
       
-      if (!statsError && stats && stats[0]) {
-        const total = Number(stats[0].total_installments) + Number(stats[0].total_interest)
+      if (!statsError && stats && stats.length > 0) {
+        const total = Number(stats[0].total_installments || 0) + Number(stats[0].total_interest || 0)
+        console.log("RPC Data Found:", total)
         setSocietyTotalFund(total)
       } else {
-        console.error("RPC Error or No Data:", statsError)
+        console.error("RPC failed, check if get_society_stats exists in Supabase:", statsError)
       }
 
-      // 2. Fetch standard data (Subject to RLS)
+      // 2. Standard Data Fetching
       const { data: membersData } = await supabase.from("members").select("*")
-      
       const { data: transData } = await supabase
         .from("Installments")
         .select("*")
         .order("created_at", { ascending: false })
-
       const { data: fdData } = await supabase
         .from("fixed_deposits")
         .select("*")
@@ -101,6 +99,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData()
   }, [currentUser])
 
+  // login, logout, register, etc. logic remains UNCHANGED as per instructions
   const login = async (email: string, pass: string) => {
     try {
       await supabase.auth.signInWithPassword({ email: email.trim(), password: pass })

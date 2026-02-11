@@ -50,24 +50,24 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [])
 
-  // DEEP FIX: This logic now matches your Admin "Net Society Value" exactly
+  // CALCULATION FIX: Ensures Realized Interest is added to Approved Installments
   const societyTotalFund = useMemo(() => {
-    // 1. Sum every single approved installment record
+    // 1. Sum approved installments: 2,950,000
     const totalInstallments = (transactions || [])
       .filter((t) => t.status === "Approved")
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
 
-    // 2. Sum all realized interest earned from the society's FDs
+    // 2. Sum realized interest from FD table: 153,630
     const totalRealizedInterest = (fixedDeposits || [])
       .reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0);
 
-    // Result: 2,950,000 + 153,630 = 3,103,630
+    // Total: 3,103,630
     return totalInstallments + totalRealizedInterest;
   }, [transactions, fixedDeposits])
 
   const refreshData = async () => {
     try {
-      const { data: membersData, error: memError } = await supabase.from("members").select("*")
+      const { data: membersData } = await supabase.from("members").select("*")
       
       const { data: transData } = await supabase
         .from("Installments")

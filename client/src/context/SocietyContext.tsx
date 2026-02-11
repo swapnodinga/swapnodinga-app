@@ -50,25 +50,18 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [])
 
-  // CALCULATION FIX: Ensures Realized Interest is added to Approved Installments
   const societyTotalFund = useMemo(() => {
-    // 1. Sum approved installments: 2,950,000
-    const totalInstallments = (transactions || [])
+    if (!Array.isArray(transactions)) return 0
+    return transactions
       .filter((t) => t.status === "Approved")
-      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-
-    // 2. Sum realized interest from FD table: 153,630
-    const totalRealizedInterest = (fixedDeposits || [])
-      .reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0);
-
-    // Total: 3,103,630
-    return totalInstallments + totalRealizedInterest;
-  }, [transactions, fixedDeposits])
+      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
+  }, [transactions])
 
   const refreshData = async () => {
     try {
-      const { data: membersData } = await supabase.from("members").select("*")
-      
+      const { data: membersData, error: memError } = await supabase.from("members").select("*")
+      if (memError) console.error("Error fetching members:", memError)
+
       const { data: transData } = await supabase
         .from("Installments")
         .select("*")
@@ -197,7 +190,9 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         .single()
 
       if (memberData) {
-        if (memberData.status !== 'active') return false;
+        if (memberData.status !== 'active') {
+          return false;
+        }
         setCurrentUser(memberData)
         localStorage.setItem("user", JSON.stringify(memberData))
         return true
@@ -217,22 +212,29 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: any) => {
     try {
       const { data: currentMembers } = await supabase.from("members").select("id")
-      const lastId = currentMembers && currentMembers.length > 0 ? Math.max(...currentMembers.map(m => m.id)) : 0;
+      const lastId = currentMembers && currentMembers.length > 0 
+        ? Math.max(...currentMembers.map(m => m.id)) 
+        : 0;
+      
       const nextId = lastId + 1;
+      const nextSocietyId = `SCS-${String(nextId).padStart(3, '0')}`;
+
       const payload = {
         ...userData,
         id: nextId,
-        society_id: `SCS-${String(nextId).padStart(3, '0')}`, 
+        society_id: nextSocietyId, 
         status: "pending",
         fixed_deposit_amount: 0,
         fixed_deposit_interest: 0,
         is_admin: false
       }
+
       const { error } = await supabase.from("members").insert([payload])
       if (error) throw error
       await refreshData()
       return true
     } catch (err) {
+      console.error("Registration failed:", err)
       return false
     }
   }

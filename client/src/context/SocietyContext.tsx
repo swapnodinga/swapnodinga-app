@@ -59,14 +59,19 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = async () => {
     try {
+      // 1. Fetch members list (Used for name mapping and admin view)
       const { data: membersData, error: memError } = await supabase.from("members").select("*")
       if (memError) console.error("Error fetching members:", memError)
 
-      const { data: transData } = await supabase
+      // 2. Fetch Installments (RLS will automatically filter these based on the logged-in email)
+      const { data: transData, error: transError } = await supabase
         .from("Installments")
         .select("*")
         .order("created_at", { ascending: false })
+      
+      if (transError) console.error("Error fetching installments:", transError)
 
+      // 3. Fetch Fixed Deposits
       const { data: fdData, error: fdError } = await supabase
         .from("fixed_deposits")
         .select("*")
@@ -74,6 +79,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       
       if (fdError) console.error("Error fetching FDs:", fdError)
 
+      // Enriched data mapping
       const nameMap: { [key: string]: string } = {}
       if (membersData) {
         membersData.forEach((m) => {
@@ -144,6 +150,11 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           },
           "nKSxYmGpgjuB2J4tF",
         )
+
+        // If approved or rejected, cleanup the storage proof as requested
+        if (transaction.proofPath) {
+          await supabase.storage.from("payments").remove([transaction.proofPath])
+        }
       }
       await refreshData()
     } catch (err) {
@@ -154,13 +165,16 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const submitInstalment = async (amount: number, file: File, month: string) => {
     try {
       if (!currentUser) throw new Error("No user logged in")
+      
       const fileExt = file.name.split(".").pop()
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`
+      
       const { error: uploadError } = await supabase.storage.from("payments").upload(fileName, file)
       if (uploadError) throw uploadError
 
       const { data: urlData } = supabase.storage.from("payments").getPublicUrl(fileName)
 
+      // Using the numeric currentUser.id to match the database expectations
       const { error: dbError } = await supabase.from("Installments").insert([{
         member_id: currentUser.id,
         memberName: currentUser.full_name || currentUser.memberName,
@@ -177,6 +191,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       await refreshData()
     } catch (err: any) {
       console.error("Submission Error:", err.message)
+      throw err
     }
   }
 

@@ -50,7 +50,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [])
 
-  // DYNAMIC CALCULATION: Sum of Approved Installments + Realized Interest from FDs
+  // REVISED CALCULATION: Sums Approved Installments + Realized Interest from FDs
   const societyTotalFund = useMemo(() => {
     const totalInstallments = (transactions || [])
       .filter((t) => t.status === "Approved")

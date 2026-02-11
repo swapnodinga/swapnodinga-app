@@ -50,12 +50,17 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [])
 
+  // DYNAMIC CALCULATION: Sum of Approved Installments + Realized Interest from FDs
   const societyTotalFund = useMemo(() => {
-    if (!Array.isArray(transactions)) return 0
-    return transactions
+    const totalInstallments = (transactions || [])
       .filter((t) => t.status === "Approved")
-      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
-  }, [transactions])
+      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+
+    const totalRealizedInterest = (fixedDeposits || [])
+      .reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0);
+
+    return totalInstallments + totalRealizedInterest;
+  }, [transactions, fixedDeposits])
 
   const refreshData = async () => {
     try {

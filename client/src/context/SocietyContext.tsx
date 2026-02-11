@@ -50,12 +50,20 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [])
 
+  // FIXED: Calculation matches Admin (Total Approved Installments + Total Realized Interest)
   const societyTotalFund = useMemo(() => {
-    if (!Array.isArray(transactions)) return 0
-    return transactions
+    // 1. Sum of all Approved Installments across the whole society
+    const totalInstallments = (transactions || [])
       .filter((t) => t.status === "Approved")
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
-  }, [transactions])
+
+    // 2. Sum of all Realized Interest earned from FDs
+    const totalInterest = (fixedDeposits || [])
+      .reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0)
+
+    // Result: 2,950,000 + 153,630 = 3,103,630
+    return totalInstallments + totalInterest
+  }, [transactions, fixedDeposits])
 
   const refreshData = async () => {
     try {
@@ -193,7 +201,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, pass: string) => {
     try {
-      // THE FIX: Unlock Supabase Auth RLS Session
       await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: pass,

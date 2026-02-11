@@ -59,11 +59,9 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = async () => {
     try {
-      // 1. Fetch members
       const { data: membersData, error: memError } = await supabase.from("members").select("*")
       if (memError) console.error("Error fetching members:", memError)
 
-      // 2. Fetch Installments (Using EXACT table name from your screenshot)
       const { data: transData, error: transError } = await supabase
         .from("Installments")
         .select("*")
@@ -71,10 +69,8 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       
       if (transError) console.error("Error fetching installments:", transError)
       
-      // DEBUG LOG: Check this in your browser console (F12)
       console.log("SocietyContext: Raw Transactions Fetched:", transData);
 
-      // 3. Fetch Fixed Deposits
       const { data: fdData, error: fdError } = await supabase
         .from("fixed_deposits")
         .select("*")
@@ -82,7 +78,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       
       if (fdError) console.error("Error fetching FDs:", fdError)
 
-      // Enriched data mapping
       const nameMap: { [key: string]: string } = {}
       if (membersData) {
         membersData.forEach((m) => {
@@ -91,7 +86,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         })
       }
 
-      // We use String() conversion to ensure the ID comparison doesn't fail [cite: 2026-02-10]
       const enrichedTransData = (transData || []).map((trans) => ({
         ...trans,
         memberName: nameMap[String(trans.member_id)] || trans.memberName || `Member #${trans.member_id}`,
@@ -155,7 +149,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           "nKSxYmGpgjuB2J4tF",
         )
 
-        // Cleanup proof as requested [cite: 2025-12-31]
         if (transaction.proofPath) {
           await supabase.storage.from("payments").remove([transaction.proofPath])
         }
@@ -200,6 +193,12 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, pass: string) => {
     try {
+      // THE FIX: Unlock Supabase Auth RLS Session
+      await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: pass,
+      });
+
       const { data: memberData } = await supabase
         .from("members")
         .select("*")
@@ -212,6 +211,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         
         setCurrentUser(memberData)
         localStorage.setItem("user", JSON.stringify(memberData))
+        await refreshData()
         return true
       }
       return false
@@ -221,6 +221,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = () => {
+    supabase.auth.signOut()
     setCurrentUser(null)
     localStorage.removeItem("user")
     setLocation("/")

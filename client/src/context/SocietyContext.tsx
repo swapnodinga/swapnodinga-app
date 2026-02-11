@@ -53,12 +53,14 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = async () => {
     try {
-      // Bypassing RLS via RPC to get the correct Gross Total: ৳3,103,630
+      // 1. Fetch Global Stats via RPC to bypass RLS for the Total Fund count
+      // This ensures members see the correct society total: ৳3,103,630
       const { data: stats, error: statsError } = await supabase.rpc('get_society_stats')
       if (!statsError && stats && stats[0]) {
         setSocietyTotalFund(Number(stats[0].total_installments) + Number(stats[0].total_interest))
       }
 
+      // 2. Fetch all other data
       const { data: membersData, error: memError } = await supabase.from("members").select("*")
       if (memError) console.error("Error fetching members:", memError)
 
@@ -217,12 +219,23 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const lastId = currentMembers && currentMembers.length > 0 ? Math.max(...currentMembers.map(m => m.id)) : 0;
       const nextId = lastId + 1;
       const nextSocietyId = `SCS-${String(nextId).padStart(3, '0')}`;
-      const payload = { ...userData, id: nextId, society_id: nextSocietyId, status: "pending", fixed_deposit_amount: 0, fixed_deposit_interest: 0, is_admin: false }
+      const payload = { 
+        ...userData, 
+        id: nextId, 
+        society_id: nextSocietyId, 
+        status: "pending", 
+        fixed_deposit_amount: 0, 
+        fixed_deposit_interest: 0, 
+        is_admin: false 
+      }
       const { error } = await supabase.from("members").insert([payload])
       if (error) throw error
       await refreshData()
       return true
-    } catch (err) { return false }
+    } catch (err) { 
+      console.error("Registration failed:", err)
+      return false 
+    }
   }
 
   const approveMember = async (id: string) => {

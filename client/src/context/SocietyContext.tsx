@@ -59,17 +59,20 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = async () => {
     try {
-      // 1. Fetch members list (Used for name mapping and admin view)
+      // 1. Fetch members
       const { data: membersData, error: memError } = await supabase.from("members").select("*")
       if (memError) console.error("Error fetching members:", memError)
 
-      // 2. Fetch Installments (RLS will automatically filter these based on the logged-in email)
+      // 2. Fetch Installments (Using EXACT table name from your screenshot)
       const { data: transData, error: transError } = await supabase
         .from("Installments")
         .select("*")
         .order("created_at", { ascending: false })
       
       if (transError) console.error("Error fetching installments:", transError)
+      
+      // DEBUG LOG: Check this in your browser console (F12)
+      console.log("SocietyContext: Raw Transactions Fetched:", transData);
 
       // 3. Fetch Fixed Deposits
       const { data: fdData, error: fdError } = await supabase
@@ -88,6 +91,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         })
       }
 
+      // We use String() conversion to ensure the ID comparison doesn't fail [cite: 2026-02-10]
       const enrichedTransData = (transData || []).map((trans) => ({
         ...trans,
         memberName: nameMap[String(trans.member_id)] || trans.memberName || `Member #${trans.member_id}`,
@@ -151,7 +155,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           "nKSxYmGpgjuB2J4tF",
         )
 
-        // If approved or rejected, cleanup the storage proof as requested
+        // Cleanup proof as requested [cite: 2025-12-31]
         if (transaction.proofPath) {
           await supabase.storage.from("payments").remove([transaction.proofPath])
         }
@@ -174,7 +178,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       const { data: urlData } = supabase.storage.from("payments").getPublicUrl(fileName)
 
-      // Using the numeric currentUser.id to match the database expectations
       const { error: dbError } = await supabase.from("Installments").insert([{
         member_id: currentUser.id,
         memberName: currentUser.full_name || currentUser.memberName,
@@ -205,9 +208,8 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         .single()
 
       if (memberData) {
-        if (memberData.status !== 'active') {
-          return false;
-        }
+        if (memberData.status !== 'active') return false
+        
         setCurrentUser(memberData)
         localStorage.setItem("user", JSON.stringify(memberData))
         return true

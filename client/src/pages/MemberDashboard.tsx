@@ -8,27 +8,23 @@ import { Card } from "@/components/ui/card";
 import { Wallet, PiggyBank, Percent, LandPlot, TrendingUp, Building2, User } from "lucide-react";
 
 export default function MemberDashboard() {
-  // Destructured societyTotalFund from context
+  // Pulling the RPC-synced total directly from Context
   const { currentUser, societyTotalFund } = useSociety();
   const [localStats, setLocalStats] = useState({
     societyFixedDeposit: 0,
     societyDepositInterest: 0,
     myAccumulatedInterest: 0,
-    myInstallments: 0,
-    fallbackTotalFund: 0 // Added as a safety backup
+    myInstallments: 0
   });
 
-  // Admin-synced helper function for interest calculation - UNCHANGED
+  // Admin-synced helper function for interest calculation - UNCHANGED [cite: 2026-02-10]
   const getMaturityData = (amount: number, rate: number, start: string, months: number) => {
     const startDate = new Date(start);
     const finishDate = new Date(start);
     finishDate.setMonth(startDate.getMonth() + Number(months));
-    
-    // Exact day-based calculation as per Admin logic
     const diffDays = Math.ceil(Math.abs(finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     const interest = (amount * rate * diffDays) / (365 * 100);
     const isFinished = finishDate <= new Date();
-    
     return { interest, isFinished };
   };
 
@@ -40,7 +36,7 @@ export default function MemberDashboard() {
         const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
         const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 
-        // Logic to group by MTDR and take only the latest entry principal - UNCHANGED
+        // Logic to group by MTDR and take only latest entry - UNCHANGED [cite: 2026-02-10]
         const groupedDeposits = (deposits || []).reduce((groups: any, fd: any) => {
           const key = fd.mtdr_no || "Unassigned";
           if (!groups[key]) groups[key] = [];
@@ -53,7 +49,6 @@ export default function MemberDashboard() {
         let totalFinishedPrincipal = 0; 
         let totalRealizedInterest = 0; 
 
-        // Apply same loop logic as Admin Dashboard - UNCHANGED
         (deposits || []).forEach(fd => {
           const m = getMaturityData(Number(fd.amount), Number(fd.interest_rate), fd.start_date, Number(fd.tenure_months));
           if (m.isFinished) { 
@@ -68,20 +63,16 @@ export default function MemberDashboard() {
           .filter(inst => inst.member_id === currentUser.id)
           .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-        // Member share calculation synced with Admin's formula - UNCHANGED
+        // Member share calculation formula - UNCHANGED [cite: 2026-02-10]
         const myInterestShare = totalFinishedPrincipal > 0 
           ? (totalRealizedInterest / totalFinishedPrincipal) * myInstallments 
           : 0;
 
-        // Calculate a local fallback in case societyTotalFund from context is 0
-        const localInstallmentsTotal = (installments || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
-
         setLocalStats({
-          societyFixedDeposit: totalActivePrincipal, 
+          societyFixedDeposit: totalActivePrincipal,
           societyDepositInterest: totalRealizedInterest,
           myAccumulatedInterest: myInterestShare,
-          myInstallments: myInstallments,
-          fallbackTotalFund: localInstallmentsTotal + totalRealizedInterest
+          myInstallments: myInstallments
         });
       } catch (error) {
         console.error("Error calculating member stats:", error);
@@ -96,9 +87,6 @@ export default function MemberDashboard() {
   const myTotalSavings = localStats.myInstallments + localStats.myAccumulatedInterest;
   const amountFontStyle = "font-sans font-bold text-slate-900 tracking-tight leading-none";
   const unifiedCardStyle = "min-h-[130px] flex flex-col bg-white border border-slate-200 border-t-4 border-t-emerald-600 shadow-sm rounded-xl px-5 justify-center hover:shadow-md transition-shadow";
-
-  // If societyTotalFund from context is 0 or null, use the local calculation as backup
-  const displayTotalFund = societyTotalFund > 0 ? societyTotalFund : localStats.fallbackTotalFund;
 
   return (
     <div className="px-4 md:px-8 pb-10 space-y-6 bg-slate-50/30 min-h-screen pt-4">
@@ -118,6 +106,7 @@ export default function MemberDashboard() {
         </div>
       </div>
 
+      {/* Personal Equity - UNCHANGED */}
       <div className="space-y-3">
         <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest ml-1">Personal Equity Overview</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -145,6 +134,7 @@ export default function MemberDashboard() {
         </div>
       </div>
 
+      {/* Society Capital Status */}
       <div className="space-y-3">
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Society Capital Status</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -168,7 +158,8 @@ export default function MemberDashboard() {
               <Building2 className="h-4 w-4 text-emerald-500 opacity-50" />
             </div>
             <div className="font-sans font-extrabold text-white text-3xl md:text-4xl tracking-tight">
-              ৳{Math.round(displayTotalFund).toLocaleString()}
+              {/* This now pulls directly from Context to ensure ৳3,103,630 is shown */}
+              ৳{Math.round(societyTotalFund).toLocaleString()}
             </div>
             <p className="text-[9px] text-emerald-500/60 font-medium uppercase mt-1">Collective Pool</p>
           </Card>

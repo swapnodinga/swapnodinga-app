@@ -8,13 +8,14 @@ import { Card } from "@/components/ui/card";
 import { Wallet, PiggyBank, Percent, LandPlot, TrendingUp, Building2, User } from "lucide-react";
 
 export default function MemberDashboard() {
-  // Destructured societyTotalFund from context to bypass RLS restrictions
+  // Destructured societyTotalFund from context
   const { currentUser, societyTotalFund } = useSociety();
   const [localStats, setLocalStats] = useState({
     societyFixedDeposit: 0,
     societyDepositInterest: 0,
     myAccumulatedInterest: 0,
-    myInstallments: 0
+    myInstallments: 0,
+    fallbackTotalFund: 0 // Added as a safety backup
   });
 
   // Admin-synced helper function for interest calculation - UNCHANGED
@@ -72,11 +73,15 @@ export default function MemberDashboard() {
           ? (totalRealizedInterest / totalFinishedPrincipal) * myInstallments 
           : 0;
 
+        // Calculate a local fallback in case societyTotalFund from context is 0
+        const localInstallmentsTotal = (installments || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
         setLocalStats({
           societyFixedDeposit: totalActivePrincipal, 
           societyDepositInterest: totalRealizedInterest,
           myAccumulatedInterest: myInterestShare,
-          myInstallments: myInstallments
+          myInstallments: myInstallments,
+          fallbackTotalFund: localInstallmentsTotal + totalRealizedInterest
         });
       } catch (error) {
         console.error("Error calculating member stats:", error);
@@ -91,6 +96,9 @@ export default function MemberDashboard() {
   const myTotalSavings = localStats.myInstallments + localStats.myAccumulatedInterest;
   const amountFontStyle = "font-sans font-bold text-slate-900 tracking-tight leading-none";
   const unifiedCardStyle = "min-h-[130px] flex flex-col bg-white border border-slate-200 border-t-4 border-t-emerald-600 shadow-sm rounded-xl px-5 justify-center hover:shadow-md transition-shadow";
+
+  // If societyTotalFund from context is 0 or null, use the local calculation as backup
+  const displayTotalFund = societyTotalFund > 0 ? societyTotalFund : localStats.fallbackTotalFund;
 
   return (
     <div className="px-4 md:px-8 pb-10 space-y-6 bg-slate-50/30 min-h-screen pt-4">
@@ -160,8 +168,7 @@ export default function MemberDashboard() {
               <Building2 className="h-4 w-4 text-emerald-500 opacity-50" />
             </div>
             <div className="font-sans font-extrabold text-white text-3xl md:text-4xl tracking-tight">
-              {/* FIXED: Using societyTotalFund from Context (RPC value) to show 3,103,630 */}
-              ৳{Math.round(societyTotalFund).toLocaleString()}
+              ৳{Math.round(displayTotalFund).toLocaleString()}
             </div>
             <p className="text-[9px] text-emerald-500/60 font-medium uppercase mt-1">Collective Pool</p>
           </Card>

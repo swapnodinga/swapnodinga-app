@@ -182,17 +182,22 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, pass: string) => {
     try {
+      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: pass,
+      })
+      if (signInErr) return false
+      const userId = signInData?.user?.id
+      if (!userId) return false
+
       const { data: memberData } = await supabase
         .from("members")
         .select("*")
-        .eq("email", email.trim())
-        .eq("password", pass)
+        .eq("auth_id", userId)
         .single()
 
       if (memberData) {
-        if (memberData.status !== 'active') {
-          return false;
-        }
+        if (memberData.status !== 'active') return false
         setCurrentUser(memberData)
         localStorage.setItem("user", JSON.stringify(memberData))
         return true
@@ -211,22 +216,35 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (userData: any) => {
     try {
+      // Sign up via Supabase Auth
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+      })
+      if (signUpErr) throw signUpErr
+      const userId = signUpData?.user?.id
+      if (!userId) throw new Error("Failed to create auth user")
+
+      // Prepare payload without client-assigned numeric id
+      const { password, ...rest } = userData
+
+      // Generate society id server-side is preferred; keep existing logic but avoid assigning numeric id
+      // We'll attempt to compute a society_id string as before but without forcing `id`.
       const { data: currentMembers } = await supabase.from("members").select("id")
       const lastId = currentMembers && currentMembers.length > 0 
-        ? Math.max(...currentMembers.map(m => m.id)) 
+        ? Math.max(...currentMembers.map((m: any) => m.id)) 
         : 0;
-      
       const nextId = lastId + 1;
       const nextSocietyId = `SCS-${String(nextId).padStart(3, '0')}`;
 
       const payload = {
-        ...userData,
-        id: nextId,
-        society_id: nextSocietyId, 
+        ...rest,
+        auth_id: userId,
+        society_id: nextSocietyId,
         status: "pending",
         fixed_deposit_amount: 0,
         fixed_deposit_interest: 0,
-        is_admin: false
+        is_admin: false,
       }
 
       const { error } = await supabase.from("members").insert([payload])

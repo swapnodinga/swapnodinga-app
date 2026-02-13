@@ -59,8 +59,20 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = async () => {
     try {
-      const { data: membersData, error: memError } = await supabase.from("members").select("*")
-      if (memError) console.error("Error fetching members:", memError)
+      let membersData: any = null
+      // If current user is admin, fetch members via server endpoint (uses service role key)
+      if (currentUser?.is_admin) {
+        try {
+          const res = await fetch('/api/members')
+          membersData = await res.json()
+        } catch (e) {
+          console.error('Failed to fetch members from server endpoint', e)
+        }
+      } else {
+        const { data, error } = await supabase.from('members').select('id, full_name, society_id')
+        if (error) console.error('Error fetching members:', error)
+        membersData = data
+      }
 
       const { data: transData } = await supabase
         .from("Installments")

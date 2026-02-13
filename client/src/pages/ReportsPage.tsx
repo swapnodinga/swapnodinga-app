@@ -40,7 +40,8 @@ export default function ReportsPage() {
   const fetchReportData = async () => {
     setIsLoading(true);
     try {
-      const { data: members } = await supabase.from('members').select('id, full_name, society_id').order('id', { ascending: true });
+      // Use server endpoint to fetch members (admin-level read)
+      const members = await fetch('/api/members').then(r => r.json()).catch(() => []);
       const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
       const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 

@@ -76,7 +76,8 @@ export default function AdminDashboard() {
 
   const fetchDashboardStats = async () => {
     try {
-      const { data: members } = await supabase.from('members').select('id, full_name, memberName');
+      // Fetch members via server admin endpoint to avoid RLS client restrictions
+      const members = await fetch('/api/members').then(r => r.json()).catch(() => []);
       const { data: allInstallments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
       const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 

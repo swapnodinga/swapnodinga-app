@@ -36,7 +36,16 @@ export default function MemberDashboard() {
       if (!currentUser || !currentUser.id) return;
 
       try {
-        const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
+        // Fetch member-specific installments (RLS-friendly)
+        const { data: myInstallmentsData } = await supabase
+          .from('Installments')
+          .select('*')
+          .eq('member_id', currentUser.id)
+          .eq('status', 'Approved');
+
+        // Fetch society-wide installments via server admin endpoint (service role)
+        const allInstallments = await fetch('/api/transactions').then(r => r.json()).catch(() => []);
+
         const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 
         // Logic to group by MTDR and take only the latest entry principal
@@ -69,11 +78,9 @@ export default function MemberDashboard() {
           totalGlobalPrincipalForDisplay += Number(group[0].amount || 0);
         });
 
-        const societyTotalInstalments = (installments || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
-        
-        const myInstallments = (installments || [])
-          .filter(inst => inst.member_id === currentUser.id)
-          .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+        const societyTotalInstalments = (allInstallments || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+        const myInstallments = (myInstallmentsData || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
         // Member share calculation synced with Admin's formula
         const myInterestShare = totalFinishedPrincipal > 0 

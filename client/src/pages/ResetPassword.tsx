@@ -38,18 +38,11 @@ export default function ResetPassword() {
       const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
       if (authError) throw authError;
 
-      // 2. Update your custom 'members' table for your login logic
-      const { error: tableError } = await supabase
-        .from('members') 
-        .update({ password: newPassword })
-        .eq('email', user.email);
-
-      if (tableError) throw tableError;
-
+      // Note: Do not store passwords in the `members` table. Update only Supabase Auth.
       await supabase.auth.signOut();
 
       toast({ title: "Success", description: "Password updated. Please login now." });
-      setLocation("/"); 
+      setLocation("/");
     } catch (error: any) {
       toast({ variant: "destructive", title: "Update Failed", description: error.message });
     } finally {

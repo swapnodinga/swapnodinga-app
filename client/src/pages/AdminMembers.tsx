@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, CheckCircle, UserPlus } from 'lucide-react';
 
 export default function AdminMembers() {
-  const { members, approveMember } = useSociety();
+  const { members, approveMember, currentUser } = useSociety();
 
   /**
    * IMPROVED FILTERING LOGIC
@@ -68,7 +68,7 @@ export default function AdminMembers() {
                       {member.status || 'pending'}
                     </Badge>
                   </TableCell>
-                  {showApprove && (
+                  {showApprove && currentUser?.is_admin && (
                     <TableCell className="text-right">
                       <Button 
                         size="sm" 

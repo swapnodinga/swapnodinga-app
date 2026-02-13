@@ -13,11 +13,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/login", async (req, res) => {
     const { email, password } = req.body;
     try {
-      const { data: user, error } = await supabase.from('members').select('*').ilike('email', email.trim()).single();
-      if (error || !user || user.password !== password) return res.status(401).json({ success: false, message: "Invalid credentials" });
-      const isAdmin = user.email.toLowerCase() === 'swapnodinga.scs@gmail.com';
-      if (user.status !== 'active' && !isAdmin) return res.status(403).json({ success: false, message: "Account pending approval" });
-      res.json({ success: true, user });
+      // NOTE: Authentication should be done via Supabase Auth from the client.
+      // This endpoint no longer validates plaintext passwords. Return instruction.
+      return res.status(400).json({ success: false, message: 'Use Supabase Auth (client) to sign in. This endpoint is deprecated.' });
     } catch (err) { res.status(500).json({ success: false }); }
   });
 
@@ -25,14 +23,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/register", async (req, res) => {
     const { full_name, email, password, status } = req.body;
     try {
+      // Create an Auth user via the service role key, then insert a members row linked by auth_id.
       const { data: lastMember } = await supabase.from('members').select('society_id').order('id', { ascending: false }).limit(1).maybeSingle();
       let nextId = "SCS-001"; 
       if (lastMember?.society_id?.startsWith('SCS-')) {
         const lastNum = parseInt(lastMember.society_id.split('-')[1]);
         nextId = `SCS-${(lastNum + 1).toString().padStart(3, '0')}`;
       }
+
+      // Create Supabase Auth user (server-side)
+      const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
+        email: email.trim(),
+        password,
+      });
+      if (authErr) return res.status(500).json({ success: false, message: authErr.message });
+      const userId = authData?.user?.id;
+      if (!userId) return res.status(500).json({ success: false, message: 'Failed to create auth user' });
+
       const { data, error } = await supabase.from('members').insert([{ 
-        society_id: nextId, full_name, email: email.trim(), password, status: status || 'pending', fixed_deposit_amount: 0, fixed_deposit_interest: 0
+        society_id: nextId, full_name, email: email.trim(), auth_id: userId, status: status || 'pending', fixed_deposit_amount: 0, fixed_deposit_interest: 0
       }]).select().single();
       if (error) return res.status(400).json({ success: false, message: error.message });
       res.json({ success: true, user: data, assignedId: nextId });

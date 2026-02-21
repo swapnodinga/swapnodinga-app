@@ -284,3 +284,4 @@ export function useSociety() {
   if (!context) throw new Error("useSociety must be used within a SocietyProvider")
   return context
 }
+

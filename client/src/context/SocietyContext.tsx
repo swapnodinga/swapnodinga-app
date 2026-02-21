@@ -22,7 +22,7 @@ interface SocietyContextType {
   approveMember: (id: string) => Promise<void>
   deleteMember: (id: string) => Promise<void>
   submitInstalment: (amount: number, file: File, month: string) => Promise<void>
-  approveInstalment: (transaction: any, status: "Approved" | "Rejected") => Promise<void>
+  approveInstalment: (transaction: any, status: "Approved" | "Rejected") => Promise<any>
   addFixedDeposit: (data: any) => Promise<void>
   updateFixedDeposit: (id: string, data: any) => Promise<void>
   deleteFixedDeposit: (id: string) => Promise<void>
@@ -51,29 +51,23 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const societyTotalFund = useMemo(() => {
-    if (!Array.isArray(transactions)) return 0
-    return transactions
+    const totalInstallments = (transactions || [])
       .filter((t) => t.status === "Approved")
-      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
-  }, [transactions])
+      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+
+    const totalRealizedInterest = (fixedDeposits || [])
+      .reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0);
+
+    return totalInstallments + totalRealizedInterest;
+  }, [transactions, fixedDeposits])
 
   const refreshData = async () => {
     try {
-      const { data: membersData, error: memError } = await supabase.from("members").select("*")
-      if (memError) console.error("Error fetching members:", memError)
-
-      const { data: transData } = await supabase
-        .from("Installments")
-        .select("*")
-        .order("created_at", { ascending: false })
-
-      const { data: fdData, error: fdError } = await supabase
-        .from("fixed_deposits")
-        .select("*")
-        .order("start_date", { ascending: false })
+      console.log("Refreshing data from Supabase...");
+      const { data: membersData } = await supabase.from("members").select("*")
+      const { data: transData } = await supabase.from("Installments").select("*").order("created_at", { ascending: false })
+      const { data: fdData } = await supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
       
-      if (fdError) console.error("Error fetching FDs:", fdError)
-
       const nameMap: { [key: string]: string } = {}
       if (membersData) {
         membersData.forEach((m) => {
@@ -99,27 +93,9 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData()
   }, [currentUser])
 
-  const addFixedDeposit = async (data: any) => {
-    const { error } = await supabase.from("fixed_deposits").insert([data])
-    if (error) throw error
-    await refreshData()
-  }
-
-  const updateFixedDeposit = async (id: string, data: any) => {
-    const { error } = await supabase.from("fixed_deposits").update(data).eq("id", id)
-    if (error) throw error
-    await refreshData()
-  }
-
-  const deleteFixedDeposit = async (id: string) => {
-    if (!window.confirm("Delete this deposit permanently?")) return
-    const { error } = await supabase.from("fixed_deposits").delete().eq("id", id)
-    if (error) throw error
-    await refreshData()
-  }
-
-  const approveInstalment = async (transaction: any, status: "Approved" | "Rejected") => {
+  const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
     try {
+      // 1. Update Database and wait
       const { error: dbError } = await supabase
         .from("Installments")
         .update({ status: status, approved_at: new Date().toISOString() })
@@ -127,11 +103,15 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (dbError) throw dbError
 
+      // 2. Critical: Wait for the refresh to finish so the UI sees the new 'Approved' status
+      await refreshData()
+
+      // 3. Cleanup & Background tasks
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
       const targetEmail = memberObj?.email
 
       if (targetEmail) {
-        await emailjs.send(
+        emailjs.send(
           "service_b8gcj9p",
           "template_vi2p4ul",
           {
@@ -143,12 +123,34 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
             proof_url: transaction.payment_proof_url, 
           },
           "nKSxYmGpgjuB2J4tF",
-        )
+        ).catch(() => {});
       }
-      await refreshData()
+
+      if (transaction.proofPath) {
+        await supabase.storage.from("payments").remove([transaction.proofPath])
+      }
+      
+      return { success: true }
     } catch (err) {
       console.error("Workflow failed:", err)
+      return { success: false }
     }
+  }
+
+  const addFixedDeposit = async (data: any) => {
+    await supabase.from("fixed_deposits").insert([data])
+    await refreshData()
+  }
+
+  const updateFixedDeposit = async (id: string, data: any) => {
+    await supabase.from("fixed_deposits").update(data).eq("id", id)
+    await refreshData()
+  }
+
+  const deleteFixedDeposit = async (id: string) => {
+    if (!window.confirm("Delete this deposit permanently?")) return
+    await supabase.from("fixed_deposits").delete().eq("id", id)
+    await refreshData()
   }
 
   const submitInstalment = async (amount: number, file: File, month: string) => {
@@ -156,12 +158,10 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       if (!currentUser) throw new Error("No user logged in")
       const fileExt = file.name.split(".").pop()
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`
-      const { error: uploadError } = await supabase.storage.from("payments").upload(fileName, file)
-      if (uploadError) throw uploadError
-
+      await supabase.storage.from("payments").upload(fileName, file)
       const { data: urlData } = supabase.storage.from("payments").getPublicUrl(fileName)
 
-      const { error: dbError } = await supabase.from("Installments").insert([{
+      await supabase.from("Installments").insert([{
         member_id: currentUser.id,
         memberName: currentUser.full_name || currentUser.memberName,
         society_id: currentUser.society_id,
@@ -172,8 +172,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         status: "Pending",
         created_at: new Date().toISOString(),
       }])
-
-      if (dbError) throw dbError
       await refreshData()
     } catch (err: any) {
       console.error("Submission Error:", err.message)
@@ -182,25 +180,14 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, pass: string) => {
     try {
-      const { data: memberData } = await supabase
-        .from("members")
-        .select("*")
-        .eq("email", email.trim())
-        .eq("password", pass)
-        .single()
-
-      if (memberData) {
-        if (memberData.status !== 'active') {
-          return false;
-        }
+      const { data: memberData } = await supabase.from("members").select("*").eq("email", email.trim()).eq("password", pass).single()
+      if (memberData && memberData.status === 'active') {
         setCurrentUser(memberData)
         localStorage.setItem("user", JSON.stringify(memberData))
         return true
       }
       return false
-    } catch (err) {
-      return false
-    }
+    } catch (err) { return false }
   }
 
   const logout = () => {
@@ -212,31 +199,19 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: any) => {
     try {
       const { data: currentMembers } = await supabase.from("members").select("id")
-      const lastId = currentMembers && currentMembers.length > 0 
-        ? Math.max(...currentMembers.map(m => m.id)) 
-        : 0;
-      
-      const nextId = lastId + 1;
-      const nextSocietyId = `SCS-${String(nextId).padStart(3, '0')}`;
-
-      const payload = {
+      const lastId = currentMembers && currentMembers.length > 0 ? Math.max(...currentMembers.map(m => m.id)) : 0;
+      await supabase.from("members").insert([{
         ...userData,
-        id: nextId,
-        society_id: nextSocietyId, 
+        id: lastId + 1,
+        society_id: `SCS-${String(lastId + 1).padStart(3, '0')}`, 
         status: "pending",
         fixed_deposit_amount: 0,
         fixed_deposit_interest: 0,
         is_admin: false
-      }
-
-      const { error } = await supabase.from("members").insert([payload])
-      if (error) throw error
+      }])
       await refreshData()
       return true
-    } catch (err) {
-      console.error("Registration failed:", err)
-      return false
-    }
+    } catch (err) { return false }
   }
 
   const approveMember = async (id: string) => {

@@ -239,7 +239,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = () => {
-.
     setCurrentUser(null)
     localStorage.removeItem("user")
     setLocation("/")

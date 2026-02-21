@@ -28,6 +28,7 @@ Add these in Vercel Project Settings → Environment Variables:
 |------|-------|-------|
 | `VITE_SUPABASE_URL` | Your Supabase project URL | e.g. `https://xxx.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | Your Supabase anon/public key | From Supabase Dashboard → Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase service role key | **Required for installments to load** (bypasses RLS) |
 
 ### 4. Deploy
 
@@ -45,5 +46,5 @@ Click **Deploy**. The build will run and your app will be live.
 
 ## Notes
 
-- **Backend API**: The app uses Supabase directly from the client for auth and data. The Express server in `server/` is optional and not deployed to Vercel. If you need the API routes, deploy the backend separately (e.g. Railway, Render).
+- **Installments API**: `/api/transactions` is a Vercel serverless function that fetches installments using the service role key (bypasses RLS). Add `SUPABASE_SERVICE_ROLE_KEY` in Vercel env vars for installments to show.
 - **Reset Password**: Requires the user to be logged in. Use "Change Password" from the sidebar when logged in, or visit `/reset-password` after signing in.

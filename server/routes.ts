@@ -94,10 +94,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
   });
 
-  // 7. FETCH TRANSACTIONS
+  // 7. FETCH TRANSACTIONS (try both table names for compatibility)
   app.get("/api/transactions", async (_req, res) => {
-    const { data } = await supabase.from('installments').select('*').order('id', { ascending: false });
-    res.json(data || []);
+    for (const table of ['installments', 'Installments']) {
+      const { data, error } = await supabase.from(table).select('*').order('created_at', { ascending: false });
+      if (!error) return res.json(data || []);
+    }
+    res.json([]);
   });
 
   return createServer(app);

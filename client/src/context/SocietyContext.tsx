@@ -64,16 +64,26 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       if (memError) console.error("Error fetching members:", memError)
 
       let transData: any[] | null = null
-      for (const tableName of ["installments", "Installments"] as const) {
-        const { data, error: transError } = await supabase.from(tableName).select("*").order("created_at", { ascending: false })
-        if (!transError) {
-          transData = data
-          installmentsTableRef.current = tableName
+      try {
+        const res = await fetch("/api/transactions")
+        if (res.ok) {
+          transData = await res.json()
+          installmentsTableRef.current = "installments"
+        }
+      } catch (_) { /* API not available, fall back to Supabase */ }
+
+      if (!transData) {
+        for (const tableName of ["installments", "Installments"] as const) {
+          const { data, error: transError } = await supabase.from(tableName).select("*").order("created_at", { ascending: false })
+          if (!transError) {
+            transData = data
+            installmentsTableRef.current = tableName
+            break
+          }
+          if (transError?.message?.includes("relation") || transError?.code === "PGRST116") continue
+          console.error("Error fetching installments:", transError)
           break
         }
-        if (transError?.message?.includes("relation") || transError?.code === "PGRST116") continue
-        console.error("Error fetching installments:", transError)
-        break
       }
 
       const { data: fdData, error: fdError } = await supabase

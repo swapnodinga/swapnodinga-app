@@ -13,7 +13,7 @@ interface SocietyContextType {
   fixedDeposits: any[]
   societyTotalFund: number
   isLoading: boolean
-  login: (email: string, pass: string) => Promise<boolean>
+  login: (email: string, pass: string) => Promise<{ user: any } | false>
   register: (userData: any) => Promise<boolean>
   logout: () => void
   updateProfile: (data: any) => Promise<void>
@@ -180,22 +180,24 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const login = async (email: string, pass: string) => {
+  const login = async (email: string, pass: string): Promise<{ user: any } | false> => {
     try {
       const { data: memberData } = await supabase
         .from("members")
         .select("*")
-        .eq("email", email.trim())
-        .eq("password", pass)
+        .ilike("email", email.trim())
         .single()
 
-      if (memberData) {
+      if (memberData && memberData.password === pass) {
         if (memberData.status !== 'active') {
-          return false;
+          const isAdminEmail = memberData.email?.toLowerCase() === 'swapnodinga.scs@gmail.com'
+          if (!isAdminEmail) return false
         }
-        setCurrentUser(memberData)
-        localStorage.setItem("user", JSON.stringify(memberData))
-        return true
+        const isAdmin = memberData.is_admin ?? memberData.email?.toLowerCase() === 'swapnodinga.scs@gmail.com'
+        const user = { ...memberData, is_admin: isAdmin }
+        setCurrentUser(user)
+        localStorage.setItem("user", JSON.stringify(user))
+        return { user }
       }
       return false
     } catch (err) {

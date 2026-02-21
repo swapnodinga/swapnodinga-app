@@ -34,7 +34,7 @@ export default function LandingPage() {
     setLoading(false)
 
     if (result) {
-      if (currentUser?.is_admin) {
+      if (result.user?.is_admin) {
         setLocation("/admin")
       } else {
         setLocation("/dashboard")
@@ -124,7 +124,7 @@ export default function LandingPage() {
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
                         <Label htmlFor="password">Password</Label>
-                        <Link href="/reset-password"><a className="text-xs text-emerald-600 hover:underline">Forgot Password?</a></Link>
+                        <Link href="/reset-password"><a className="text-xs text-emerald-600 hover:underline">Change Password</a></Link>
                       </div>
                       <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
                     </div>

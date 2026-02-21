@@ -63,25 +63,13 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = async () => {
     try {
-      // 1. Fetch Members
-      const { data: membersData, error: memErr } = await supabase.from("members").select("*")
-      if (memErr) console.error("Members Fetch Error:", memErr)
-
-      // 2. Fetch Installments (Added safety for table name case sensitivity)
-      const { data: transData, error: transErr } = await supabase
-        .from("Installments")
-        .select("*")
-        .order("created_at", { ascending: false })
+      const { data: membersData, error: mErr } = await supabase.from("members").select("*")
+      const { data: transData, error: tErr } = await supabase.from("Installments").select("*").order("created_at", { ascending: false })
+      const { data: fdData, error: fErr } = await supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
       
-      if (transErr) console.error("Installments Fetch Error:", transErr)
-
-      // 3. Fetch Fixed Deposits
-      const { data: fdData, error: fdErr } = await supabase
-        .from("fixed_deposits")
-        .select("*")
-        .order("start_date", { ascending: false })
-      
-      if (fdErr) console.error("FD Fetch Error:", fdErr)
+      if (mErr || tErr || fErr) {
+        console.error("Fetch Error Details:", { mErr, tErr, fErr });
+      }
 
       const nameMap: { [key: string]: string } = {}
       if (membersData) {
@@ -100,7 +88,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       setTransactions(enrichedTransData)
       setFixedDeposits(fdData || [])
     } catch (err) {
-      console.error("[SocietyContext] Global Refresh Error:", err)
+      console.error("[SocietyContext] Automatic refresh failed:", err)
     }
   }
 
@@ -110,6 +98,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
     try {
+      // 1. Update the Database
       const { error: dbError } = await supabase
         .from("Installments")
         .update({ status: status, approved_at: new Date().toISOString() })
@@ -117,11 +106,14 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (dbError) throw dbError
 
-      // Update local state immediately
-      setTransactions(prev => prev.map(t => 
-        t.id === transaction.id ? { ...t, status: status } : t
-      ));
+      // 2. Consistency Delay (Wait 300ms for Supabase to finish indexing)
+      // This prevents the "automatic" refresh from fetching old data.
+      await new Promise(resolve => setTimeout(resolve, 300));
 
+      // 3. Automatic Refresh (UI only updates via this fetch)
+      await refreshData()
+
+      // 4. Background Tasks (Doesn't affect UI timing)
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
       if (memberObj?.email) {
         emailjs.send("service_b8gcj9p", "template_vi2p4ul", {
@@ -138,7 +130,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         await supabase.storage.from("payments").remove([transaction.proofPath])
       }
       
-      await refreshData();
       return { success: true }
     } catch (err) {
       console.error("Workflow failed:", err)
@@ -147,19 +138,19 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   }
 
   const addFixedDeposit = async (data: any) => {
-    await supabase.from("fixed_deposits").insert([data])
-    await refreshData()
+    const { error } = await supabase.from("fixed_deposits").insert([data])
+    if (!error) await refreshData()
   }
 
   const updateFixedDeposit = async (id: string, data: any) => {
-    await supabase.from("fixed_deposits").update(data).eq("id", id)
-    await refreshData()
+    const { error } = await supabase.from("fixed_deposits").update(data).eq("id", id)
+    if (!error) await refreshData()
   }
 
   const deleteFixedDeposit = async (id: string) => {
-    if (!window.confirm("Delete this deposit permanently?")) return
-    await supabase.from("fixed_deposits").delete().eq("id", id)
-    await refreshData()
+    if (!window.confirm("Delete this deposit?")) return
+    const { error } = await supabase.from("fixed_deposits").delete().eq("id", id)
+    if (!error) await refreshData()
   }
 
   const submitInstalment = async (amount: number, file: File, month: string) => {

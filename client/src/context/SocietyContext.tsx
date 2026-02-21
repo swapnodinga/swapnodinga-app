@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect, useMemo } from "react"
+import { createContext, useContext, useState, useEffect, useMemo, useRef } from "react"
 import { useLocation } from "wouter"
 import { supabase } from "@/lib/supabase"
 import emailjs from "@emailjs/browser"
@@ -22,7 +22,7 @@ interface SocietyContextType {
   approveMember: (id: string) => Promise<void>
   deleteMember: (id: string) => Promise<void>
   submitInstalment: (amount: number, file: File, month: string) => Promise<void>
-  approveInstalment: (transaction: any, status: "Approved" | "Rejected") => Promise<void>
+  approveInstalment: (transaction: any, status: "Approved" | "Rejected") => Promise<{ success: boolean; error?: string }>
   addFixedDeposit: (data: any) => Promise<void>
   updateFixedDeposit: (id: string, data: any) => Promise<void>
   deleteFixedDeposit: (id: string) => Promise<void>
@@ -37,6 +37,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const [fixedDeposits, setFixedDeposits] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [, setLocation] = useLocation()
+  const installmentsTableRef = useRef<string>("installments")
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user")
@@ -62,10 +63,18 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const { data: membersData, error: memError } = await supabase.from("members").select("*")
       if (memError) console.error("Error fetching members:", memError)
 
-      const { data: transData } = await supabase
-        .from("Installments")
-        .select("*")
-        .order("created_at", { ascending: false })
+      let transData: any[] | null = null
+      for (const tableName of ["installments", "Installments"] as const) {
+        const { data, error: transError } = await supabase.from(tableName).select("*").order("created_at", { ascending: false })
+        if (!transError) {
+          transData = data
+          installmentsTableRef.current = tableName
+          break
+        }
+        if (transError?.message?.includes("relation") || transError?.code === "PGRST116") continue
+        console.error("Error fetching installments:", transError)
+        break
+      }
 
       const { data: fdData, error: fdError } = await supabase
         .from("fixed_deposits")
@@ -118,36 +127,49 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     await refreshData()
   }
 
-  const approveInstalment = async (transaction: any, status: "Approved" | "Rejected") => {
+  const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<{ success: boolean; error?: string }> => {
     try {
+      if (!transaction?.id) return { success: false, error: "Invalid transaction" }
+
+      const tableName = installmentsTableRef.current
       const { error: dbError } = await supabase
-        .from("Installments")
+        .from(tableName)
         .update({ status: status, approved_at: new Date().toISOString() })
         .eq("id", transaction.id)
 
-      if (dbError) throw dbError
+      if (dbError) {
+        console.error("Approve DB error:", dbError)
+        return { success: false, error: dbError.message }
+      }
 
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
       const targetEmail = memberObj?.email
 
       if (targetEmail) {
-        await emailjs.send(
-          "service_b8gcj9p",
-          "template_vi2p4ul",
-          {
-            member_name: memberObj.full_name || transaction.memberName,
-            member_email: targetEmail,
-            amount: transaction.amount,
-            month: transaction.month,
-            status: status,
-            proof_url: transaction.payment_proof_url, 
-          },
-          "nKSxYmGpgjuB2J4tF",
-        )
+        try {
+          await emailjs.send(
+            "service_b8gcj9p",
+            "template_vi2p4ul",
+            {
+              member_name: memberObj.full_name || transaction.memberName,
+              member_email: targetEmail,
+              amount: transaction.amount,
+              month: transaction.month,
+              status: status,
+              proof_url: transaction.payment_proof_url, 
+            },
+            "nKSxYmGpgjuB2J4tF",
+          )
+        } catch (emailErr) {
+          console.warn("Email notification failed:", emailErr)
+          // Don't fail the whole flow for email
+        }
       }
       await refreshData()
-    } catch (err) {
-      console.error("Workflow failed:", err)
+      return { success: true }
+    } catch (err: any) {
+      console.error("Approve workflow failed:", err)
+      return { success: false, error: err?.message || "Approval failed" }
     }
   }
 
@@ -161,7 +183,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       const { data: urlData } = supabase.storage.from("payments").getPublicUrl(fileName)
 
-      const { error: dbError } = await supabase.from("Installments").insert([{
+      const { error: dbError } = await supabase.from(installmentsTableRef.current).insert([{
         member_id: currentUser.id,
         memberName: currentUser.full_name || currentUser.memberName,
         society_id: currentUser.society_id,

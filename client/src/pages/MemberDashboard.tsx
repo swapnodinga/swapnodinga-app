@@ -36,7 +36,11 @@ export default function MemberDashboard() {
       if (!currentUser || !currentUser.id) return;
 
       try {
-        const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
+        let installments: any[] | null = null;
+        for (const tbl of ['installments', 'Installments']) {
+          const { data, error } = await supabase.from(tbl).select('*').eq('status', 'Approved');
+          if (!error) { installments = data; break; }
+        }
         const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 
         // Logic to group by MTDR and take only the latest entry principal
@@ -72,7 +76,7 @@ export default function MemberDashboard() {
         const societyTotalInstalments = (installments || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
         
         const myInstallments = (installments || [])
-          .filter(inst => inst.member_id === currentUser.id)
+          .filter(inst => String(inst.member_id) === String(currentUser.id))
           .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
         // Member share calculation synced with Admin's formula

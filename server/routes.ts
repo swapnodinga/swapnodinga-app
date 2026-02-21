@@ -11,13 +11,12 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 
 const supabase = SUPABASE_URL && SUPABASE_SERVICE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-  : null;
+  : createClient("https://ivhjokefdwospalrqcmk.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2aGpva2VmZHdvc3BhbHJxY21rIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTg2MTY0OSwiZXhwIjoyMDgxNDM3NjQ5fQ.3Ilfmul7dVrzvvboz74nwUyKuQD34BH_kmpPe5fKt7U");
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
   // 1. LOGIN & AUTH
   app.post("/api/login", async (req, res) => {
-    if (!supabase) return res.status(503).json({ success: false, message: "Database not configured" });
     const { email, password } = req.body;
     try {
       const { data: user, error } = await supabase.from('members').select('*').ilike('email', email.trim()).single();
@@ -30,7 +29,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 2. REGISTRATION
   app.post("/api/register", async (req, res) => {
-    if (!supabase) return res.status(503).json({ success: false, message: "Database not configured" });
     const { full_name, email, password, status } = req.body;
     try {
       const { data: lastMember } = await supabase.from('members').select('society_id').order('id', { ascending: false }).limit(1).maybeSingle();
@@ -49,30 +47,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 3. MEMBER DATA
   app.get("/api/members", async (_req, res) => {
-    if (!supabase) return res.status(503).json({ success: false, message: "Database not configured" });
     const { data } = await supabase.from('members').select('*').order('id', { ascending: false });
     res.json(data || []);
   });
 
   // 4. ADMIN MEMBER TOOLS
   app.post('/api/approve-member', async (req, res) => {
-    if (!supabase) return res.status(503).json({ success: false, message: "Database not configured" });
     await supabase.from('members').update({ status: 'active' }).eq('id', req.body.id);
     res.json({ success: true });
   });
 
   app.delete('/api/members/:id', async (req, res) => {
-    if (!supabase) return res.status(503).json({ success: false, message: "Database not configured" });
     await supabase.from('members').delete().eq('id', req.params.id);
     res.json({ success: true });
   });
 
   // 5. SUBMIT INSTALMENT
   app.post("/api/submit-instalment", async (req, res) => {
-    if (!supabase) return res.status(503).json({ success: false, message: "Database not configured" });
     try {
       const { memberId, society_id, memberName, amount, proofUrl, proofPath, month, late_fee } = req.body;
-      const { data, error } = await supabase.from('Installments').insert([{
+      const { data, error } = await supabase.from('installments').insert([{
         member_id: memberId, society_id, memberName, amount: Number(amount), late_fee: Number(late_fee || 0),
         payment_proof_url: proofUrl, proofPath: proofPath, month, status: 'Pending', created_at: new Date().toISOString() 
       }]).select().single();
@@ -83,11 +77,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 6. DYNAMIC INSTALMENT STATUS UPDATE
   app.post("/api/approve-instalment", async (req, res) => {
-    if (!supabase) return res.status(503).json({ success: false, message: "Database not configured" });
     try {
       const { id, status } = req.body; 
       const { data, error } = await supabase
-        .from('Installments')
+        .from('installments')
         .update({ 
           status: status, // NO LONGER HARDCODED [cite: 2025-12-31]
           approved_at: status === 'Approved' ? new Date().toISOString() : null 
@@ -103,8 +96,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 7. FETCH TRANSACTIONS
   app.get("/api/transactions", async (_req, res) => {
-    if (!supabase) return res.status(503).json({ success: false, message: "Database not configured" });
-    const { data } = await supabase.from('Installments').select('*').order('id', { ascending: false });
+    const { data } = await supabase.from('installments').select('*').order('id', { ascending: false });
     res.json(data || []);
   });
 

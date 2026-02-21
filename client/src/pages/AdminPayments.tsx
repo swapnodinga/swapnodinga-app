@@ -3,11 +3,12 @@ import { useSociety } from "@/context/SocietyContext";
 import { TransactionTable } from "@/components/TransactionTable";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
 import { Search, Landmark, Clock, ShieldCheck } from "lucide-react";
 
 export default function AdminPayments() {
-  // Extracting transactions and the updated approval function [cite: 2025-12-31]
   const { transactions, approveInstalment } = useSociety();
+  const { toast } = useToast();
   const [query, setQuery] = useState("");
 
   // Filtering based on member name or Society ID
@@ -24,17 +25,16 @@ export default function AdminPayments() {
     .filter(t => t.status?.toLowerCase() === "pending")
     .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
-  /**
-   * CRITICAL ACTION HANDLER
-   * This calls the context function which updates the DB, sends the Gmail,
-   * and deletes the proof from the 'payments' bucket.
-   */
   const handleAction = async (transaction: any, status: 'Approved' | 'Rejected') => {
     try {
-      // Pass full transaction to access proofPath and member details [cite: 2025-12-31]
-      await approveInstalment(transaction, status); 
-    } catch (error) {
-      console.error("Verification process failed:", error);
+      const result = await approveInstalment(transaction, status);
+      if (result.success) {
+        toast({ title: "Success", description: `Payment ${status.toLowerCase()} successfully.` });
+      } else {
+        toast({ variant: "destructive", title: "Failed", description: result.error || "Could not update payment." });
+      }
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error?.message || "Verification failed." });
     }
   };
 

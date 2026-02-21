@@ -1,103 +1,59 @@
 "use client"
 
-import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { useMemo } from "react";
 import { useSociety } from "@/context/SocietyContext";
 import { StatCard } from "@/components/StatCard";
 import { Card } from "@/components/ui/card";
 import { Wallet, PiggyBank, Percent, LandPlot, TrendingUp, Building2, User } from "lucide-react";
 
+const getMaturityData = (amount: number, rate: number, start: string, months: number) => {
+  const startDate = new Date(start);
+  const finishDate = new Date(start);
+  finishDate.setMonth(startDate.getMonth() + Number(months));
+  const diffDays = Math.ceil(Math.abs(finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const interest = (amount * rate * diffDays) / (365 * 100);
+  const isFinished = finishDate <= new Date();
+  return { interest, isFinished };
+};
+
 export default function MemberDashboard() {
-  const { currentUser } = useSociety();
-  const [localStats, setLocalStats] = useState({
-    societyTotalFund: 0,
-    societyFixedDeposit: 0,
-    societyDepositInterest: 0,
-    myAccumulatedInterest: 0,
-    myInstallments: 0
-  });
+  const { currentUser, transactions, fixedDeposits } = useSociety();
 
-  // Admin-synced helper function for interest calculation
-  const getMaturityData = (amount: number, rate: number, start: string, months: number) => {
-    const startDate = new Date(start);
-    const finishDate = new Date(start);
-    finishDate.setMonth(startDate.getMonth() + Number(months));
-    
-    // Exact day-based calculation as per Admin logic
-    const diffDays = Math.ceil(Math.abs(finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const interest = (amount * rate * diffDays) / (365 * 100);
-    const isFinished = finishDate <= new Date();
-    
-    return { interest, isFinished };
-  };
+  const localStats = useMemo(() => {
+    if (!currentUser?.id) return { societyTotalFund: 0, societyFixedDeposit: 0, societyDepositInterest: 0, myAccumulatedInterest: 0, myInstallments: 0 };
 
-  useEffect(() => {
-    const fetchMemberData = async () => {
-      if (!currentUser || !currentUser.id) return;
+    const approvedInstallments = (transactions || []).filter(t => String(t.status).toLowerCase() === "approved");
+    const societyTotalInstalments = approvedInstallments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const myInstallments = approvedInstallments
+      .filter(t => String(t.member_id) === String(currentUser.id))
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-      try {
-        let installments: any[] | null = null;
-        for (const tbl of ['installments', 'Installments']) {
-          const { data, error } = await supabase.from(tbl).select('*').eq('status', 'Approved');
-          if (!error) { installments = data; break; }
-        }
-        const { data: deposits } = await supabase.from('fixed_deposits').select('*');
-
-        // Logic to group by MTDR and take only the latest entry principal
-        const groupedDeposits = (deposits || []).reduce((groups: any, fd: any) => {
-          const key = fd.mtdr_no || "Unassigned";
-          if (!groups[key]) groups[key] = [];
-          groups[key].push(fd);
-          groups[key].sort((a: any, b: any) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
-          return groups;
-        }, {});
-
-        let totalActivePrincipal = 0;
-        let totalFinishedPrincipal = 0; 
-        let totalRealizedInterest = 0; 
-
-        // Apply same loop logic as Admin Dashboard
-        (deposits || []).forEach(fd => {
-          const m = getMaturityData(Number(fd.amount), Number(fd.interest_rate), fd.start_date, Number(fd.tenure_months));
-          if (m.isFinished) { 
-            totalRealizedInterest += m.interest; 
-            totalFinishedPrincipal += Number(fd.amount); 
-          } else { 
-            totalActivePrincipal += Number(fd.amount); 
-          }
-        });
-
-        // Fixed Global Principal logic for the display card
-        let totalGlobalPrincipalForDisplay = 0;
-        Object.values(groupedDeposits).forEach((group: any) => {
-          totalGlobalPrincipalForDisplay += Number(group[0].amount || 0);
-        });
-
-        const societyTotalInstalments = (installments || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
-        
-        const myInstallments = (installments || [])
-          .filter(inst => String(inst.member_id) === String(currentUser.id))
-          .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-
-        // Member share calculation synced with Admin's formula
-        const myInterestShare = totalFinishedPrincipal > 0 
-          ? (totalRealizedInterest / totalFinishedPrincipal) * myInstallments 
-          : 0;
-
-        setLocalStats({
-          societyFixedDeposit: totalActivePrincipal, // Synced with "Active FD Capital"
-          societyDepositInterest: totalRealizedInterest,
-          societyTotalFund: societyTotalInstalments + totalRealizedInterest,
-          myAccumulatedInterest: myInterestShare,
-          myInstallments: myInstallments
-        });
-      } catch (error) {
-        console.error("Error calculating member stats:", error);
+    const deposits = fixedDeposits || [];
+    let totalActivePrincipal = 0;
+    let totalFinishedPrincipal = 0;
+    let totalRealizedInterest = 0;
+    deposits.forEach((fd: any) => {
+      const m = getMaturityData(Number(fd.amount), Number(fd.interest_rate), fd.start_date, Number(fd.tenure_months));
+      if (m.isFinished) {
+        totalRealizedInterest += m.interest;
+        totalFinishedPrincipal += Number(fd.amount);
+      } else {
+        totalActivePrincipal += Number(fd.amount);
       }
-    };
+    });
 
-    fetchMemberData();
-  }, [currentUser]);
+    const myInterestShare = totalFinishedPrincipal > 0
+      ? (totalRealizedInterest / totalFinishedPrincipal) * myInstallments
+      : 0;
+
+    return {
+      societyFixedDeposit: totalActivePrincipal,
+      societyDepositInterest: totalRealizedInterest,
+      societyTotalFund: societyTotalInstalments + totalRealizedInterest,
+      myAccumulatedInterest: myInterestShare,
+      myInstallments
+    };
+  }, [currentUser, transactions, fixedDeposits]);
 
   if (!currentUser) return null;
 

@@ -65,7 +65,8 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       let transData: any[] | null = null
       try {
-        const res = await fetch("/api/transactions")
+        const base = typeof window !== "undefined" ? window.location.origin : ""
+        const res = await fetch(`${base}/api/transactions`)
         if (res.ok) {
           transData = await res.json()
           installmentsTableRef.current = "installments"

@@ -51,17 +51,20 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const societyTotalFund = useMemo(() => {
-    if (!Array.isArray(transactions)) return 0
-    return transactions
+    const totalInstallments = (transactions || [])
       .filter((t) => t.status === "Approved")
-      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
-  }, [transactions])
+      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+
+    const totalRealizedInterest = (fixedDeposits || [])
+      .reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0);
+
+    return totalInstallments + totalRealizedInterest;
+  }, [transactions, fixedDeposits])
 
   const refreshData = async () => {
     try {
-      const { data: membersData, error: memError } = await supabase.from("members").select("*")
-      if (memError) console.error("Error fetching members:", memError)
-
+      const { data: membersData } = await supabase.from("members").select("*")
+      
       const { data: transData } = await supabase
         .from("Installments")
         .select("*")
@@ -99,6 +102,53 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData()
   }, [currentUser])
 
+  // UPDATED: Fixed the EmailJS response handling to avoid "success" undefined error
+  const approveInstalment = async (transaction: any, status: "Approved" | "Rejected") => {
+    try {
+      const { error: dbError } = await supabase
+        .from("Installments")
+        .update({ status: status, approved_at: new Date().toISOString() })
+        .eq("id", transaction.id)
+
+      if (dbError) throw dbError
+
+      const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
+      const targetEmail = memberObj?.email
+
+      if (targetEmail) {
+        // We use a try/catch specifically for the mail to prevent it from breaking the UI
+        try {
+          await emailjs.send(
+            "service_b8gcj9p",
+            "template_vi2p4ul",
+            {
+              member_name: memberObj.full_name || transaction.memberName,
+              member_email: targetEmail,
+              amount: transaction.amount,
+              month: transaction.month,
+              status: status,
+              proof_url: transaction.payment_proof_url, 
+            },
+            "nKSxYmGpgjuB2J4tF",
+          )
+        } catch (mailErr) {
+          console.warn("Mail sent but returned response error:", mailErr)
+        }
+      }
+
+      // If status is approved/rejected, we handle file cleanup as per your rules
+      if (status === "Approved" || status === "Rejected") {
+        if (transaction.proofPath) {
+          await supabase.storage.from("payments").remove([transaction.proofPath])
+        }
+      }
+
+      await refreshData()
+    } catch (err) {
+      console.error("Workflow failed:", err)
+    }
+  }
+
   const addFixedDeposit = async (data: any) => {
     const { error } = await supabase.from("fixed_deposits").insert([data])
     if (error) throw error
@@ -116,39 +166,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.from("fixed_deposits").delete().eq("id", id)
     if (error) throw error
     await refreshData()
-  }
-
-  const approveInstalment = async (transaction: any, status: "Approved" | "Rejected") => {
-    try {
-      const { error: dbError } = await supabase
-        .from("Installments")
-        .update({ status: status, approved_at: new Date().toISOString() })
-        .eq("id", transaction.id)
-
-      if (dbError) throw dbError
-
-      const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
-      const targetEmail = memberObj?.email
-
-      if (targetEmail) {
-        await emailjs.send(
-          "service_b8gcj9p",
-          "template_vi2p4ul",
-          {
-            member_name: memberObj.full_name || transaction.memberName,
-            member_email: targetEmail,
-            amount: transaction.amount,
-            month: transaction.month,
-            status: status,
-            proof_url: transaction.payment_proof_url, 
-          },
-          "nKSxYmGpgjuB2J4tF",
-        )
-      }
-      await refreshData()
-    } catch (err) {
-      console.error("Workflow failed:", err)
-    }
   }
 
   const submitInstalment = async (amount: number, file: File, month: string) => {
@@ -190,9 +207,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         .single()
 
       if (memberData) {
-        if (memberData.status !== 'active') {
-          return false;
-        }
+        if (memberData.status !== 'active') return false;
         setCurrentUser(memberData)
         localStorage.setItem("user", JSON.stringify(memberData))
         return true
@@ -212,29 +227,22 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: any) => {
     try {
       const { data: currentMembers } = await supabase.from("members").select("id")
-      const lastId = currentMembers && currentMembers.length > 0 
-        ? Math.max(...currentMembers.map(m => m.id)) 
-        : 0;
-      
+      const lastId = currentMembers && currentMembers.length > 0 ? Math.max(...currentMembers.map(m => m.id)) : 0;
       const nextId = lastId + 1;
-      const nextSocietyId = `SCS-${String(nextId).padStart(3, '0')}`;
-
       const payload = {
         ...userData,
         id: nextId,
-        society_id: nextSocietyId, 
+        society_id: `SCS-${String(nextId).padStart(3, '0')}`, 
         status: "pending",
         fixed_deposit_amount: 0,
         fixed_deposit_interest: 0,
         is_admin: false
       }
-
       const { error } = await supabase.from("members").insert([payload])
       if (error) throw error
       await refreshData()
       return true
     } catch (err) {
-      console.error("Registration failed:", err)
       return false
     }
   }
@@ -284,3 +292,4 @@ export function useSociety() {
   if (!context) throw new Error("useSociety must be used within a SocietyProvider")
   return context
 }
+

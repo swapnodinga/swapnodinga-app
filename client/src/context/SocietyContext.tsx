@@ -50,6 +50,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [])
 
+  // Calculation logic for Society Total Fund
   const societyTotalFund = useMemo(() => {
     const totalInstallments = (transactions || [])
       .filter((t) => t.status === "Approved")
@@ -96,6 +97,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
     try {
+      // 1. Update Database Status
       const { error: dbError } = await supabase
         .from("Installments")
         .update({ status: status, approved_at: new Date().toISOString() })
@@ -103,37 +105,34 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (dbError) throw dbError
 
+      // 2. Refresh UI Data Immediately so Collected/Pending updates
+      await refreshData()
+
+      // 3. Email Notification (Background)
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
       const targetEmail = memberObj?.email
 
       if (targetEmail) {
-        try {
-          emailjs.send(
-            "service_b8gcj9p",
-            "template_vi2p4ul",
-            {
-              member_name: memberObj.full_name || transaction.memberName,
-              member_email: targetEmail,
-              amount: transaction.amount,
-              month: transaction.month,
-              status: status,
-              proof_url: transaction.payment_proof_url, 
-            },
-            "nKSxYmGpgjuB2J4tF",
-          )
-        } catch (e) {
-          console.warn("Mail background error ignored.")
-        }
+        emailjs.send(
+          "service_b8gcj9p",
+          "template_vi2p4ul",
+          {
+            member_name: memberObj.full_name || transaction.memberName,
+            member_email: targetEmail,
+            amount: transaction.amount,
+            month: transaction.month,
+            status: status,
+            proof_url: transaction.payment_proof_url, 
+          },
+          "nKSxYmGpgjuB2J4tF",
+        ).catch(e => console.warn("Email failed to send, but status updated."));
       }
 
-      // Proof deletion only happens when status is updated
+      // 4. Delete Proof from Bucket (As requested)
       if (transaction.proofPath) {
         await supabase.storage.from("payments").remove([transaction.proofPath])
       }
-
-      await refreshData()
       
-      // CRITICAL FIX: Returning this object prevents the "v is undefined" UI crash
       return { success: true }
     } catch (err) {
       console.error("Workflow failed:", err)

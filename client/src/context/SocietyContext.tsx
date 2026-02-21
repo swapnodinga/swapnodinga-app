@@ -239,6 +239,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = () => {
+.
     setCurrentUser(null)
     localStorage.removeItem("user")
     setLocation("/")
@@ -319,4 +320,3 @@ export function useSociety() {
   if (!context) throw new Error("useSociety must be used within a SocietyProvider")
   return context
 }
-

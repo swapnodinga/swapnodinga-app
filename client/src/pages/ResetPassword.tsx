@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLocation } from "wouter";
+import { useSociety } from "@/context/SocietyContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +17,19 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { currentUser, logout, isLoading } = useSociety();
+
+  useEffect(() => {
+    if (!isLoading && !currentUser) {
+      toast({ variant: "destructive", title: "Login Required", description: "Please log in first to change your password." });
+      setLocation("/");
+    }
+  }, [currentUser, isLoading]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!currentUser) return;
 
     if (newPassword.length < 6) {
       return toast({ variant: "destructive", title: "Weak Password", description: "Minimum 6 characters required." });
@@ -31,25 +42,17 @@ export default function ResetPassword() {
     try {
       setLoading(true);
 
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) throw new Error("Session expired. Please request a new reset link.");
-
-      // 1. Update Supabase Internal Auth
-      const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
-      if (authError) throw authError;
-
-      // 2. Update your custom 'members' table for your login logic
-      const { error: tableError } = await supabase
-        .from('members') 
+      const { error } = await supabase
+        .from("members")
         .update({ password: newPassword })
-        .eq('email', user.email);
+        .eq("id", currentUser.id);
 
-      if (tableError) throw tableError;
+      if (error) throw error;
 
-      await supabase.auth.signOut();
+      logout();
 
-      toast({ title: "Success", description: "Password updated. Please login now." });
-      setLocation("/"); 
+      toast({ title: "Success", description: "Password updated. Please log in with your new password." });
+      setLocation("/");
     } catch (error: any) {
       toast({ variant: "destructive", title: "Update Failed", description: error.message });
     } finally {

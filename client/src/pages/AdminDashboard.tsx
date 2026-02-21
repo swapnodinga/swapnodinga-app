@@ -77,7 +77,11 @@ export default function AdminDashboard() {
   const fetchDashboardStats = async () => {
     try {
       const { data: members } = await supabase.from('members').select('id, full_name, memberName');
-      const { data: allInstallments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
+      let allInstallments: any[] | null = null;
+      for (const tbl of ['Installments', 'installments']) {
+        const { data, error } = await supabase.from(tbl).select('*').eq('status', 'Approved');
+        if (!error) { allInstallments = data; break; }
+      }
       const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 
       const memberNamesMap: Record<string, string> = {};

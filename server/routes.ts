@@ -2,10 +2,16 @@ import { type Express } from "express";
 import { createServer, type Server } from "http";
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = "https://ivhjokefdwospalrqcmk.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2aGpva2VmZHdvc3BhbHJxY21rIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTg2MTY0OSwiZXhwIjoyMDgxNDM3NjQ5fQ.3Ilfmul7dVrzvvboz74nwUyKuQD34BH_kmpPe5fKt7U";
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  console.warn("[routes] Supabase credentials missing. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env for production.");
+}
+
+const supabase = SUPABASE_URL && SUPABASE_SERVICE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+  : createClient("https://ivhjokefdwospalrqcmk.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2aGpva2VmZHdvc3BhbHJxY21rIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTg2MTY0OSwiZXhwIjoyMDgxNDM3NjQ5fQ.3Ilfmul7dVrzvvboz74nwUyKuQD34BH_kmpPe5fKt7U");
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -15,9 +21,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { data: user, error } = await supabase.from('members').select('*').ilike('email', email.trim()).single();
       if (error || !user || user.password !== password) return res.status(401).json({ success: false, message: "Invalid credentials" });
-      const isAdmin = user.email.toLowerCase() === 'swapnodinga.scs@gmail.com';
+      const isAdmin = user.email?.toLowerCase() === 'swapnodinga.scs@gmail.com';
       if (user.status !== 'active' && !isAdmin) return res.status(403).json({ success: false, message: "Account pending approval" });
-      res.json({ success: true, user });
+      res.json({ success: true, user: { ...user, is_admin: user.is_admin ?? isAdmin } });
     } catch (err) { res.status(500).json({ success: false }); }
   });
 
@@ -69,8 +75,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
   });
 
-  // 6. FIXED: DYNAMIC INSTALMENT STATUS UPDATE
-  // This route now uses the 'status' sent from the frontend context [cite: 2025-12-31]
+  // 6. DYNAMIC INSTALMENT STATUS UPDATE
   app.post("/api/approve-instalment", async (req, res) => {
     try {
       const { id, status } = req.body; 
@@ -89,10 +94,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
   });
 
-  // 7. FETCH TRANSACTIONS
+  // 7. FETCH TRANSACTIONS (try both table names for compatibility)
   app.get("/api/transactions", async (_req, res) => {
-    const { data } = await supabase.from('Installments').select('*').order('id', { ascending: false });
-    res.json(data || []);
+    for (const table of ['Installments', 'installments']) {
+      const { data, error } = await supabase.from(table).select('*').order('id', { ascending: false });
+      if (!error) return res.json(data || []);
+    }
+    res.json([]);
   });
 
   return createServer(app);

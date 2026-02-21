@@ -21,7 +21,7 @@ export default function MyPayments() {
   const [baseAmount, setBaseAmount] = useState(8000);
   const [file, setFile] = useState<File | null>(null);
 
-  const myTransactions = transactions.filter(t => t.member_id === currentUser?.id);
+  const myTransactions = transactions.filter(t => String(t.member_id) === String(currentUser?.id));
 
   const lateFine = useMemo(() => {
     const today = new Date();

@@ -41,7 +41,11 @@ export default function ReportsPage() {
     setIsLoading(true);
     try {
       const { data: members } = await supabase.from('members').select('id, full_name, society_id').order('id', { ascending: true });
-      const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
+      let installments: any[] | null = null;
+      for (const tbl of ['Installments', 'installments']) {
+        const { data, error } = await supabase.from(tbl).select('*').eq('status', 'Approved');
+        if (!error) { installments = data; break; }
+      }
       const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 
       let totalEarnedInterest = 0;

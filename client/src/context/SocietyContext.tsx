@@ -95,15 +95,17 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData()
   }, [currentUser])
 
-  // DEEP FIX: Function now returns { success: true } so the UI component doesn't crash
+  // FIX: Use server API (service role key) to bypass Supabase RLS on client side
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected") => {
     try {
-      const { error: dbError } = await supabase
-        .from("Installments")
-        .update({ status: status, approved_at: new Date().toISOString() })
-        .eq("id", transaction.id)
-
-      if (dbError) throw dbError
+      // Call server-side API which uses service role key — bypasses RLS policies
+      const res = await fetch("/api/approve-instalment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: transaction.id, status }),
+      })
+      const result = await res.json()
+      if (!result.success) throw new Error(result.message || "Server update failed")
 
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
       const targetEmail = memberObj?.email
@@ -119,7 +121,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
               amount: transaction.amount,
               month: transaction.month,
               status: status,
-              proof_url: transaction.payment_proof_url, 
+              proof_url: transaction.payment_proof_url,
             },
             "nKSxYmGpgjuB2J4tF",
           )
@@ -128,17 +130,17 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      if (transaction.proofPath) {
+      // FIX: Only delete proof file on Approval, not on Rejection
+      if (status === "Approved" && transaction.proofPath) {
         await supabase.storage.from("payments").remove([transaction.proofPath])
       }
 
       await refreshData()
-      
-      // Explicit return object satisfying the UI's 'success' property expectation
-      return { success: true } 
-    } catch (err) {
+
+      return { success: true }
+    } catch (err: any) {
       console.error("Workflow failed:", err)
-      return { success: false }
+      return { success: false, error: err.message }
     }
   }
 

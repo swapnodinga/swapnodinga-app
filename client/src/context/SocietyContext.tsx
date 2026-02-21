@@ -22,7 +22,6 @@ interface SocietyContextType {
   approveMember: (id: string) => Promise<void>
   deleteMember: (id: string) => Promise<void>
   submitInstalment: (amount: number, file: File, month: string) => Promise<void>
-  // Changed return type from Promise<void> to Promise<any> to satisfy UI expectations
   approveInstalment: (transaction: any, status: "Approved" | "Rejected") => Promise<any>
   addFixedDeposit: (data: any) => Promise<void>
   updateFixedDeposit: (id: string, data: any) => Promise<void>
@@ -95,17 +94,14 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData()
   }, [currentUser])
 
-  // FIX: Use server API (service role key) to bypass Supabase RLS on client side
-  const approveInstalment = async (transaction: any, status: "Approved" | "Rejected") => {
+  const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
     try {
-      // Call server-side API which uses service role key — bypasses RLS policies
-      const res = await fetch("/api/approve-instalment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: transaction.id, status }),
-      })
-      const result = await res.json()
-      if (!result.success) throw new Error(result.message || "Server update failed")
+      const { error: dbError } = await supabase
+        .from("Installments")
+        .update({ status: status, approved_at: new Date().toISOString() })
+        .eq("id", transaction.id)
+
+      if (dbError) throw dbError
 
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
       const targetEmail = memberObj?.email
@@ -121,7 +117,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
               amount: transaction.amount,
               month: transaction.month,
               status: status,
-              proof_url: transaction.payment_proof_url,
+              proof_url: transaction.payment_proof_url, 
             },
             "nKSxYmGpgjuB2J4tF",
           )
@@ -130,17 +126,18 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // FIX: Only delete proof file on Approval, not on Rejection
-      if (status === "Approved" && transaction.proofPath) {
+      // Proof deletion only happens when status is updated
+      if (transaction.proofPath) {
         await supabase.storage.from("payments").remove([transaction.proofPath])
       }
 
       await refreshData()
-
+      
+      // CRITICAL FIX: Returning this object prevents the "v is undefined" UI crash
       return { success: true }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Workflow failed:", err)
-      return { success: false, error: err.message }
+      return { success: false }
     }
   }
 

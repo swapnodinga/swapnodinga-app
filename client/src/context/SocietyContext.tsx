@@ -50,7 +50,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [])
 
-  // Calculation logic for Society Total Fund
+  // Society Total Fund calculation based on Approved status
   const societyTotalFund = useMemo(() => {
     const totalInstallments = (transactions || [])
       .filter((t) => t.status === "Approved")
@@ -97,7 +97,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
     try {
-      // 1. Update Database Status
+      // 1. Update Database
       const { error: dbError } = await supabase
         .from("Installments")
         .update({ status: status, approved_at: new Date().toISOString() })
@@ -105,10 +105,12 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (dbError) throw dbError
 
-      // 2. Refresh UI Data Immediately so Collected/Pending updates
-      await refreshData()
+      // 2. MANUALLY UPDATE STATE IMMEDIATELY (Bypasses network delay for UI numbers)
+      setTransactions(prev => prev.map(t => 
+        t.id === transaction.id ? { ...t, status: status } : t
+      ));
 
-      // 3. Email Notification (Background)
+      // 3. Email Notification
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
       const targetEmail = memberObj?.email
 
@@ -125,13 +127,16 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
             proof_url: transaction.payment_proof_url, 
           },
           "nKSxYmGpgjuB2J4tF",
-        ).catch(e => console.warn("Email failed to send, but status updated."));
+        ).catch(e => console.warn("Email error ignored."));
       }
 
-      // 4. Delete Proof from Bucket (As requested)
+      // 4. Cleanup Storage
       if (transaction.proofPath) {
         await supabase.storage.from("payments").remove([transaction.proofPath])
       }
+
+      // 5. Final sync with database
+      await refreshData()
       
       return { success: true }
     } catch (err) {

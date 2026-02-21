@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect, useMemo } from "react"
+import { createContext, useContext, useState, useEffect, useMemo, useRef } from "react"
 import { useLocation } from "wouter"
 import { supabase } from "@/lib/supabase"
 import emailjs from "@emailjs/browser"
@@ -13,7 +13,7 @@ interface SocietyContextType {
   fixedDeposits: any[]
   societyTotalFund: number
   isLoading: boolean
-  login: (email: string, pass: string) => Promise<boolean>
+  login: (email: string, pass: string) => Promise<{ user: any } | false>
   register: (userData: any) => Promise<boolean>
   logout: () => void
   updateProfile: (data: any) => Promise<void>
@@ -22,7 +22,7 @@ interface SocietyContextType {
   approveMember: (id: string) => Promise<void>
   deleteMember: (id: string) => Promise<void>
   submitInstalment: (amount: number, file: File, month: string) => Promise<void>
-  approveInstalment: (transaction: any, status: "Approved" | "Rejected") => Promise<any>
+  approveInstalment: (transaction: any, status: "Approved" | "Rejected") => Promise<{ success: boolean; error?: string }>
   addFixedDeposit: (data: any) => Promise<void>
   updateFixedDeposit: (id: string, data: any) => Promise<void>
   deleteFixedDeposit: (id: string) => Promise<void>
@@ -37,6 +37,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const [fixedDeposits, setFixedDeposits] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [, setLocation] = useLocation()
+  const installmentsTableRef = useRef<string>("Installments")
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user")
@@ -51,23 +52,48 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const societyTotalFund = useMemo(() => {
-    const totalInstallments = (transactions || [])
+    if (!Array.isArray(transactions)) return 0
+    return transactions
       .filter((t) => t.status === "Approved")
-      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-
-    const totalRealizedInterest = (fixedDeposits || [])
-      .reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0);
-
-    return totalInstallments + totalRealizedInterest;
-  }, [transactions, fixedDeposits])
+      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
+  }, [transactions])
 
   const refreshData = async () => {
     try {
-      console.log("Refreshing data from Supabase...");
-      const { data: membersData } = await supabase.from("members").select("*")
-      const { data: transData } = await supabase.from("Installments").select("*").order("created_at", { ascending: false })
-      const { data: fdData } = await supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
+      const { data: membersData, error: memError } = await supabase.from("members").select("*")
+      if (memError) console.error("Error fetching members:", memError)
+
+      let transData: any[] | null = null
+      try {
+        const base = typeof window !== "undefined" ? window.location.origin : ""
+        const res = await fetch(`${base}/api/transactions`)
+        if (res.ok) {
+          transData = await res.json()
+          installmentsTableRef.current = "Installments"
+        }
+      } catch (_) { /* API not available, fall back to Supabase */ }
+
+      if (!transData) {
+        for (const tableName of ["Installments", "installments"] as const) {
+          const { data, error: transError } = await supabase.from(tableName).select("*").order("id", { ascending: false })
+          if (!transError) {
+            transData = data
+            installmentsTableRef.current = tableName
+            break
+          }
+          if (transError?.message?.includes("relation") || transError?.code === "PGRST116") continue
+          console.error("Error fetching installments:", transError)
+          break
+        }
+      }
+
+      const { data: fdData, error: fdError } = await supabase
+        .from("fixed_deposits")
+        .select("*")
+        .order("start_date", { ascending: false })
       
+      if (fdError) console.error("Error fetching FDs:", fdError)
+
       const nameMap: { [key: string]: string } = {}
       if (membersData) {
         membersData.forEach((m) => {
@@ -93,64 +119,69 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData()
   }, [currentUser])
 
-  const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
-    try {
-      // 1. Update Database and wait
-      const { error: dbError } = await supabase
-        .from("Installments")
-        .update({ status: status, approved_at: new Date().toISOString() })
-        .eq("id", transaction.id)
-
-      if (dbError) throw dbError
-
-      // 2. Critical: Wait for the refresh to finish so the UI sees the new 'Approved' status
-      await refreshData()
-
-      // 3. Cleanup & Background tasks
-      const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
-      const targetEmail = memberObj?.email
-
-      if (targetEmail) {
-        emailjs.send(
-          "service_b8gcj9p",
-          "template_vi2p4ul",
-          {
-            member_name: memberObj.full_name || transaction.memberName,
-            member_email: targetEmail,
-            amount: transaction.amount,
-            month: transaction.month,
-            status: status,
-            proof_url: transaction.payment_proof_url, 
-          },
-          "nKSxYmGpgjuB2J4tF",
-        ).catch(() => {});
-      }
-
-      if (transaction.proofPath) {
-        await supabase.storage.from("payments").remove([transaction.proofPath])
-      }
-      
-      return { success: true }
-    } catch (err) {
-      console.error("Workflow failed:", err)
-      return { success: false }
-    }
-  }
-
   const addFixedDeposit = async (data: any) => {
-    await supabase.from("fixed_deposits").insert([data])
+    const { error } = await supabase.from("fixed_deposits").insert([data])
+    if (error) throw error
     await refreshData()
   }
 
   const updateFixedDeposit = async (id: string, data: any) => {
-    await supabase.from("fixed_deposits").update(data).eq("id", id)
+    const { error } = await supabase.from("fixed_deposits").update(data).eq("id", id)
+    if (error) throw error
     await refreshData()
   }
 
   const deleteFixedDeposit = async (id: string) => {
     if (!window.confirm("Delete this deposit permanently?")) return
-    await supabase.from("fixed_deposits").delete().eq("id", id)
+    const { error } = await supabase.from("fixed_deposits").delete().eq("id", id)
+    if (error) throw error
     await refreshData()
+  }
+
+  const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<{ success: boolean; error?: string }> => {
+    try {
+      if (!transaction?.id) return { success: false, error: "Invalid transaction" }
+
+      const tableName = installmentsTableRef.current
+      const { error: dbError } = await supabase
+        .from(tableName)
+        .update({ status: status, approved_at: new Date().toISOString() })
+        .eq("id", transaction.id)
+
+      if (dbError) {
+        console.error("Approve DB error:", dbError)
+        return { success: false, error: dbError.message }
+      }
+
+      const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
+      const targetEmail = memberObj?.email
+
+      if (targetEmail) {
+        try {
+          await emailjs.send(
+            "service_b8gcj9p",
+            "template_vi2p4ul",
+            {
+              member_name: memberObj.full_name || transaction.memberName,
+              member_email: targetEmail,
+              amount: transaction.amount,
+              month: transaction.month,
+              status: status,
+              proof_url: transaction.payment_proof_url, 
+            },
+            "nKSxYmGpgjuB2J4tF",
+          )
+        } catch (emailErr) {
+          console.warn("Email notification failed:", emailErr)
+          // Don't fail the whole flow for email
+        }
+      }
+      await refreshData()
+      return { success: true }
+    } catch (err: any) {
+      console.error("Approve workflow failed:", err)
+      return { success: false, error: err?.message || "Approval failed" }
+    }
   }
 
   const submitInstalment = async (amount: number, file: File, month: string) => {
@@ -158,10 +189,12 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       if (!currentUser) throw new Error("No user logged in")
       const fileExt = file.name.split(".").pop()
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`
-      await supabase.storage.from("payments").upload(fileName, file)
+      const { error: uploadError } = await supabase.storage.from("payments").upload(fileName, file)
+      if (uploadError) throw uploadError
+
       const { data: urlData } = supabase.storage.from("payments").getPublicUrl(fileName)
 
-      await supabase.from("Installments").insert([{
+      const { error: dbError } = await supabase.from(installmentsTableRef.current).insert([{
         member_id: currentUser.id,
         memberName: currentUser.full_name || currentUser.memberName,
         society_id: currentUser.society_id,
@@ -172,22 +205,37 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         status: "Pending",
         created_at: new Date().toISOString(),
       }])
+
+      if (dbError) throw dbError
       await refreshData()
     } catch (err: any) {
       console.error("Submission Error:", err.message)
     }
   }
 
-  const login = async (email: string, pass: string) => {
+  const login = async (email: string, pass: string): Promise<{ user: any } | false> => {
     try {
-      const { data: memberData } = await supabase.from("members").select("*").eq("email", email.trim()).eq("password", pass).single()
-      if (memberData && memberData.status === 'active') {
-        setCurrentUser(memberData)
-        localStorage.setItem("user", JSON.stringify(memberData))
-        return true
+      const { data: memberData } = await supabase
+        .from("members")
+        .select("*")
+        .ilike("email", email.trim())
+        .single()
+
+      if (memberData && memberData.password === pass) {
+        if (memberData.status !== 'active') {
+          const isAdminEmail = memberData.email?.toLowerCase() === 'swapnodinga.scs@gmail.com'
+          if (!isAdminEmail) return false
+        }
+        const isAdmin = memberData.is_admin ?? memberData.email?.toLowerCase() === 'swapnodinga.scs@gmail.com'
+        const user = { ...memberData, is_admin: isAdmin }
+        setCurrentUser(user)
+        localStorage.setItem("user", JSON.stringify(user))
+        return { user }
       }
       return false
-    } catch (err) { return false }
+    } catch (err) {
+      return false
+    }
   }
 
   const logout = () => {
@@ -199,19 +247,31 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: any) => {
     try {
       const { data: currentMembers } = await supabase.from("members").select("id")
-      const lastId = currentMembers && currentMembers.length > 0 ? Math.max(...currentMembers.map(m => m.id)) : 0;
-      await supabase.from("members").insert([{
+      const lastId = currentMembers && currentMembers.length > 0 
+        ? Math.max(...currentMembers.map(m => m.id)) 
+        : 0;
+      
+      const nextId = lastId + 1;
+      const nextSocietyId = `SCS-${String(nextId).padStart(3, '0')}`;
+
+      const payload = {
         ...userData,
-        id: lastId + 1,
-        society_id: `SCS-${String(lastId + 1).padStart(3, '0')}`, 
+        id: nextId,
+        society_id: nextSocietyId, 
         status: "pending",
         fixed_deposit_amount: 0,
         fixed_deposit_interest: 0,
         is_admin: false
-      }])
+      }
+
+      const { error } = await supabase.from("members").insert([payload])
+      if (error) throw error
       await refreshData()
       return true
-    } catch (err) { return false }
+    } catch (err) {
+      console.error("Registration failed:", err)
+      return false
+    }
   }
 
   const approveMember = async (id: string) => {

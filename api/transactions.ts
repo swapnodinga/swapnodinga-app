@@ -16,7 +16,7 @@ export default async function handler(req: Request) {
 
   const supabase = createClient(url, key);
 
-  for (const table of ["installments", "Installments", "Installment"]) {
+  for (const table of ["Installments", "installments"]) {
     const { data, error } = await supabase
       .from(table)
       .select("*")

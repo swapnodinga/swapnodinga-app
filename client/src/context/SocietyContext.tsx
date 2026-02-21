@@ -37,7 +37,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const [fixedDeposits, setFixedDeposits] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [, setLocation] = useLocation()
-  const installmentsTableRef = useRef<string>("installments")
+  const installmentsTableRef = useRef<string>("Installments")
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user")
@@ -69,12 +69,12 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         const res = await fetch(`${base}/api/transactions`)
         if (res.ok) {
           transData = await res.json()
-          installmentsTableRef.current = "installments"
+          installmentsTableRef.current = "Installments"
         }
       } catch (_) { /* API not available, fall back to Supabase */ }
 
       if (!transData) {
-        for (const tableName of ["installments", "Installments"] as const) {
+        for (const tableName of ["Installments", "installments"] as const) {
           const { data, error: transError } = await supabase.from(tableName).select("*").order("created_at", { ascending: false })
           if (!transError) {
             transData = data

@@ -66,7 +66,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/submit-instalment", async (req, res) => {
     try {
       const { memberId, society_id, memberName, amount, proofUrl, proofPath, month, late_fee } = req.body;
-      const { data, error } = await supabase.from('installments').insert([{
+      const { data, error } = await supabase.from('Installments').insert([{
         member_id: memberId, society_id, memberName, amount: Number(amount), late_fee: Number(late_fee || 0),
         payment_proof_url: proofUrl, proofPath: proofPath, month, status: 'Pending', created_at: new Date().toISOString() 
       }]).select().single();
@@ -80,7 +80,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id, status } = req.body; 
       const { data, error } = await supabase
-        .from('installments')
+        .from('Installments')
         .update({ 
           status: status, // NO LONGER HARDCODED [cite: 2025-12-31]
           approved_at: status === 'Approved' ? new Date().toISOString() : null 
@@ -96,7 +96,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 7. FETCH TRANSACTIONS (try both table names for compatibility)
   app.get("/api/transactions", async (_req, res) => {
-    for (const table of ['installments', 'Installments']) {
+    for (const table of ['Installments', 'installments']) {
       const { data, error } = await supabase.from(table).select('*').order('created_at', { ascending: false });
       if (!error) return res.json(data || []);
     }

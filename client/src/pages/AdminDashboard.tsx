@@ -78,7 +78,7 @@ export default function AdminDashboard() {
     try {
       const { data: members } = await supabase.from('members').select('id, full_name, memberName');
       let allInstallments: any[] | null = null;
-      for (const tbl of ['installments', 'Installments']) {
+      for (const tbl of ['Installments', 'installments']) {
         const { data, error } = await supabase.from(tbl).select('*').eq('status', 'Approved');
         if (!error) { allInstallments = data; break; }
       }

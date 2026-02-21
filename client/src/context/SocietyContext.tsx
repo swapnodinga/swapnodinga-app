@@ -50,7 +50,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [])
 
-  // Society Total Fund calculation based on Approved status
+  // Automatically recalculates whenever transactions or deposits are refreshed
   const societyTotalFund = useMemo(() => {
     const totalInstallments = (transactions || [])
       .filter((t) => t.status === "Approved")
@@ -66,10 +66,8 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data: membersData } = await supabase.from("members").select("*")
       const { data: transData } = await supabase.from("Installments").select("*").order("created_at", { ascending: false })
-      const { data: fdData, error: fdError } = await supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
+      const { data: fdData } = await supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
       
-      if (fdError) console.error("Error fetching FDs:", fdError)
-
       const nameMap: { [key: string]: string } = {}
       if (membersData) {
         membersData.forEach((m) => {
@@ -97,7 +95,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
     try {
-      // 1. Update Database
+      // 1. Update Database and wait for confirmation
       const { error: dbError } = await supabase
         .from("Installments")
         .update({ status: status, approved_at: new Date().toISOString() })
@@ -105,12 +103,11 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (dbError) throw dbError
 
-      // 2. MANUALLY UPDATE STATE IMMEDIATELY (Bypasses network delay for UI numbers)
-      setTransactions(prev => prev.map(t => 
-        t.id === transaction.id ? { ...t, status: status } : t
-      ));
+      // 2. Automatical Refresh - Triggering a full data fetch from the server
+      // We await this to ensure the UI only updates once the new data is in hand
+      await refreshData()
 
-      // 3. Email Notification
+      // 3. Background tasks (Mail & Storage)
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
       const targetEmail = memberObj?.email
 
@@ -127,16 +124,12 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
             proof_url: transaction.payment_proof_url, 
           },
           "nKSxYmGpgjuB2J4tF",
-        ).catch(e => console.warn("Email error ignored."));
+        ).catch(e => console.warn("Email background error."));
       }
 
-      // 4. Cleanup Storage
       if (transaction.proofPath) {
         await supabase.storage.from("payments").remove([transaction.proofPath])
       }
-
-      // 5. Final sync with database
-      await refreshData()
       
       return { success: true }
     } catch (err) {

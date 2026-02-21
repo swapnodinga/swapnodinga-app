@@ -22,7 +22,8 @@ interface SocietyContextType {
   approveMember: (id: string) => Promise<void>
   deleteMember: (id: string) => Promise<void>
   submitInstalment: (amount: number, file: File, month: string) => Promise<void>
-  approveInstalment: (transaction: any, status: "Approved" | "Rejected") => Promise<void>
+  // Changed return type from Promise<void> to Promise<any> to satisfy UI expectations
+  approveInstalment: (transaction: any, status: "Approved" | "Rejected") => Promise<any>
   addFixedDeposit: (data: any) => Promise<void>
   updateFixedDeposit: (id: string, data: any) => Promise<void>
   deleteFixedDeposit: (id: string) => Promise<void>
@@ -94,8 +95,8 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData()
   }, [currentUser])
 
-  // FINAL DEEP FIX: Explicitly prevents the UI from reading a null success property
-  const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<void> => {
+  // DEEP FIX: Function now returns { success: true } so the UI component doesn't crash
+  const approveInstalment = async (transaction: any, status: "Approved" | "Rejected") => {
     try {
       const { error: dbError } = await supabase
         .from("Installments")
@@ -109,7 +110,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (targetEmail) {
         try {
-          // Fire and forget email to prevent blocking the UI
           emailjs.send(
             "service_b8gcj9p",
             "template_vi2p4ul",
@@ -128,16 +128,17 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // Proof deletion logic as requested [cite: 2025-12-31]
       if (transaction.proofPath) {
         await supabase.storage.from("payments").remove([transaction.proofPath])
       }
 
       await refreshData()
-      return Promise.resolve() // Explicitly return nothing to the UI caller
+      
+      // Explicit return object satisfying the UI's 'success' property expectation
+      return { success: true } 
     } catch (err) {
       console.error("Workflow failed:", err)
-      return Promise.resolve() // Prevent the UI from crashing even on error
+      return { success: false }
     }
   }
 

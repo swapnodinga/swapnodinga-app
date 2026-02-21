@@ -97,7 +97,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 7. FETCH TRANSACTIONS (try both table names for compatibility)
   app.get("/api/transactions", async (_req, res) => {
     for (const table of ['Installments', 'installments']) {
-      const { data, error } = await supabase.from(table).select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from(table).select('*').order('id', { ascending: false });
       if (!error) return res.json(data || []);
     }
     res.json([]);

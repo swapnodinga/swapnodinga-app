@@ -17,12 +17,13 @@ export default async function handler(req: Request) {
   const supabase = createClient(url, key);
 
   for (const table of ["Installments", "installments"]) {
-    const { data, error } = await supabase
-      .from(table)
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (!error) {
-      return new Response(JSON.stringify(data || []), {
+    let { data, error } = await supabase.from(table).select("*").order("id", { ascending: false });
+    if (error) {
+      const fallback = await supabase.from(table).select("*");
+      if (!fallback.error) ({ data, error } = fallback);
+    }
+    if (!error && Array.isArray(data)) {
+      return new Response(JSON.stringify(data), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       });
     }

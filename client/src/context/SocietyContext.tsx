@@ -75,7 +75,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (!transData) {
         for (const tableName of ["Installments", "installments"] as const) {
-          const { data, error: transError } = await supabase.from(tableName).select("*").order("created_at", { ascending: false })
+          const { data, error: transError } = await supabase.from(tableName).select("*").order("id", { ascending: false })
           if (!transError) {
             transData = data
             installmentsTableRef.current = tableName

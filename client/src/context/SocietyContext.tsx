@@ -53,33 +53,29 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const societyTotalFund = useMemo(() => {
     const totalInstallments = (transactions || [])
       .filter((t) => t.status === "Approved")
-      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
 
     const totalRealizedInterest = (fixedDeposits || [])
-      .reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0);
+      .reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0)
 
-    return totalInstallments + totalRealizedInterest;
+    return totalInstallments + totalRealizedInterest
   }, [transactions, fixedDeposits])
 
   const refreshData = async () => {
     try {
-      const { data: membersData, error: mErr } = await supabase.from("members").select("*")
-      const { data: transData, error: tErr } = await supabase.from("Installments").select("*").order("created_at", { ascending: false })
-      const { data: fdData, error: fErr } = await supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
-      
-      if (mErr || tErr || fErr) {
-        console.error("Fetch Error Details:", { mErr, tErr, fErr });
-      }
+      const { data: membersData } = await supabase.from("members").select("*")
+      const { data: transData } = await supabase.from("Installments").select("*").order("created_at", { ascending: false })
+      const { data: fdData } = await supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
 
       const nameMap: { [key: string]: string } = {}
       if (membersData) {
-        membersData.forEach((m) => {
+        membersData.forEach((m: any) => {
           const name = m.full_name || m.memberName || m.member_name || "No Name"
           nameMap[String(m.id)] = name
         })
       }
 
-      const enrichedTransData = (transData || []).map((trans) => ({
+      const enrichedTransData = (transData || []).map((trans: any) => ({
         ...trans,
         memberName: nameMap[String(trans.member_id)] || trans.memberName || `Member #${trans.member_id}`,
       }))
@@ -88,17 +84,37 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       setTransactions(enrichedTransData)
       setFixedDeposits(fdData || [])
     } catch (err) {
-      console.error("[SocietyContext] Automatic refresh failed:", err)
+      console.error("[SocietyContext] Refresh failed:", err)
     }
   }
 
+  // ✅ AUTOMATIC REALTIME SUBSCRIPTION
   useEffect(() => {
-    if (currentUser) refreshData()
+    if (!currentUser) return;
+
+    refreshData();
+
+    // Listen for any change in Installments table and auto-refresh
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'Installments' },
+        () => {
+          console.log("Database changed! Auto-refreshing...");
+          refreshData();
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [currentUser])
 
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
     try {
-      // 1. Update the Database
+      // 1. Database update
       const { error: dbError } = await supabase
         .from("Installments")
         .update({ status: status, approved_at: new Date().toISOString() })
@@ -106,51 +122,45 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (dbError) throw dbError
 
-      // 2. Consistency Delay (Wait 300ms for Supabase to finish indexing)
-      // This prevents the "automatic" refresh from fetching old data.
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      // 3. Automatic Refresh (UI only updates via this fetch)
-      await refreshData()
-
-      // 4. Background Tasks (Doesn't affect UI timing)
+      // 2. Email Notification
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
       if (memberObj?.email) {
         emailjs.send("service_b8gcj9p", "template_vi2p4ul", {
-          member_name: memberObj.full_name || transaction.memberName,
-          member_email: memberObj.email,
-          amount: transaction.amount,
-          month: transaction.month,
-          status: status,
-          proof_url: transaction.payment_proof_url, 
-        }, "nKSxYmGpgjuB2J4tF").catch(() => {});
+            member_name: memberObj.full_name || transaction.memberName,
+            member_email: memberObj.email,
+            amount: transaction.amount,
+            month: transaction.month,
+            status: status,
+            proof_url: transaction.payment_proof_url,
+          }, "nKSxYmGpgjuB2J4tF"
+        ).catch(() => {});
       }
 
+      // 3. Storage Cleanup
       if (transaction.proofPath) {
         await supabase.storage.from("payments").remove([transaction.proofPath])
       }
-      
+
+      // Note: No refreshData() needed here anymore! 
+      // The Realtime listener above will handle it automatically.
       return { success: true }
-    } catch (err) {
-      console.error("Workflow failed:", err)
+    } catch (err: any) {
+      console.error("Approval failed:", err)
       return { success: false }
     }
   }
 
   const addFixedDeposit = async (data: any) => {
-    const { error } = await supabase.from("fixed_deposits").insert([data])
-    if (!error) await refreshData()
+    await supabase.from("fixed_deposits").insert([data])
   }
 
   const updateFixedDeposit = async (id: string, data: any) => {
-    const { error } = await supabase.from("fixed_deposits").update(data).eq("id", id)
-    if (!error) await refreshData()
+    await supabase.from("fixed_deposits").update(data).eq("id", id)
   }
 
   const deleteFixedDeposit = async (id: string) => {
-    if (!window.confirm("Delete this deposit?")) return
-    const { error } = await supabase.from("fixed_deposits").delete().eq("id", id)
-    if (!error) await refreshData()
+    if (!window.confirm("Delete this deposit permanently?")) return
+    await supabase.from("fixed_deposits").delete().eq("id", id)
   }
 
   const submitInstalment = async (amount: number, file: File, month: string) => {
@@ -172,7 +182,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         status: "Pending",
         created_at: new Date().toISOString(),
       }])
-      await refreshData()
     } catch (err: any) {
       console.error("Submission Error:", err.message)
     }
@@ -199,29 +208,26 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: any) => {
     try {
       const { data: currentMembers } = await supabase.from("members").select("id")
-      const lastId = currentMembers && currentMembers.length > 0 ? Math.max(...currentMembers.map(m => m.id)) : 0;
+      const lastId = currentMembers && currentMembers.length > 0 ? Math.max(...currentMembers.map((m: any) => m.id)) : 0
       await supabase.from("members").insert([{
         ...userData,
         id: lastId + 1,
-        society_id: `SCS-${String(lastId + 1).padStart(3, '0')}`, 
+        society_id: `SCS-${String(lastId + 1).padStart(3, '0')}`,
         status: "pending",
         fixed_deposit_amount: 0,
         fixed_deposit_interest: 0,
         is_admin: false
       }])
-      await refreshData()
       return true
     } catch (err) { return false }
   }
 
   const approveMember = async (id: string) => {
     await supabase.from("members").update({ status: "active" }).eq("id", id)
-    await refreshData()
   }
 
   const deleteMember = async (id: string) => {
     await supabase.from("members").delete().eq("id", id)
-    await refreshData()
   }
 
   const updateProfile = async (data: any) => {

@@ -53,38 +53,33 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const societyTotalFund = useMemo(() => {
     const totalInstallments = (transactions || [])
       .filter((t) => t.status === "Approved")
-      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
+      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
 
     const totalRealizedInterest = (fixedDeposits || [])
-      .reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0)
+      .reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0);
 
-    return totalInstallments + totalRealizedInterest
+    return totalInstallments + totalRealizedInterest;
   }, [transactions, fixedDeposits])
 
-  // ✅ FIX: Fetch Installments via server API to bypass RLS
   const refreshData = async () => {
     try {
-      const [membersRes, transRes, fdRes] = await Promise.all([
-        supabase.from("members").select("*"),
-        fetch("/api/transactions").then((r) => r.json()),
-        supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false }),
-      ])
-
-      const membersData = membersRes.data
-      const transData = transRes.success ? transRes.transactions : []
-      const fdData = fdRes.data
-
-      if (fdRes.error) console.error("Error fetching FDs:", fdRes.error)
+      const { data: membersData, error: mErr } = await supabase.from("members").select("*")
+      const { data: transData, error: tErr } = await supabase.from("Installments").select("*").order("created_at", { ascending: false })
+      const { data: fdData, error: fErr } = await supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
+      
+      if (mErr || tErr || fErr) {
+        console.error("Fetch Error Details:", { mErr, tErr, fErr });
+      }
 
       const nameMap: { [key: string]: string } = {}
       if (membersData) {
-        membersData.forEach((m: any) => {
+        membersData.forEach((m) => {
           const name = m.full_name || m.memberName || m.member_name || "No Name"
           nameMap[String(m.id)] = name
         })
       }
 
-      const enrichedTransData = (transData || []).map((trans: any) => ({
+      const enrichedTransData = (transData || []).map((trans) => ({
         ...trans,
         memberName: nameMap[String(trans.member_id)] || trans.memberName || `Member #${trans.member_id}`,
       }))
@@ -93,7 +88,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       setTransactions(enrichedTransData)
       setFixedDeposits(fdData || [])
     } catch (err) {
-      console.error("[SocietyContext] Data refresh failed:", err)
+      console.error("[SocietyContext] Automatic refresh failed:", err)
     }
   }
 
@@ -101,69 +96,61 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) refreshData()
   }, [currentUser])
 
-  const approveInstalment = async (transaction: any, status: "Approved" | "Rejected") => {
+  const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
     try {
-      const res = await fetch("/api/approve-instalment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: transaction.id, status }),
-      })
-      const result = await res.json()
-      if (!result.success) throw new Error(result.message || "Server update failed")
+      // 1. Update the Database
+      const { error: dbError } = await supabase
+        .from("Installments")
+        .update({ status: status, approved_at: new Date().toISOString() })
+        .eq("id", transaction.id)
 
-      const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
-      const targetEmail = memberObj?.email
+      if (dbError) throw dbError
 
-      if (targetEmail) {
-        try {
-          emailjs.send(
-            "service_b8gcj9p",
-            "template_vi2p4ul",
-            {
-              member_name: memberObj.full_name || transaction.memberName,
-              member_email: targetEmail,
-              amount: transaction.amount,
-              month: transaction.month,
-              status: status,
-              proof_url: transaction.payment_proof_url,
-            },
-            "nKSxYmGpgjuB2J4tF",
-          )
-        } catch (e) {
-          console.warn("Mail background error ignored.")
-        }
-      }
+      // 2. Consistency Delay (Wait 300ms for Supabase to finish indexing)
+      // This prevents the "automatic" refresh from fetching old data.
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      if (status === "Approved" && transaction.proofPath) {
-        await supabase.storage.from("payments").remove([transaction.proofPath])
-      }
-
+      // 3. Automatic Refresh (UI only updates via this fetch)
       await refreshData()
 
+      // 4. Background Tasks (Doesn't affect UI timing)
+      const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
+      if (memberObj?.email) {
+        emailjs.send("service_b8gcj9p", "template_vi2p4ul", {
+          member_name: memberObj.full_name || transaction.memberName,
+          member_email: memberObj.email,
+          amount: transaction.amount,
+          month: transaction.month,
+          status: status,
+          proof_url: transaction.payment_proof_url, 
+        }, "nKSxYmGpgjuB2J4tF").catch(() => {});
+      }
+
+      if (transaction.proofPath) {
+        await supabase.storage.from("payments").remove([transaction.proofPath])
+      }
+      
       return { success: true }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Workflow failed:", err)
-      return { success: false, error: err.message }
+      return { success: false }
     }
   }
 
   const addFixedDeposit = async (data: any) => {
     const { error } = await supabase.from("fixed_deposits").insert([data])
-    if (error) throw error
-    await refreshData()
+    if (!error) await refreshData()
   }
 
   const updateFixedDeposit = async (id: string, data: any) => {
     const { error } = await supabase.from("fixed_deposits").update(data).eq("id", id)
-    if (error) throw error
-    await refreshData()
+    if (!error) await refreshData()
   }
 
   const deleteFixedDeposit = async (id: string) => {
-    if (!window.confirm("Delete this deposit permanently?")) return
+    if (!window.confirm("Delete this deposit?")) return
     const { error } = await supabase.from("fixed_deposits").delete().eq("id", id)
-    if (error) throw error
-    await refreshData()
+    if (!error) await refreshData()
   }
 
   const submitInstalment = async (amount: number, file: File, month: string) => {
@@ -171,8 +158,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       if (!currentUser) throw new Error("No user logged in")
       const fileExt = file.name.split(".").pop()
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`
-      const { error: uploadError } = await supabase.storage.from("payments").upload(fileName, file)
-      if (uploadError) throw uploadError
+      await supabase.storage.from("payments").upload(fileName, file)
       const { data: urlData } = supabase.storage.from("payments").getPublicUrl(fileName)
 
       await supabase.from("Installments").insert([{
@@ -213,11 +199,11 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: any) => {
     try {
       const { data: currentMembers } = await supabase.from("members").select("id")
-      const lastId = currentMembers && currentMembers.length > 0 ? Math.max(...currentMembers.map(m => m.id)) : 0
+      const lastId = currentMembers && currentMembers.length > 0 ? Math.max(...currentMembers.map(m => m.id)) : 0;
       await supabase.from("members").insert([{
         ...userData,
         id: lastId + 1,
-        society_id: `SCS-${String(lastId + 1).padStart(3, '0')}`,
+        society_id: `SCS-${String(lastId + 1).padStart(3, '0')}`, 
         status: "pending",
         fixed_deposit_amount: 0,
         fixed_deposit_interest: 0,

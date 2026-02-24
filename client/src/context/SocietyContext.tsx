@@ -2,8 +2,8 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect, useMemo } from "react"
-import { useLocation } from "wouter"
-import { supabase } from "@/lib/supabase"
+import { useNavigate } from "react-router-dom"
+import { supabase } from "@/integrations/supabase/client"
 import emailjs from "@emailjs/browser"
 
 interface SocietyContextType {
@@ -13,7 +13,7 @@ interface SocietyContextType {
   fixedDeposits: any[]
   societyTotalFund: number
   isLoading: boolean
-  login: (email: string, pass: string) => Promise<boolean>
+  login: (email: string, pass: string) => Promise<any>
   register: (userData: any) => Promise<boolean>
   logout: () => void
   updateProfile: (data: any) => Promise<void>
@@ -36,7 +36,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<any[]>([])
   const [fixedDeposits, setFixedDeposits] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [, setLocation] = useLocation()
+  const navigate = useNavigate()
 
   // 1. Initialize User Session
   useEffect(() => {
@@ -70,7 +70,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const { data: transData } = await supabase.from("Installments").select("*").order("created_at", { ascending: false })
       const { data: fdData } = await supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
 
-      // Create a map for member names to ensure transactions always show the correct name
+      // Create a map for member names
       const nameMap: { [key: string]: string } = {}
       if (membersData) {
         membersData.forEach((m: any) => {
@@ -98,14 +98,13 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
     refreshData()
 
-    // Setup Realtime Channel for the Installments table
     const channel = supabase
       .channel("realtime-updates")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "Installments" },
         () => {
-          refreshData() // Automatically refresh UI when database changes
+          refreshData()
         },
       )
       .subscribe()
@@ -118,7 +117,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   // 5. Action Handlers
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
     try {
-      // Step A: Update Database
       const { error: dbError } = await supabase
         .from("Installments")
         .update({ status: status, approved_at: new Date().toISOString() })
@@ -126,7 +124,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
       if (dbError) throw dbError
 
-      // Step B: Send Confirmation Email
+      // Send Confirmation Email
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
       if (memberObj?.email) {
         emailjs
@@ -146,16 +144,15 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           .catch((e) => console.warn("Email service failed", e))
       }
 
-      // Step C: Delete proof from storage (as requested)
+      // Delete proof from storage
       if (transaction.proofPath) {
         await supabase.storage.from("payments").remove([transaction.proofPath])
       }
 
-      // Note: No refreshData() needed here because Realtime listener handles it!
       return { success: true }
     } catch (err: any) {
       console.error("Workflow failed:", err)
-      return { success: false }
+      return { success: false, error: err.message }
     }
   }
 
@@ -164,7 +161,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       if (!currentUser) throw new Error("No user logged in")
       const fileExt = file.name.split(".").pop()
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`
-      
+
       const { error: uploadError } = await supabase.storage.from("payments").upload(fileName, file)
       if (uploadError) throw uploadError
 
@@ -188,13 +185,13 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   // Member Management
   const approveMember = async (id: string) => {
-    await supabase.from("members").update({ status: "active" }).eq("id", id)
+    await supabase.from("members").update({ status: "active" }).eq("id", Number(id))
     await refreshData()
   }
 
   const deleteMember = async (id: string) => {
     if (!window.confirm("Delete this member permanently?")) return
-    await supabase.from("members").delete().eq("id", id)
+    await supabase.from("members").delete().eq("id", Number(id))
     await refreshData()
   }
 
@@ -205,13 +202,13 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   }
 
   const updateFixedDeposit = async (id: string, data: any) => {
-    await supabase.from("fixed_deposits").update(data).eq("id", id)
+    await supabase.from("fixed_deposits").update(data).eq("id", Number(id))
     await refreshData()
   }
 
   const deleteFixedDeposit = async (id: string) => {
     if (!window.confirm("Delete this deposit permanently?")) return
-    await supabase.from("fixed_deposits").delete().eq("id", id)
+    await supabase.from("fixed_deposits").delete().eq("id", Number(id))
     await refreshData()
   }
 
@@ -224,11 +221,11 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         .eq("email", email.trim())
         .eq("password", pass)
         .single()
-      
+
       if (memberData && memberData.status === "active") {
         setCurrentUser(memberData)
         localStorage.setItem("user", JSON.stringify(memberData))
-        return true
+        return { success: true, user: memberData }
       }
       return false
     } catch (err) {
@@ -239,14 +236,14 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setCurrentUser(null)
     localStorage.removeItem("user")
-    setLocation("/")
+    navigate("/")
   }
 
   const register = async (userData: any) => {
     try {
       const { data: currentMembers } = await supabase.from("members").select("id")
       const lastId = currentMembers && currentMembers.length > 0 ? Math.max(...currentMembers.map((m: any) => m.id)) : 0
-      
+
       const { error } = await supabase.from("members").insert([{
         ...userData,
         id: lastId + 1,
@@ -256,7 +253,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         fixed_deposit_interest: 0,
         is_admin: false,
       }])
-      
+
       return !error
     } catch (err) {
       return false

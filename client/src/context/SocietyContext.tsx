@@ -2,7 +2,8 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect, useMemo } from "react"
-import { supabase } from "@/integrations/supabase/client"
+import { useLocation } from "wouter"
+import { supabase } from "@/lib/supabase"
 import emailjs from "@emailjs/browser"
 
 interface SocietyContextType {
@@ -35,7 +36,9 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<any[]>([])
   const [fixedDeposits, setFixedDeposits] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [, setLocation] = useLocation()
 
+  // 1. Initialize User Session
   useEffect(() => {
     const savedUser = localStorage.getItem("user")
     if (savedUser) {
@@ -48,6 +51,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [])
 
+  // 2. Automated Fund Calculation
   const societyTotalFund = useMemo(() => {
     const totalInstallments = (transactions || [])
       .filter((t) => t.status === "Approved")
@@ -59,6 +63,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     return totalInstallments + totalRealizedInterest
   }, [transactions, fixedDeposits])
 
+  // 3. Centralized Refresh Logic
   const refreshData = async () => {
     try {
       const { data: membersData } = await supabase.from("members").select("*")
@@ -86,6 +91,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // 4. AUTOMATIC REALTIME SUBSCRIPTION
   useEffect(() => {
     if (!currentUser) return
     refreshData()
@@ -102,32 +108,24 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentUser])
 
-  // FIX: This now updates the UI INSTANTLY before waiting for the database
+  // 5. Action Handlers (Optimistic Updates)
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
-    // Save current state for rollback if things go wrong
-    const originalTransactions = [...transactions];
-
+    const originalTransactions = [...transactions]
     try {
-      // 1. OPTIMISTIC UI UPDATE (Instant visual feedback)
+      // Instant UI update
       setTransactions((prev) =>
         prev.map((t) => (t.id === transaction.id ? { ...t, status: status } : t))
       )
 
-      // 2. DATABASE UPDATE
       const { error: dbError } = await supabase
         .from("Installments")
-        .update({ 
-          status: status, 
-          approved_at: new Date().toISOString() 
-        })
+        .update({ status: status, approved_at: new Date().toISOString() })
         .eq("id", transaction.id)
 
       if (dbError) throw dbError
 
-      // 3. BACKGROUND TASKS (Emails & Storage)
+      // Background Email Notification
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
-      
-      // We don't 'await' these so they don't block the UI
       if (memberObj?.email) {
         emailjs.send("service_b8gcj9p", "template_vi2p4ul", {
           member_name: memberObj.full_name || transaction.memberName,
@@ -136,19 +134,18 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           month: transaction.month,
           status: status,
           proof_url: transaction.payment_proof_url,
-        }, "nKSxYmGpgjuB2J4tF").catch(e => console.error("Email failed:", e))
+        }, "nKSxYmGpgjuB2J4tF").catch(() => {})
       }
 
-      // 4. STORAGE CLEANUP (Proof Deletion)
+      // Proof cleanup
       if (status === "Approved" && transaction.proofPath) {
         await supabase.storage.from("payments").remove([transaction.proofPath])
       }
 
       return { success: true }
     } catch (err: any) {
-      // ROLLBACK: If DB fails, reset the UI to what it was
-      console.error("Workflow failed, rolling back UI:", err)
-      setTransactions(originalTransactions);
+      setTransactions(originalTransactions)
+      console.error("Workflow failed:", err)
       return { success: false, error: err.message }
     }
   }
@@ -183,7 +180,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   }
 
   const deleteMember = async (id: string) => {
-    if (!window.confirm("Delete member?")) return
+    if (!window.confirm("Delete member permanently?")) return
     await supabase.from("members").delete().eq("id", Number(id))
     await refreshData()
   }
@@ -199,7 +196,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   }
 
   const deleteFixedDeposit = async (id: string) => {
-    if (!window.confirm("Delete deposit?")) return
+    if (!window.confirm("Delete deposit permanently?")) return
     await supabase.from("fixed_deposits").delete().eq("id", Number(id))
     await refreshData()
   }
@@ -225,7 +222,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setCurrentUser(null)
     localStorage.removeItem("user")
-    window.location.href = "/"
+    setLocation("/")
   }
 
   const register = async (userData: any) => {

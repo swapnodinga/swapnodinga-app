@@ -14,14 +14,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ success: false, message: "Method not allowed" });
 
   try {
-    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    const supabase = createClient(url!, key!);
+    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const { id, status } = body || {};
 
-    // 1. Update status and fetch full transaction data [cite: 2025-12-31]
+    // 1. Fetch current record to get the proof URL before updating [cite: 2025-12-31]
     const { data: tx, error: updateError } = await supabase
       .from("Installments")
       .update({ status, approved_at: status === "Approved" ? new Date().toISOString() : null })
@@ -31,18 +28,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (updateError) throw updateError;
 
-    // 2. Fetch Member Email and Name [cite: 2025-12-31]
     const { data: member } = await supabase
       .from("members")
       .select("email, name")
       .eq("id", tx.member_id)
       .single();
 
-    // 3. Trigger External Send Email API with proof_url [cite: 2025-12-31]
+    // 2. Trigger Email with proof_url and Local Time [cite: 2025-12-31]
     if (member?.email) {
       const protocol = req.headers["x-forwarded-proto"] || "http";
       const host = req.headers.host;
       
+      // Formatting time for Bangladesh (UTC+6)
+      const localTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" });
+
       await fetch(`${protocol}://${host}/api/send-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -52,12 +51,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           amount: tx.amount,
           month: tx.month,
           status: status,
-          proof_url: tx.payment_proof_url // Added this [cite: 2025-12-31]
+          proof_url: tx.payment_proof_url, // Pass URL before deletion [cite: 2025-12-31]
+          time: localTime
         }),
       });
     }
 
-    // 4. Delete Proof from Bucket & Clear DB path [cite: 2025-12-31]
+    // 3. Storage Cleanup after email is sent [cite: 2025-12-31]
     if (tx.proofPath) {
       await supabase.storage.from("payment-proofs").remove([tx.proofPath]);
       await supabase.from("Installments").update({ payment_proof_url: null, proofPath: null }).eq("id", id);

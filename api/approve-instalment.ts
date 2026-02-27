@@ -16,63 +16,50 @@ export default async function handler(req: any, res: any) {
     const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!url || !key) {
-      return res.status(500).json({ success: false, message: "Server configuration error" });
-    }
-
-    const supabase = createClient(url, key);
+    const supabase = createClient(url!, key!);
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const { id, status } = body || {};
 
-    if (!id || !status) return res.status(400).json({ success: false, message: "Missing id or status" });
-
-    // 1. Update status and fetch data
+    // 1. Update status and fetch full transaction data
     const { data: tx, error: updateError } = await supabase
       .from("Installments")
-      .update({ 
-        status, 
-        approved_at: status === "Approved" ? new Date().toISOString() : null 
-      })
+      .update({ status, approved_at: status === "Approved" ? new Date().toISOString() : null })
       .eq("id", id)
       .select()
       .single();
 
     if (updateError) throw updateError;
 
-    // 2. Fetch Member Email [cite: 2025-12-31]
+    // 2. Fetch Member Email and Name [cite: 2025-12-31]
     const { data: member } = await supabase
       .from("members")
       .select("email, name")
       .eq("id", tx.member_id)
       .single();
 
-    // 3. Trigger EmailJS REST API
-    if (member?.email && process.env.EMAILJS_PUBLIC_KEY) {
-      try {
-        const emailResponse = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            service_id: process.env.EMAILJS_SERVICE_ID,
-            template_id: process.env.EMAILJS_TEMPLATE_ID,
-            user_id: process.env.EMAILJS_PUBLIC_KEY,
-            accessToken: process.env.EMAILJS_PRIVATE_KEY, // Added for backend authorization
-            template_params: {
-              to_email: member.email,
-              user_name: member.name,
-              status: status,
-              amount: tx.amount,
-              month: tx.month,
-              transaction_id: tx.id
-            },
-          }),
-        });
-        
-        const result = await emailResponse.text();
-        console.log("EmailJS Server Response:", result);
-      } catch (emailErr) {
-        console.error("EmailJS failed:", emailErr);
-      }
+    // 3. Trigger EmailJS with CORRECT Variables
+    if (member?.email && process.env.EMAILJS_PRIVATE_KEY) {
+      const emailResponse = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_id: process.env.EMAILJS_SERVICE_ID,
+          template_id: process.env.EMAILJS_TEMPLATE_ID,
+          user_id: process.env.EMAILJS_PUBLIC_KEY,
+          accessToken: process.env.EMAILJS_PRIVATE_KEY, // Critical for backend
+          template_params: {
+            to_email: member.email,        // Matches {{to_email}} in Dashboard
+            member_name: member.name,      // Matches {{member_name}} in Dashboard
+            status: status,                // Matches {{status}} in Dashboard
+            amount: tx.amount,              // Matches {{amount}} in Dashboard
+            month: tx.month,               // Matches {{month}} in Dashboard
+            time: new Date().toLocaleString() // Matches {{time}} in Dashboard
+          },
+        }),
+      });
+      
+      const result = await emailResponse.text();
+      console.log("EmailJS Server Response:", result);
     }
 
     // 4. Delete Proof from Bucket & Clear DB path [cite: 2025-12-31]
@@ -82,8 +69,7 @@ export default async function handler(req: any, res: any) {
     }
 
     return res.status(200).json({ success: true, transaction: tx });
-
   } catch (err: any) {
-    return res.status(500).json({ success: false, message: err.message || "Unknown error" });
+    return res.status(500).json({ success: false, message: err.message });
   }
 }

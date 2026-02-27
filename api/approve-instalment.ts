@@ -26,7 +26,7 @@ export default async function handler(req: any, res: any) {
 
     if (!id || !status) return res.status(400).json({ success: false, message: "Missing id or status" });
 
-    // 1. Update Status and fetch data for the email
+    // 1. Update status and fetch data
     const { data: tx, error: updateError } = await supabase
       .from("Installments")
       .update({ 
@@ -39,23 +39,24 @@ export default async function handler(req: any, res: any) {
 
     if (updateError) throw updateError;
 
-    // 2. Fetch Member Email (required for EmailJS)
+    // 2. Fetch Member Email [cite: 2025-12-31]
     const { data: member } = await supabase
       .from("members")
       .select("email, name")
       .eq("id", tx.member_id)
       .single();
 
-    // 3. Trigger EmailJS REST API [cite: 2025-12-31]
+    // 3. Trigger EmailJS REST API
     if (member?.email && process.env.EMAILJS_PUBLIC_KEY) {
       try {
-        await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        const emailResponse = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             service_id: process.env.EMAILJS_SERVICE_ID,
             template_id: process.env.EMAILJS_TEMPLATE_ID,
             user_id: process.env.EMAILJS_PUBLIC_KEY,
+            accessToken: process.env.EMAILJS_PRIVATE_KEY, // Added for backend authorization
             template_params: {
               to_email: member.email,
               user_name: member.name,
@@ -66,27 +67,23 @@ export default async function handler(req: any, res: any) {
             },
           }),
         });
+        
+        const result = await emailResponse.text();
+        console.log("EmailJS Server Response:", result);
       } catch (emailErr) {
-        console.error("EmailJS failed but status was updated:", emailErr);
+        console.error("EmailJS failed:", emailErr);
       }
     }
 
     // 4. Delete Proof from Bucket & Clear DB path [cite: 2025-12-31]
     if (tx.proofPath) {
-      // Remove from storage
       await supabase.storage.from("payment-proofs").remove([tx.proofPath]);
-      
-      // Update DB to clear the proof link as per your requirement [cite: 2025-12-31]
-      await supabase
-        .from("Installments")
-        .update({ payment_proof_url: null, proofPath: null })
-        .eq("id", id);
+      await supabase.from("Installments").update({ payment_proof_url: null, proofPath: null }).eq("id", id);
     }
 
     return res.status(200).json({ success: true, transaction: tx });
 
   } catch (err: any) {
-    console.error("Handler error:", err);
     return res.status(500).json({ success: false, message: err.message || "Unknown error" });
   }
 }

@@ -1,27 +1,45 @@
 import { createClient } from "@supabase/supabase-js";
 
 export default async function handler(req: Request) {
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ success: false, message: "Method not allowed" }), {
-      status: 405, headers: { "Content-Type": "application/json" },
+  // Handle CORS Preflight
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
     });
   }
 
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ success: false, message: "Method not allowed" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY; // Service role is preferred for inserts
+  
   if (!url || !key) {
     return new Response(JSON.stringify({ success: false, message: "Supabase credentials missing" }), {
-      status: 500, headers: { "Content-Type": "application/json" },
+      status: 500,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
   const supabase = createClient(url, key);
 
   try {
-    const { member_id, memberName, society_id, amount, payment_proof_url, proofPath, month } = await req.json();
+    const body = await req.json();
+    const { member_id, memberName, society_id, amount, payment_proof_url, proofPath, month } = body;
+
     if (!member_id || !amount || !month) {
       return new Response(JSON.stringify({ success: false, message: "Missing required fields" }), {
-        status: 400, headers: { "Content-Type": "application/json" },
+        status: 400,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       });
     }
 
@@ -40,11 +58,17 @@ export default async function handler(req: Request) {
     if (error) throw error;
 
     return new Response(JSON.stringify({ success: true }), {
-      status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      status: 200,
+      headers: { 
+        "Content-Type": "application/json", 
+        "Access-Control-Allow-Origin": "*" 
+      },
     });
   } catch (err: any) {
+    console.error("API Error:", err.message);
     return new Response(JSON.stringify({ success: false, message: err.message }), {
-      status: 500, headers: { "Content-Type": "application/json" },
+      status: 500,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 }

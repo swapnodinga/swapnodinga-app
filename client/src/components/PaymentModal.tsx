@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, ImageIcon, AlertCircle, Loader2 } from "lucide-react";
 
 interface PaymentModalProps {
-  // Updated signature to match SocietyContext submitInstalment(amount, file, month)
+  // Updated signature to match SocietyContext: (amount, file, month)
   onSubmit: (amount: number, file: File, month: string) => Promise<void>;
   userSocietyId: string; 
 }
@@ -63,18 +63,18 @@ export function PaymentModal({ onSubmit, userSocietyId }: PaymentModalProps) {
 
     setIsProcessing(true);
     try {
-      // We pass the raw File object to SocietyContext's submitInstalment
-      // This allows the Context to handle the Upload and the API call together
+      // Pass the raw File object to SocietyContext's submitInstalment
+      // The context now handles the Supabase storage upload and API call
       await onSubmit(totalAmount, file, month);
       
-      // Cleanup on success
+      // Cleanup and close on success
       setOpen(false);
       setFile(null);
       setMonth("");
       setAmount("7500");
     } catch (error: any) {
       console.error("Payment submission error:", error);
-      alert("Submission failed. Please try again.");
+      alert("Submission failed. Please check your connection and try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -135,11 +135,11 @@ export function PaymentModal({ onSubmit, userSocietyId }: PaymentModalProps) {
               className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center cursor-pointer transition-colors ${
                 file ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-emerald-300'
               }`}
-              onClick={() => document.getElementById('proof-upload')?.click()}
+              onClick={() => document.getElementById('receipt-upload')?.click()}
             >
               <input 
                 type="file" 
-                id="proof-upload" 
+                id="receipt-upload" 
                 className="hidden" 
                 onChange={(e) => setFile(e.target.files?.[0] || null)} 
                 accept="image/*" 
@@ -150,7 +150,6 @@ export function PaymentModal({ onSubmit, userSocietyId }: PaymentModalProps) {
                 <span className={`text-xs font-medium ${file ? 'text-emerald-700' : 'text-slate-500'}`}>
                   {file ? file.name : "Click to Upload Receipt"}
                 </span>
-                {file && <span className="text-[10px] text-emerald-600">File selected successfully</span>}
               </div>
             </div>
           </div>

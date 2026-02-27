@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowRight, Check, UploadCloud, X, MailCheck } from "lucide-react";
+import { ArrowRight, Check, UploadCloud, X, MailCheck, Loader2 } from "lucide-react";
 
 export default function MyPayments() {
   const { currentUser, transactions, submitInstalment } = useSociety();
@@ -16,12 +16,15 @@ export default function MyPayments() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const [year, setYear] = useState("2025");
-  const [month, setMonth] = useState("December");
+  const [year, setYear] = useState("2026");
+  const [month, setMonth] = useState("February");
   const [baseAmount, setBaseAmount] = useState(8000);
   const [file, setFile] = useState<File | null>(null);
 
-  const myTransactions = transactions.filter(t => String(t.member_id) === String(currentUser?.id));
+  const myTransactions = useMemo(() => 
+    transactions.filter(t => String(t.member_id) === String(currentUser?.id)),
+    [transactions, currentUser]
+  );
 
   const lateFine = useMemo(() => {
     const today = new Date();
@@ -32,32 +35,39 @@ export default function MyPayments() {
     const selectedMonthIdx = monthNames.indexOf(month);
     const selectedYear = parseInt(year);
 
-    if (selectedYear > currentYear) return 0;
-    if (selectedYear === currentYear && selectedMonthIdx >= currentMonthIdx) return 0;
-
-    return 1000;
+    // Fine logic: If selected date is in the past compared to current month/year
+    if (selectedYear < currentYear) return 1000;
+    if (selectedYear === currentYear && selectedMonthIdx < currentMonthIdx) return 1000;
+    
+    // Add specific day-of-month logic if needed here
+    return 0;
   }, [month, year]);
 
   const totalToPay = baseAmount + lateFine;
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return;
+    if (!file) return alert("Please upload a payment receipt.");
     
     setIsSubmitting(true);
     try {
       const billingPeriod = `${month} ${year}`;
       
-      // Removed the alert() call from here to prevent the double notification
+      // Call context function which handles Supabase Storage + API Call
       await submitInstalment(totalToPay, file, billingPeriod);
       
+      // Success flow
       setShowSuccess(true);
       setShowForm(false);
       setFile(null);
+      
+      // Auto-hide success toast
       setTimeout(() => setShowSuccess(false), 5000);
-    } catch (err) {
-      console.error("Submission failed");
+    } catch (err: any) {
+      console.error("Submission failed:", err);
+      alert("Submission failed. Please try again or check your connection.");
     } finally {
+      // This ensures the "PROCESSING..." state clears even on error
       setIsSubmitting(false);
     }
   };
@@ -66,7 +76,7 @@ export default function MyPayments() {
     <div className="p-4 md:p-6 space-y-6 relative min-h-screen">
       
       {showSuccess && (
-        <div className="fixed top-4 right-4 z-[9999] animate-in slide-in-from-top duration-500">
+        <div className="fixed top-4 right-4 z-[9999] animate-in fade-in slide-in-from-top-4 duration-300">
           <div className="bg-[#059669] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 border border-emerald-400/30">
             <MailCheck size={20}/>
             <div>
@@ -109,11 +119,10 @@ export default function MyPayments() {
                     <SelectTrigger className="rounded-xl border-slate-100 bg-slate-50/50 h-9 text-xs font-bold">
                       <SelectValue placeholder="Year" />
                     </SelectTrigger>
-                    <SelectContent position="popper" className="z-[999] bg-white border border-slate-200 shadow-xl rounded-xl">
+                    <SelectContent className="bg-white border border-slate-200 shadow-xl rounded-xl">
                       <SelectItem value="2025">2025</SelectItem>
                       <SelectItem value="2026">2026</SelectItem>
                       <SelectItem value="2027">2027</SelectItem>
-                      <SelectItem value="2028">2028</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -123,7 +132,7 @@ export default function MyPayments() {
                     <SelectTrigger className="rounded-xl border-slate-100 bg-slate-50/50 h-9 text-xs font-bold">
                       <SelectValue placeholder="Month" />
                     </SelectTrigger>
-                    <SelectContent position="popper" className="z-[999] bg-white border border-slate-200 shadow-xl rounded-xl">
+                    <SelectContent className="bg-white border border-slate-200 shadow-xl rounded-xl">
                       {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(m => (
                         <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
                       ))}
@@ -139,16 +148,16 @@ export default function MyPayments() {
 
               <div className="space-y-1">
                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Proof of Payment</label>
-                <div className="relative border-2 border-dashed border-emerald-100 rounded-xl p-3 bg-emerald-50/10 text-center hover:bg-emerald-50/30 transition-all cursor-pointer">
-                  <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                  <UploadCloud size={18} className="text-emerald-400 mx-auto mb-1"/>
+                <div className={`relative border-2 border-dashed rounded-xl p-3 text-center transition-all cursor-pointer ${file ? 'border-emerald-500 bg-emerald-50/50' : 'border-emerald-100 bg-emerald-50/10 hover:bg-emerald-50/30'}`}>
+                  <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer z-10" accept="image/*" />
+                  <UploadCloud size={18} className={`${file ? 'text-emerald-600' : 'text-emerald-400'} mx-auto mb-1`}/>
                   <p className="text-[9px] text-emerald-900 font-bold truncate px-2">{file ? file.name : "Upload receipt"}</p>
                 </div>
               </div>
 
               <div className="bg-[#f0fdf4] border border-emerald-50 rounded-2xl py-3 text-center">
                 <p className="text-emerald-600 text-[8px] font-black uppercase tracking-widest mb-0.5">
-                  Late Fine: <span className="text-emerald-500">৳{lateFine}</span>
+                  Late Fine: <span className="text-emerald-500">৳{lateFee}</span>
                 </p>
                 <h3 className="text-2xl font-black text-[#004d33] tracking-tighter">৳{totalToPay.toLocaleString()}</h3>
                 <p className="text-[#004d33]/30 text-[7px] font-bold uppercase">Total to pay</p>
@@ -158,11 +167,23 @@ export default function MyPayments() {
                 <Button 
                   onClick={handleUpload}
                   disabled={isSubmitting || !file}
-                  className="w-full bg-[#10b981] hover:bg-[#059669] text-white rounded-xl h-10 font-black text-[11px] tracking-widest shadow-lg shadow-emerald-100"
+                  className="w-full bg-[#10b981] hover:bg-[#059669] text-white rounded-xl h-10 font-black text-[11px] tracking-widest shadow-lg shadow-emerald-100 disabled:opacity-70"
                 >
-                  {isSubmitting ? "PROCESSING..." : "SUBMIT TO VERIFY"}
+                  {isSubmitting ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 size={14} className="animate-spin" />
+                      PROCESSING...
+                    </span>
+                  ) : "SUBMIT TO VERIFY"}
                 </Button>
-                <button onClick={() => setShowForm(false)} className="w-full text-slate-400 text-[8px] font-black uppercase tracking-widest">Cancel</button>
+                <button 
+                  type="button"
+                  onClick={() => setShowForm(false)} 
+                  disabled={isSubmitting}
+                  className="w-full text-slate-400 text-[8px] font-black uppercase tracking-widest hover:text-slate-600 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
               </div>
             </CardContent>
           </Card>

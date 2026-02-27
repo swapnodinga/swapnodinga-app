@@ -1,64 +1,54 @@
 import { createClient } from "@supabase/supabase-js";
 
-export default async function handler(req: Request) {
-  const corsHeaders = {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  };
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
 
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
-  }
+export default async function handler(req: any, res: any) {
+  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
 
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ success: false, message: "Method not allowed" }), {
-      status: 405,
-      headers: corsHeaders,
-    });
-  }
-
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
-  if (!url || !key) {
-    return new Response(JSON.stringify({ success: false, message: "Supabase credentials missing" }), {
-      status: 500,
-      headers: corsHeaders,
-    });
-  }
-
-  const supabase = createClient(url, key);
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ success: false, message: "Method not allowed" });
 
   try {
-    const { id, status } = await req.json();
+    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !key) {
+      console.error("Missing env vars:", { url: !!url, key: !!key });
+      return res.status(500).json({ success: false, message: "Server configuration error" });
+    }
+
+    const supabase = createClient(url, key);
+
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const { id, status } = body || {};
+
     if (!id || !status) {
-      return new Response(JSON.stringify({ success: false, message: "Missing id or status" }), {
-        status: 400,
-        headers: corsHeaders,
-      });
+      return res.status(400).json({ success: false, message: "Missing id or status" });
+    }
+
+    if (!["Approved", "Rejected"].includes(status)) {
+      return res.status(400).json({ success: false, message: "Invalid status value" });
     }
 
     const { data, error } = await supabase
       .from("Installments")
-      .update({
-        status: status,
-        approved_at: status === "Approved" ? new Date().toISOString() : null,
-      })
+      .update({ status, approved_at: status === "Approved" ? new Date().toISOString() : null })
       .eq("id", id)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase error:", error);
+      return res.status(500).json({ success: false, message: error.message });
+    }
 
-    return new Response(JSON.stringify({ success: true, transaction: data }), {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return res.status(200).json({ success: true, transaction: data });
   } catch (err: any) {
-    return new Response(JSON.stringify({ success: false, message: err.message }), {
-      status: 500,
-      headers: corsHeaders,
-    });
+    console.error("Handler error:", err);
+    return res.status(500).json({ success: false, message: err.message || "Unknown error" });
   }
 }

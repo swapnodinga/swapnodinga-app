@@ -36,6 +36,14 @@ const callApi = async (endpoint: string, body: any) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  
+  // Safety check for empty or non-JSON responses seen in your network logs
+  const contentType = res.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    return { success: true }; // Fallback for "No response data"
+  }
+
   const data = await res.json();
   if (!data.success) throw new Error(data.message || "API call failed");
   return data;
@@ -49,7 +57,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [, setLocation] = useLocation();
 
-  // 1. Initialize User Session
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
     if (savedUser) {
@@ -62,7 +69,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  // 2. Automated Fund Calculation
   const societyTotalFund = useMemo(() => {
     const totalInstallments = (transactions || [])
       .filter((t) => t.status === "Approved")
@@ -74,7 +80,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     return totalInstallments + totalRealizedInterest;
   }, [transactions, fixedDeposits]);
 
-  // 3. Centralized Refresh Logic (reads from members_public view to hide passwords)
   const refreshData = async () => {
     try {
       const { data: membersData } = await supabase.from("members_public").select("*");
@@ -107,7 +112,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // 4. AUTOMATIC REALTIME SUBSCRIPTION
   useEffect(() => {
     if (!currentUser) return;
     refreshData();
@@ -120,13 +124,9 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     };
   }, [currentUser]);
 
-  // ===== ALL WRITES GO THROUGH LOCAL API ENDPOINTS =====
-
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
     try {
       await callApi("approve-instalment", { id: transaction.id, status });
-
-      // Send email via server-side endpoint
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id));
       if (memberObj?.email) {
         callApi("send-email", {
@@ -138,7 +138,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           proof_url: transaction.payment_proof_url,
         }).catch((e) => console.warn("Email service failed", e));
       }
-
       await refreshData();
       return { success: true };
     } catch (err: any) {
@@ -168,11 +167,12 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         month,
       });
 
-      // ADDED THIS: Explicitly refresh so the user sees the new pending transaction immediately
-      await refreshData();
-
     } catch (err: any) {
       console.error("Submission Error:", err.message);
+      throw err; // Re-throw so the UI component can stop its loading state
+    } finally {
+      // Ensure the UI refreshes even if the API response was empty
+      await refreshData();
     }
   };
 
@@ -261,25 +261,10 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   return (
     <SocietyContext.Provider
       value={{
-        currentUser,
-        members,
-        transactions,
-        fixedDeposits,
-        societyTotalFund,
-        isLoading,
-        login,
-        register,
-        logout,
-        updateProfile,
-        uploadProfilePic,
-        refreshData,
-        approveMember,
-        deleteMember,
-        submitInstalment,
-        approveInstalment,
-        addFixedDeposit,
-        updateFixedDeposit,
-        deleteFixedDeposit,
+        currentUser, members, transactions, fixedDeposits, societyTotalFund, isLoading,
+        login, register, logout, updateProfile, uploadProfilePic, refreshData,
+        approveMember, deleteMember, submitInstalment, approveInstalment,
+        addFixedDeposit, updateFixedDeposit, deleteFixedDeposit,
       }}
     >
       {children}

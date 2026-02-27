@@ -206,9 +206,10 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     await refreshData()
   }
 
+  // ✅ FIX: Changed "auth-login" → "login" to match routes.ts
   const login = async (email: string, pass: string) => {
     try {
-      const data = await callApi("auth-login", { email, password: pass })
+      const data = await callApi("login", { email, password: pass })
       if (data?.success && data?.user) {
         setCurrentUser(data.user)
         localStorage.setItem("user", JSON.stringify(data.user))
@@ -227,12 +228,14 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setLocation("/")
   }
 
+  // ✅ FIX: Changed "auth-register" → "register" to match routes.ts
   const register = async (userData: any) => {
     try {
-      const data = await callApi("auth-register", {
+      const data = await callApi("register", {
         full_name: userData.full_name,
         email: userData.email,
         password: userData.password,
+        status: "pending",
       })
       return data?.success === true
     } catch (err) {

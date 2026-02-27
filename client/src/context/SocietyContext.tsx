@@ -30,14 +30,42 @@ interface SocietyContextType {
 const SocietyContext = createContext<SocietyContextType | undefined>(undefined)
 
 const callApi = async (endpoint: string, body: any) => {
-  const res = await fetch(`/api/${endpoint}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  })
-  const data = await res.json()
-  if (!data.success) throw new Error(data.message || "API call failed")
-  return data
+  const candidates = [`/api/${endpoint}`, `/local-api/${endpoint}`]
+  let lastError: any = null
+
+  for (const url of candidates) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15000)
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+
+      const text = await res.text()
+      let data: any = {}
+      try {
+        data = text ? JSON.parse(text) : {}
+      } catch {
+        throw new Error(`Invalid JSON response from ${url}`)
+      }
+
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.message || data?.error || `Request failed (${res.status})`)
+      }
+
+      return data
+    } catch (err) {
+      clearTimeout(timeout)
+      lastError = err
+    }
+  }
+
+  throw lastError || new Error("API call failed")
 }
 
 export function SocietyProvider({ children }: { children: React.ReactNode }) {
@@ -51,14 +79,19 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const savedUser = localStorage.getItem("user")
     if (savedUser) {
-      try { setCurrentUser(JSON.parse(savedUser)) } catch (e) { console.error("Failed to parse user session") }
+      try { setCurrentUser(JSON.parse(savedUser)) } catch { console.error("Failed to parse user session") }
     }
     setIsLoading(false)
   }, [])
 
   const societyTotalFund = useMemo(() => {
-    const totalInstallments = (transactions || []).filter((t) => t.status === "Approved").reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
-    const totalRealizedInterest = (fixedDeposits || []).reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0)
+    const totalInstallments = (transactions || [])
+      .filter((t) => t.status === "Approved")
+      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
+
+    const totalRealizedInterest = (fixedDeposits || [])
+      .reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0)
+
     return totalInstallments + totalRealizedInterest
   }, [transactions, fixedDeposits])
 
@@ -68,12 +101,10 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const { data: transData } = await supabase.from("Installments").select("*").order("created_at", { ascending: false })
       const { data: fdData } = await supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
 
-      const nameMap: { [key: string]: string } = {}
-      if (membersData) {
-        membersData.forEach((m: any) => {
-          nameMap[String(m.id)] = m.full_name || m.memberName || m.member_name || "No Name"
-        })
-      }
+      const nameMap: Record<string, string> = {}
+      ;(membersData || []).forEach((m: any) => {
+        nameMap[String(m.id)] = m.full_name || m.memberName || m.member_name || "No Name"
+      })
 
       const enrichedTransData = (transData || []).map((trans: any) => ({
         ...trans,
@@ -95,12 +126,14 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       .channel("realtime-updates")
       .on("postgres_changes", { event: "*", schema: "public", table: "Installments" }, () => refreshData())
       .subscribe()
+
     return () => { supabase.removeChannel(channel) }
   }, [currentUser])
 
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
     try {
       await callApi("approve-instalment", { id: transaction.id, status })
+
       const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
       if (memberObj?.email) {
         callApi("send-email", {
@@ -112,6 +145,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
           proof_url: transaction.payment_proof_url,
         }).catch((e) => console.warn("Email service failed", e))
       }
+
       await refreshData()
       return { success: true }
     } catch (err: any) {
@@ -125,9 +159,12 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       if (!currentUser) throw new Error("No user logged in")
       const fileExt = file.name.split(".").pop()
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`
+
       const { error: uploadError } = await supabase.storage.from("payments").upload(fileName, file)
       if (uploadError) throw uploadError
+
       const { data: urlData } = supabase.storage.from("payments").getPublicUrl(fileName)
+
       await callApi("submit-instalment", {
         member_id: currentUser.id,
         memberName: currentUser.full_name || currentUser.memberName,

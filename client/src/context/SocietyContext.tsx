@@ -29,8 +29,16 @@ interface SocietyContextType {
 
 const SocietyContext = createContext<SocietyContextType | undefined>(undefined)
 
+// Handles mixed backend route naming across environments
+const endpointAliases: Record<string, string[]> = {
+  login: ["auth-login", "login"],
+  register: ["auth-register", "register"],
+}
+
 const callApi = async (endpoint: string, body: any) => {
-  const candidates = [`/api/${endpoint}`, `/local-api/${endpoint}`]
+  const aliases = endpointAliases[endpoint] ?? [endpoint]
+  const candidates = aliases.flatMap((name) => [`/api/${name}`, `/local-api/${name}`])
+
   let lastError: any = null
 
   for (const url of candidates) {
@@ -44,18 +52,25 @@ const callApi = async (endpoint: string, body: any) => {
         body: JSON.stringify(body),
         signal: controller.signal,
       })
+
       clearTimeout(timeout)
 
-      const text = await res.text()
+      const contentType = res.headers.get("content-type") || ""
       let data: any = {}
-      try {
-        data = text ? JSON.parse(text) : {}
-      } catch {
-        throw new Error(`Invalid JSON response from ${url}`)
+
+      if (contentType.includes("application/json")) {
+        data = await res.json()
+      } else {
+        const text = await res.text()
+        data = { message: text }
       }
 
       if (!res.ok || data?.success === false) {
-        throw new Error(data?.message || data?.error || `Request failed (${res.status})`)
+        const msg =
+          data?.message ||
+          data?.error ||
+          `Request failed (${res.status}) at ${url}`
+        throw new Error(msg)
       }
 
       return data
@@ -79,7 +94,11 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const savedUser = localStorage.getItem("user")
     if (savedUser) {
-      try { setCurrentUser(JSON.parse(savedUser)) } catch { console.error("Failed to parse user session") }
+      try {
+        setCurrentUser(JSON.parse(savedUser))
+      } catch {
+        console.error("Failed to parse user session")
+      }
     }
     setIsLoading(false)
   }, [])
@@ -89,8 +108,10 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       .filter((t) => t.status === "Approved")
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
 
-    const totalRealizedInterest = (fixedDeposits || [])
-      .reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0)
+    const totalRealizedInterest = (fixedDeposits || []).reduce(
+      (acc, curr) => acc + (Number(curr.realized_interest) || 0),
+      0,
+    )
 
     return totalInstallments + totalRealizedInterest
   }, [transactions, fixedDeposits])
@@ -98,8 +119,14 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const refreshData = async () => {
     try {
       const { data: membersData } = await supabase.from("members_public").select("*")
-      const { data: transData } = await supabase.from("Installments").select("*").order("created_at", { ascending: false })
-      const { data: fdData } = await supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
+      const { data: transData } = await supabase
+        .from("Installments")
+        .select("*")
+        .order("created_at", { ascending: false })
+      const { data: fdData } = await supabase
+        .from("fixed_deposits")
+        .select("*")
+        .order("start_date", { ascending: false })
 
       const nameMap: Record<string, string> = {}
       ;(membersData || []).forEach((m: any) => {
@@ -122,12 +149,15 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!currentUser) return
     refreshData()
+
     const channel = supabase
       .channel("realtime-updates")
       .on("postgres_changes", { event: "*", schema: "public", table: "Installments" }, () => refreshData())
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [currentUser])
 
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
@@ -206,7 +236,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     await refreshData()
   }
 
-  // ✅ FIX: Changed "auth-login" → "login" to match routes.ts
   const login = async (email: string, pass: string) => {
     try {
       const data = await callApi("login", { email, password: pass })
@@ -228,7 +257,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setLocation("/")
   }
 
-  // ✅ FIX: Changed "auth-register" → "register" to match routes.ts
   const register = async (userData: any) => {
     try {
       const data = await callApi("register", {
@@ -267,10 +295,25 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   return (
     <SocietyContext.Provider
       value={{
-        currentUser, members, transactions, fixedDeposits, societyTotalFund, isLoading,
-        login, register, logout, updateProfile, uploadProfilePic, refreshData,
-        approveMember, deleteMember, submitInstalment, approveInstalment,
-        addFixedDeposit, updateFixedDeposit, deleteFixedDeposit,
+        currentUser,
+        members,
+        transactions,
+        fixedDeposits,
+        societyTotalFund,
+        isLoading,
+        login,
+        register,
+        logout,
+        updateProfile,
+        uploadProfilePic,
+        refreshData,
+        approveMember,
+        deleteMember,
+        submitInstalment,
+        approveInstalment,
+        addFixedDeposit,
+        updateFixedDeposit,
+        deleteFixedDeposit,
       }}
     >
       {children}

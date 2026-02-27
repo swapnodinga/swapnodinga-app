@@ -35,11 +35,9 @@ export default function MyPayments() {
     const selectedMonthIdx = monthNames.indexOf(month);
     const selectedYear = parseInt(year);
 
-    // Fine logic: If selected date is in the past compared to current month/year
     if (selectedYear < currentYear) return 1000;
     if (selectedYear === currentYear && selectedMonthIdx < currentMonthIdx) return 1000;
     
-    // Add specific day-of-month logic if needed here
     return 0;
   }, [month, year]);
 
@@ -52,22 +50,17 @@ export default function MyPayments() {
     setIsSubmitting(true);
     try {
       const billingPeriod = `${month} ${year}`;
-      
-      // Call context function which handles Supabase Storage + API Call
       await submitInstalment(totalToPay, file, billingPeriod);
       
-      // Success flow
       setShowSuccess(true);
       setShowForm(false);
       setFile(null);
       
-      // Auto-hide success toast
       setTimeout(() => setShowSuccess(false), 5000);
     } catch (err: any) {
       console.error("Submission failed:", err);
-      alert("Submission failed. Please try again or check your connection.");
+      alert("Submission failed. Please try again.");
     } finally {
-      // This ensures the "PROCESSING..." state clears even on error
       setIsSubmitting(false);
     }
   };
@@ -90,6 +83,7 @@ export default function MyPayments() {
         </div>
       )}
 
+      {/* Hero Section - This toggles the form state */}
       {!showForm && (
         <div className="bg-[#002b1b] rounded-2xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-4 border border-emerald-900/50 shadow-lg">
           <div className="space-y-1 text-center md:text-left">
@@ -108,6 +102,7 @@ export default function MyPayments() {
         </div>
       )}
 
+      {/* Inline Form - This replaces the deleted Modal functionality */}
       {showForm && (
         <div className="max-w-md mx-auto py-2 animate-in zoom-in-95 duration-200 relative z-40">
           <Card className="border-none shadow-2xl rounded-[32px] bg-white overflow-visible">
@@ -157,7 +152,7 @@ export default function MyPayments() {
 
               <div className="bg-[#f0fdf4] border border-emerald-50 rounded-2xl py-3 text-center">
                 <p className="text-emerald-600 text-[8px] font-black uppercase tracking-widest mb-0.5">
-                  Late Fine: <span className="text-emerald-500">৳{lateFee}</span>
+                  Late Fine: <span className="text-emerald-500">৳{lateFine}</span>
                 </p>
                 <h3 className="text-2xl font-black text-[#004d33] tracking-tighter">৳{totalToPay.toLocaleString()}</h3>
                 <p className="text-[#004d33]/30 text-[7px] font-bold uppercase">Total to pay</p>
@@ -180,7 +175,7 @@ export default function MyPayments() {
                   type="button"
                   onClick={() => setShowForm(false)} 
                   disabled={isSubmitting}
-                  className="w-full text-slate-400 text-[8px] font-black uppercase tracking-widest hover:text-slate-600 disabled:opacity-50"
+                  className="w-full text-slate-400 text-[8px] font-black uppercase tracking-widest hover:text-slate-600"
                 >
                   Cancel
                 </button>

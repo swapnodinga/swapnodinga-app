@@ -1,24 +1,20 @@
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 
-export default async function handler(req: Request) {
-  // 1. Handle CORS Preflight
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // 1. Set CORS headers to allow frontend communication
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // Handle Preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-      },
-    });
+    return res.status(200).end();
   }
 
   // 2. Strict Method Check
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ success: false, message: "Method not allowed" }), {
-      status: 405,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-    });
+    return res.status(405).json({ success: false, message: "Method not allowed" });
   }
 
   try {
@@ -27,25 +23,21 @@ export default async function handler(req: Request) {
     
     if (!url || !key) {
       console.error("Missing Environment Variables");
-      return new Response(JSON.stringify({ success: false, message: "Server configuration error" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-      });
+      return res.status(500).json({ success: false, message: "Server configuration error" });
     }
 
     const supabase = createClient(url, key);
-    const body = await req.json();
+
+    // 3. Logic Fix: Robust body parsing for Vercel
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const { member_id, memberName, society_id, amount, payment_proof_url, proofPath, month } = body;
 
-    // 3. Validation
+    // 4. Validation
     if (!member_id || !amount || !month) {
-      return new Response(JSON.stringify({ success: false, message: "Missing required fields" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-      });
+      return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
-    // 4. Database Insert
+    // 5. Database Insert
     const { error } = await supabase.from("Installments").insert([{
       member_id,
       memberName,
@@ -54,32 +46,20 @@ export default async function handler(req: Request) {
       payment_proof_url,
       proofPath,
       month,
-      status: "Pending",
+      status: "Pending", // Member submitted, waiting for admin approval [cite: 2025-12-31]
       created_at: new Date().toISOString(),
     }]);
 
     if (error) {
       console.error("Supabase Insert Error:", error.message);
-      return new Response(JSON.stringify({ success: false, message: error.message }), {
-        status: 500,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-      });
+      return res.status(500).json({ success: false, message: error.message });
     }
 
-    // 5. SUCCESS RESPONSE (This clears the PROCESSING state)
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 
-        "Content-Type": "application/json", 
-        "Access-Control-Allow-Origin": "*" 
-      },
-    });
+    // 6. SUCCESS RESPONSE (This is what clears the "PROCESSING..." state in UI)
+    return res.status(200).json({ success: true });
 
   } catch (err: any) {
     console.error("Global API Error:", err.message);
-    return new Response(JSON.stringify({ success: false, message: err.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-    });
+    return res.status(500).json({ success: false, message: err.message });
   }
 }

@@ -38,14 +38,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq("id", tx.member_id)
       .single();
 
-    console.log("Found member email:", member?.email); // Check Vercel logs for this!
-
-    // 3. Trigger External Send Email API
+    // 3. Trigger External Send Email API with proof_url [cite: 2025-12-31]
     if (member?.email) {
       const protocol = req.headers["x-forwarded-proto"] || "http";
       const host = req.headers.host;
       
-      // We use internal fetch to keep logic separate as requested
       await fetch(`${protocol}://${host}/api/send-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -54,7 +51,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           member_email: member.email,
           amount: tx.amount,
           month: tx.month,
-          status: status
+          status: status,
+          proof_url: tx.payment_proof_url // Added this [cite: 2025-12-31]
         }),
       });
     }

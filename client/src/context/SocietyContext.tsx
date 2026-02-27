@@ -29,7 +29,6 @@ interface SocietyContextType {
 
 const SocietyContext = createContext<SocietyContextType | undefined>(undefined)
 
-// Handles mixed backend route naming across environments
 const endpointAliases: Record<string, string[]> = {
   login: ["auth-login", "login"],
   register: ["auth-register", "register"],
@@ -38,7 +37,6 @@ const endpointAliases: Record<string, string[]> = {
 const callApi = async (endpoint: string, body: any) => {
   const aliases = endpointAliases[endpoint] ?? [endpoint]
   const candidates = aliases.flatMap((name) => [`/api/${name}`, `/local-api/${name}`])
-
   let lastError: any = null
 
   for (const url of candidates) {
@@ -54,7 +52,6 @@ const callApi = async (endpoint: string, body: any) => {
       })
 
       clearTimeout(timeout)
-
       const contentType = res.headers.get("content-type") || ""
       let data: any = {}
 
@@ -66,10 +63,7 @@ const callApi = async (endpoint: string, body: any) => {
       }
 
       if (!res.ok || data?.success === false) {
-        const msg =
-          data?.message ||
-          data?.error ||
-          `Request failed (${res.status}) at ${url}`
+        const msg = data?.message || data?.error || `Request failed (${res.status}) at ${url}`
         throw new Error(msg)
       }
 
@@ -190,11 +184,13 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       const fileExt = file.name.split(".").pop()
       const fileName = `proof-${currentUser.id}-${Date.now()}.${fileExt}`
 
+      // 1. Upload to storage
       const { error: uploadError } = await supabase.storage.from("payments").upload(fileName, file)
       if (uploadError) throw uploadError
 
       const { data: urlData } = supabase.storage.from("payments").getPublicUrl(fileName)
 
+      // 2. Call the backend API
       await callApi("submit-instalment", {
         member_id: currentUser.id,
         memberName: currentUser.full_name || currentUser.memberName,
@@ -204,6 +200,10 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         proofPath: fileName,
         month,
       })
+
+      // 3. CRITICAL: Trigger a refresh so the new record appears immediately
+      await refreshData()
+      
     } catch (err: any) {
       console.error("Submission Error:", err.message)
     }

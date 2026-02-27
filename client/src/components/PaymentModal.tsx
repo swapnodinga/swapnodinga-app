@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { 
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger 
@@ -6,11 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, ImageIcon, AlertCircle } from "lucide-react";
-import { supabase } from "@/lib/supabase"; 
+import { Upload, ImageIcon, AlertCircle, Loader2 } from "lucide-react";
 
 interface PaymentModalProps {
-  onSubmit: (amount: number, proofUrl: string, month: string, lateFee: number, societyId: string) => void;
+  // Updated signature to match SocietyContext submitInstalment(amount, file, month)
+  onSubmit: (amount: number, file: File, month: string) => Promise<void>;
   userSocietyId: string; 
 }
 
@@ -20,7 +22,7 @@ export function PaymentModal({ onSubmit, userSocietyId }: PaymentModalProps) {
   const [month, setMonth] = useState(""); 
   const [lateFee, setLateFee] = useState(0);
   const [file, setFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const monthsList = Array.from({ length: 12 }, (_, i) => {
     const d = new Date();
@@ -59,38 +61,22 @@ export function PaymentModal({ onSubmit, userSocietyId }: PaymentModalProps) {
     e.preventDefault(); 
     if (!month || !file) return alert("Please select a month and upload your receipt.");
 
-    setIsUploading(true);
+    setIsProcessing(true);
     try {
-      // 3. CORRECTED UPLOAD PATH: Removing 'receipts/' folder prefix
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${userSocietyId}-${Date.now()}.${fileExt}`;
+      // We pass the raw File object to SocietyContext's submitInstalment
+      // This allows the Context to handle the Upload and the API call together
+      await onSubmit(totalAmount, file, month);
       
-      const { error: uploadError } = await supabase.storage
-        .from('payments')
-        .upload(fileName, file, { 
-          cacheControl: '3600',
-          upsert: true 
-        });
-
-      if (uploadError) throw uploadError;
-
-      // GET PUBLIC URL: Must match the path used in .upload()
-      const { data: { publicUrl } } = supabase.storage
-        .from('payments')
-        .getPublicUrl(fileName);
-      
-      // 4. SUBMIT TRANSACTION
-      await onSubmit(totalAmount, publicUrl, month, lateFee, userSocietyId);
-      
+      // Cleanup on success
       setOpen(false);
       setFile(null);
       setMonth("");
+      setAmount("7500");
     } catch (error: any) {
-      // Clearer error reporting for debugging
       console.error("Payment submission error:", error);
-      alert("Submission failed: " + error.message);
+      alert("Submission failed. Please try again.");
     } finally {
-      setIsUploading(false);
+      setIsProcessing(false);
     }
   };
 
@@ -101,27 +87,38 @@ export function PaymentModal({ onSubmit, userSocietyId }: PaymentModalProps) {
           <Upload className="w-4 h-4 mr-2" /> Submit Instalment
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] bg-white">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Monthly Instalment</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-emerald-900">Monthly Instalment</DialogTitle>
             <DialogDescription>
               Submit payment for <strong>{userSocietyId}</strong>.
               Late fees apply after the 1st and 5th.
             </DialogDescription>
           </DialogHeader>
+          
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Amount (৳)</Label>
-                <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+                <Label className="text-slate-600 font-medium">Amount (৳)</Label>
+                <Input 
+                  type="number" 
+                  value={amount} 
+                  onChange={(e) => setAmount(e.target.value)} 
+                  required 
+                  className="border-slate-200 focus:border-emerald-500"
+                />
               </div>
               <div className="space-y-2">
-                <Label>Month</Label>
+                <Label className="text-slate-600 font-medium">Month</Label>
                 <Select value={month} onValueChange={setMonth} required>
-                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectTrigger className="border-slate-200">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
                   <SelectContent className="bg-white">
-                    {monthsList.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    {monthsList.map((m) => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -130,21 +127,48 @@ export function PaymentModal({ onSubmit, userSocietyId }: PaymentModalProps) {
             {lateFee > 0 && (
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-md flex items-center gap-2 text-amber-800 text-sm">
                 <AlertCircle className="w-4 h-4" />
-                <span>Late Fee Applied: ৳{lateFee}</span>
+                <span>Late Fee Applied: <strong>৳{lateFee}</strong></span>
               </div>
             )}
 
-            <div className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center cursor-pointer ${file ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200'}`}>
-              <input type="file" id="proof" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} accept="image/*" required />
-              <label htmlFor="proof" className="cursor-pointer flex flex-col items-center gap-2">
-                <ImageIcon className="w-8 h-8 text-slate-400" />
-                <span className="text-xs text-slate-500">{file ? file.name : "Upload Receipt"}</span>
-              </label>
+            <div 
+              className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center cursor-pointer transition-colors ${
+                file ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-emerald-300'
+              }`}
+              onClick={() => document.getElementById('proof-upload')?.click()}
+            >
+              <input 
+                type="file" 
+                id="proof-upload" 
+                className="hidden" 
+                onChange={(e) => setFile(e.target.files?.[0] || null)} 
+                accept="image/*" 
+                required 
+              />
+              <div className="flex flex-col items-center gap-2">
+                <ImageIcon className={`w-8 h-8 ${file ? 'text-emerald-500' : 'text-slate-400'}`} />
+                <span className={`text-xs font-medium ${file ? 'text-emerald-700' : 'text-slate-500'}`}>
+                  {file ? file.name : "Click to Upload Receipt"}
+                </span>
+                {file && <span className="text-[10px] text-emerald-600">File selected successfully</span>}
+              </div>
             </div>
           </div>
+
           <DialogFooter>
-            <Button type="submit" className="w-full bg-emerald-900 text-white" disabled={isUploading}>
-              {isUploading ? "Submitting..." : `Pay ৳${totalAmount}`}
+            <Button 
+              type="submit" 
+              className="w-full bg-emerald-900 hover:bg-emerald-950 text-white h-11" 
+              disabled={isProcessing}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  PROCESSING...
+                </>
+              ) : (
+                `Pay ৳${totalAmount}`
+              )}
             </Button>
           </DialogFooter>
         </form>

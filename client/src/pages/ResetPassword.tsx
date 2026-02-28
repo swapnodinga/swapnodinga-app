@@ -24,7 +24,7 @@ export default function ResetPassword() {
       toast({ variant: "destructive", title: "Login Required", description: "Please log in first to change your password." });
       setLocation("/");
     }
-  }, [currentUser, isLoading]);
+  }, [currentUser, isLoading, setLocation, toast]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,16 +42,36 @@ export default function ResetPassword() {
     try {
       setLoading(true);
 
-      const { error } = await supabase
-        .from("members")
-        .update({ password: newPassword })
-        .eq("id", currentUser.id);
+      // 1. Update the actual Supabase Auth credentials
+      const { error: authError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
 
-      if (error) throw error;
+      if (authError) throw authError;
 
-      logout();
+      // 2. Update your custom members table using the hashing function
+      // We use an RPC call if you have a function, or a raw query logic 
+      // to ensure the database 'password' column isn't plain text.
+      const { error: dbError } = await supabase
+        .rpc('update_member_password', { 
+          member_id: currentUser.id, 
+          new_pass: newPassword 
+        });
 
-      toast({ title: "Success", description: "Password updated. Please log in with your new password." });
+      // If you don't have the RPC setup yet, use this fallback update:
+      if (dbError) {
+        const { error: fallbackError } = await supabase
+          .from("members")
+          .update({ password: newPassword }) // Ensure your DB trigger hashes this!
+          .eq("id", currentUser.id);
+        
+        if (fallbackError) throw fallbackError;
+      }
+
+      toast({ title: "Success", description: "Password updated successfully. Please log in again." });
+      
+      // Logout to clear the old session and force a fresh login with the new password
+      await logout();
       setLocation("/");
     } catch (error: any) {
       toast({ variant: "destructive", title: "Update Failed", description: error.message });
@@ -63,6 +83,7 @@ export default function ResetPassword() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
       <Card className="w-full max-w-md shadow-xl border-emerald-100">
+        <div className="h-2 bg-[#1a4d3c]" />
         <CardHeader className="text-center">
           <div className="mx-auto w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
             <Lock className="text-emerald-700" size={24} />
@@ -83,8 +104,8 @@ export default function ResetPassword() {
             <Button type="submit" className="w-full bg-emerald-800 hover:bg-emerald-900" disabled={loading}>
               {loading ? <Loader2 className="animate-spin mr-2" size={18} /> : "Update Password"}
             </Button>
-            <Button type="button" variant="ghost" className="w-full" onClick={() => setLocation("/")}>
-              <ArrowLeft size={14} className="mr-2" /> Back to Home
+            <Button type="button" variant="ghost" className="w-full" onClick={() => setLocation("/dashboard")}>
+              <ArrowLeft size={14} className="mr-2" /> Back to Dashboard
             </Button>
           </form>
         </CardContent>

@@ -37,11 +37,10 @@ const callApi = async (endpoint: string, body: any) => {
     body: JSON.stringify(body),
   });
   
-  // Safety check for empty or non-JSON responses seen in your network logs
   const contentType = res.headers.get("content-type");
   if (!contentType || !contentType.includes("application/json")) {
     if (!res.ok) throw new Error(`Server error: ${res.status}`);
-    return { success: true }; // Fallback for "No response data"
+    return { success: true };
   }
 
   const data = await res.json();
@@ -62,8 +61,9 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (savedUser) {
       try {
         const parsed = JSON.parse(savedUser);
-        // Ensure ID is a valid string/UUID to prevent RPC errors
-        if (parsed && typeof parsed.id === 'string') {
+        // Safety check: Only set user if the ID is a valid UUID string
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (parsed && uuidRegex.test(parsed.id)) {
           setCurrentUser(parsed);
         } else {
           localStorage.removeItem("user");
@@ -212,13 +212,12 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await callApi("auth-login", { email, password: pass });
       if (data?.success && data?.user) {
-        // Force logout of any existing Supabase Auth session to sync with custom login
+        // Essential: Clear potential Supabase Auth session conflicts
         await supabase.auth.signOut();
         
-        const userWithId = { ...data.user, id: String(data.user.id) };
-        setCurrentUser(userWithId);
-        localStorage.setItem("user", JSON.stringify(userWithId));
-        return { success: true, user: userWithId };
+        setCurrentUser(data.user);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        return { success: true, user: data.user };
       }
       return false;
     } catch (err) {

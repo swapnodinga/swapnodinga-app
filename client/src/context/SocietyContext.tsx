@@ -29,7 +29,6 @@ interface SocietyContextType {
 
 const SocietyContext = createContext<SocietyContextType | undefined>(undefined);
 
-// Helper: call local API endpoints (all writes bypass RLS via service role key)
 const callApi = async (endpoint: string, body: any) => {
   const res = await fetch(`/api/${endpoint}`, {
     method: "POST",
@@ -61,7 +60,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (savedUser) {
       try {
         const parsed = JSON.parse(savedUser);
-        // Safety check: Only set user if the ID is a valid UUID string
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         if (parsed && uuidRegex.test(parsed.id)) {
           setCurrentUser(parsed);
@@ -88,31 +86,30 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = async () => {
     try {
-      const { data: membersData } = await supabase.from("members_public").select("*");
-      const { data: transData } = await supabase
-        .from("Installments")
-        .select("*")
-        .order("created_at", { ascending: false });
-      const { data: fdData } = await supabase
-        .from("fixed_deposits")
-        .select("*")
-        .order("start_date", { ascending: false });
+      // PERFORMANCE FIX: Run all queries in parallel
+      const [membersRes, transRes, fdRes] = await Promise.all([
+        supabase.from("members_public").select("*"),
+        supabase.from("Installments").select("*").order("created_at", { ascending: false }),
+        supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
+      ]);
+
+      const membersData = membersRes.data || [];
+      const transData = transRes.data || [];
+      const fdData = fdRes.data || [];
 
       const nameMap: { [key: string]: string } = {};
-      if (membersData) {
-        membersData.forEach((m: any) => {
-          nameMap[String(m.id)] = m.full_name || m.memberName || m.member_name || "No Name";
-        });
-      }
+      membersData.forEach((m: any) => {
+        nameMap[String(m.id)] = m.full_name || m.memberName || m.member_name || "No Name";
+      });
 
-      const enrichedTransData = (transData || []).map((trans: any) => ({
+      const enrichedTransData = transData.map((trans: any) => ({
         ...trans,
         memberName: nameMap[String(trans.member_id)] || trans.memberName || `Member #${trans.member_id}`,
       }));
 
-      setMembers(membersData || []);
+      setMembers(membersData);
       setTransactions(enrichedTransData);
-      setFixedDeposits(fdData || []);
+      setFixedDeposits(fdData);
     } catch (err) {
       console.error("[SocietyContext] Refresh failed:", err);
     }
@@ -212,9 +209,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await callApi("auth-login", { email, password: pass });
       if (data?.success && data?.user) {
-        // Essential: Clear potential Supabase Auth session conflicts
         await supabase.auth.signOut();
-        
         setCurrentUser(data.user);
         localStorage.setItem("user", JSON.stringify(data.user));
         return { success: true, user: data.user };

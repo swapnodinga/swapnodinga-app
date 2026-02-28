@@ -20,19 +20,23 @@ export default function ResetPassword() {
   const { currentUser, logout, isLoading } = useSociety();
 
   useEffect(() => {
-    if (!isLoading && !currentUser) {
-      toast({ variant: "destructive", title: "Login Required", description: "Please log in first to change your password." });
+    // Check if we are coming from an email recovery link
+    const isRecovery = window.location.hash.includes('type=recovery') || 
+                       window.location.search.includes('type=recovery');
+
+    // If not loading, not logged in, AND not a recovery link, then redirect
+    if (!isLoading && !currentUser && !isRecovery) {
+      toast({ 
+        variant: "destructive", 
+        title: "Login Required", 
+        description: "Please log in or use a valid reset link." 
+      });
       setLocation("/");
     }
   }, [currentUser, isLoading, setLocation, toast]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Critical Check: Ensure we have a valid UUID from the current user
-    if (!currentUser || !currentUser.id) {
-      return toast({ variant: "destructive", title: "Session Error", description: "User ID not found. Please log in again." });
-    }
 
     if (newPassword.length < 6) {
       return toast({ variant: "destructive", title: "Weak Password", description: "Minimum 6 characters required." });
@@ -45,30 +49,36 @@ export default function ResetPassword() {
     try {
       setLoading(true);
 
-      // 1. Update your custom members table using the secure RPC hashing function
-      // We pass the currentUser.id directly to avoid the "invalid syntax for uuid" error
+      // 1. Update Supabase Auth (This handles the link session)
+      const { data: authData, error: authError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (authError) throw authError;
+
+      // 2. Update your custom members table using the secure RPC
+      // If currentUser is null (from email link), we use the ID from authData
+      const userId = currentUser?.id || authData.user?.id;
+
+      if (!userId) throw new Error("Could not identify user session.");
+
       const { error: rpcError } = await supabase.rpc('update_member_password', { 
-        member_id: currentUser.id, 
+        member_id: userId, 
         new_pass: newPassword 
       });
 
       if (rpcError) throw rpcError;
 
-      // 2. Update Supabase Auth (Internal) - Optional if you only use custom login
-      // We wrap this in a try-catch to prevent CORS/SSL blocks from stopping the process
-      try {
-        await supabase.auth.updateUser({ password: newPassword });
-      } catch (authErr) {
-        console.warn("Auth update skipped due to connection issues, but DB is updated.");
-      }
-
-      toast({ title: "Success", description: "Password updated successfully. Please log in again." });
+      toast({ 
+        title: "Success", 
+        description: "Password updated successfully. Please log in with your new password." 
+      });
       
-      await logout();
+      await logout(); // Clear any temporary recovery session
       setLocation("/");
     } catch (error: any) {
       console.error("Reset Error:", error);
-      toast({ variant: "destructive", title: "Update Failed", description: error.message || "Database sync failed." });
+      toast({ variant: "destructive", title: "Update Failed", description: error.message });
     } finally {
       setLoading(false);
     }
@@ -82,7 +92,7 @@ export default function ResetPassword() {
           <div className="mx-auto w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
             <Lock className="text-emerald-700" size={24} />
           </div>
-          <CardTitle className="text-2xl font-bold text-slate-900 font-serif">Reset Password</CardTitle>
+          <CardTitle className="text-2xl font-bold text-slate-900 font-serif">Set New Password</CardTitle>
           <CardDescription>Enter your new secure password below.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -98,9 +108,11 @@ export default function ResetPassword() {
             <Button type="submit" className="w-full bg-emerald-800 hover:bg-emerald-900" disabled={loading}>
               {loading ? <Loader2 className="animate-spin mr-2" size={18} /> : "Update Password"}
             </Button>
-            <Button type="button" variant="ghost" className="w-full" onClick={() => setLocation("/dashboard")}>
-              <ArrowLeft size={14} className="mr-2" /> Back to Dashboard
-            </Button>
+            {!currentUser && (
+               <Button type="button" variant="ghost" className="w-full" onClick={() => setLocation("/")}>
+                <ArrowLeft size={14} className="mr-2" /> Back to Login
+              </Button>
+            )}
           </form>
         </CardContent>
       </Card>

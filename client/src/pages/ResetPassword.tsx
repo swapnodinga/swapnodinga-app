@@ -64,16 +64,16 @@ export default function ResetPassword() {
 
       if (authError) throw authError;
 
-      // 2. Identify the correct UUID to avoid "integer = uuid" errors
-      const userId = authData.user?.id || currentUser?.id;
+      // 2. Identify the user by EMAIL to avoid ID type mismatches between Auth and custom tables
+      const userEmail = authData.user?.email || currentUser?.email;
 
-      if (!userId) {
-        throw new Error("User identity not found. Please try the link again.");
+      if (!userEmail) {
+        throw new Error("User email not found. Please try the link again.");
       }
 
-      // 3. Sync the new password to your custom members table (Hashed)
-      const { error: rpcError } = await supabase.rpc('update_member_password', { 
-        member_id: userId, 
+      // 3. Sync the new password to your custom members table using email
+      const { error: rpcError } = await supabase.rpc('update_member_password_by_email', { 
+        user_email: userEmail, 
         new_pass: newPassword 
       });
 

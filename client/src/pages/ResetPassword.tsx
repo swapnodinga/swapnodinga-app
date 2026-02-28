@@ -42,35 +42,27 @@ export default function ResetPassword() {
     try {
       setLoading(true);
 
-      // 1. Update the actual Supabase Auth credentials
+      // 1. Update the Supabase Auth system (Internal)
       const { error: authError } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       if (authError) throw authError;
 
-      // 2. Update your custom members table using the hashing function
-      // We use an RPC call if you have a function, or a raw query logic 
-      // to ensure the database 'password' column isn't plain text.
-      const { error: dbError } = await supabase
-        .rpc('update_member_password', { 
-          member_id: currentUser.id, 
-          new_pass: newPassword 
-        });
+      // 2. Update your custom members table using the secure RPC hashing function
+      const { error: rpcError } = await supabase.rpc('update_member_password', { 
+        member_id: currentUser.id, 
+        new_pass: newPassword 
+      });
 
-      // If you don't have the RPC setup yet, use this fallback update:
-      if (dbError) {
-        const { error: fallbackError } = await supabase
-          .from("members")
-          .update({ password: newPassword }) // Ensure your DB trigger hashes this!
-          .eq("id", currentUser.id);
-        
-        if (fallbackError) throw fallbackError;
+      if (rpcError) {
+        console.error("RPC Error:", rpcError);
+        throw new Error("Database sync failed. Please contact admin.");
       }
 
       toast({ title: "Success", description: "Password updated successfully. Please log in again." });
       
-      // Logout to clear the old session and force a fresh login with the new password
+      // Logout to clear the old session and force a fresh login
       await logout();
       setLocation("/");
     } catch (error: any) {

@@ -61,7 +61,13 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     const savedUser = localStorage.getItem("user");
     if (savedUser) {
       try {
-        setCurrentUser(JSON.parse(savedUser));
+        const parsed = JSON.parse(savedUser);
+        // Ensure ID is a valid string/UUID to prevent RPC errors
+        if (parsed && typeof parsed.id === 'string') {
+          setCurrentUser(parsed);
+        } else {
+          localStorage.removeItem("user");
+        }
       } catch (e) {
         console.error("Failed to parse user session");
       }
@@ -169,9 +175,8 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
     } catch (err: any) {
       console.error("Submission Error:", err.message);
-      throw err; // Re-throw so the UI component can stop its loading state
+      throw err;
     } finally {
-      // Ensure the UI refreshes even if the API response was empty
       await refreshData();
     }
   };
@@ -207,9 +212,13 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await callApi("auth-login", { email, password: pass });
       if (data?.success && data?.user) {
-        setCurrentUser(data.user);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        return { success: true, user: data.user };
+        // Force logout of any existing Supabase Auth session to sync with custom login
+        await supabase.auth.signOut();
+        
+        const userWithId = { ...data.user, id: String(data.user.id) };
+        setCurrentUser(userWithId);
+        localStorage.setItem("user", JSON.stringify(userWithId));
+        return { success: true, user: userWithId };
       }
       return false;
     } catch (err) {
@@ -221,6 +230,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem("user");
+    supabase.auth.signOut();
     setLocation("/");
   };
 

@@ -29,7 +29,10 @@ export default function ResetPassword() {
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!currentUser) return;
+    // Critical Check: Ensure we have a valid UUID from the current user
+    if (!currentUser || !currentUser.id) {
+      return toast({ variant: "destructive", title: "Session Error", description: "User ID not found. Please log in again." });
+    }
 
     if (newPassword.length < 6) {
       return toast({ variant: "destructive", title: "Weak Password", description: "Minimum 6 characters required." });
@@ -42,31 +45,30 @@ export default function ResetPassword() {
     try {
       setLoading(true);
 
-      // 1. Update the Supabase Auth system (Internal)
-      const { error: authError } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-
-      if (authError) throw authError;
-
-      // 2. Update your custom members table using the secure RPC hashing function
+      // 1. Update your custom members table using the secure RPC hashing function
+      // We pass the currentUser.id directly to avoid the "invalid syntax for uuid" error
       const { error: rpcError } = await supabase.rpc('update_member_password', { 
         member_id: currentUser.id, 
         new_pass: newPassword 
       });
 
-      if (rpcError) {
-        console.error("RPC Error:", rpcError);
-        throw new Error("Database sync failed. Please contact admin.");
+      if (rpcError) throw rpcError;
+
+      // 2. Update Supabase Auth (Internal) - Optional if you only use custom login
+      // We wrap this in a try-catch to prevent CORS/SSL blocks from stopping the process
+      try {
+        await supabase.auth.updateUser({ password: newPassword });
+      } catch (authErr) {
+        console.warn("Auth update skipped due to connection issues, but DB is updated.");
       }
 
       toast({ title: "Success", description: "Password updated successfully. Please log in again." });
       
-      // Logout to clear the old session and force a fresh login
       await logout();
       setLocation("/");
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Update Failed", description: error.message });
+      console.error("Reset Error:", error);
+      toast({ variant: "destructive", title: "Update Failed", description: error.message || "Database sync failed." });
     } finally {
       setLoading(false);
     }

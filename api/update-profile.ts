@@ -1,20 +1,55 @@
 import { createClient } from "@supabase/supabase-js";
 
 export default async function handler(req: Request) {
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+  const commonHeaders = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
 
-  const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const { member_email, data } = await req.json();
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: commonHeaders });
+  }
+
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ success: false, message: "Method not allowed" }), {
+      status: 405, headers: commonHeaders,
+    });
+  }
+
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+  if (!url || !key) {
+    return new Response(JSON.stringify({ success: false, message: "Supabase credentials missing" }), {
+      status: 500, headers: commonHeaders,
+    });
+  }
+
+  const supabase = createClient(url, key);
 
   try {
-    const { error } = await supabase
-      .from("members")
-      .update(data)
-      .eq("email", member_email);
+    const { member_id, member_email, data } = await req.json();
+    if ((!member_id && !member_email) || !data) {
+      throw new Error("member_id or member_email and data required");
+    }
 
+    let query = supabase.from("members").update(data);
+    if (member_email) {
+      query = query.eq("email", member_email);
+    } else {
+      query = query.eq("id", member_id);
+    }
+    const { error } = await query;
     if (error) throw error;
-    return new Response(JSON.stringify({ success: true }), { status: 200 });
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200, headers: commonHeaders,
+    });
   } catch (err: any) {
-    return new Response(JSON.stringify({ success: false, message: err.message }), { status: 500 });
+    console.error("API Error:", err.message);
+    return new Response(JSON.stringify({ success: false, message: err.message }), {
+      status: 500, headers: commonHeaders,
+    });
   }
 }

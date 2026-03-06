@@ -1,55 +1,59 @@
+// pages/api/update-profile.ts
 import { createClient } from "@supabase/supabase-js";
 
+const jsonResponse = (data: any, status = 200) => {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
+};
+
 export default async function handler(req: Request) {
-  const commonHeaders = {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-  };
-
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: commonHeaders });
+    return jsonResponse(null, 204);
   }
 
+  // Only allow POST requests
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ success: false, message: "Method not allowed" }), {
-      status: 405, headers: commonHeaders,
-    });
+    return jsonResponse({ success: false, message: "Method Not Allowed" }, 405);
   }
-
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
-  if (!url || !key) {
-    return new Response(JSON.stringify({ success: false, message: "Supabase credentials missing" }), {
-      status: 500, headers: commonHeaders,
-    });
-  }
-
-  const supabase = createClient(url, key);
 
   try {
-    const { member_id, member_email, data } = await req.json();
-    if ((!member_id && !member_email) || !data) {
-      throw new Error("member_id or member_email and data required");
+    const supabaseUrl = process.env.SUPABASE_URL;
+    // Use the SERVICE_ROLE_KEY for server-side operations
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error("Missing Supabase environment variables");
     }
 
-    let query = supabase.from("members").update(data);
-    if (member_email) {
-      query = query.eq("email", member_email);
-    } else {
-      query = query.eq("id", member_id);
-    }
-    const { error } = await query;
-    if (error) throw error;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200, headers: commonHeaders,
-    });
-  } catch (err: any) {
-    console.error("API Error:", err.message);
-    return new Response(JSON.stringify({ success: false, message: err.message }), {
-      status: 500, headers: commonHeaders,
-    });
+    const { user_id, profile_pic_url } = await req.json();
+
+    if (!user_id || !profile_pic_url) {
+      return jsonResponse({ success: false, message: "Missing required fields: user_id or profile_pic_url" }, 400);
+    }
+
+    // Perform the update on the profile_public table
+    const { data: updateData, error: updateError } = await supabase
+      .from("profile_public")
+      .update({ profile_pic_url: profile_pic_url })
+      .eq("user_id", user_id);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    return jsonResponse({ success: true, data: updateData });
+  } catch (error: any) {
+    console.error("Update Profile Error:", error.message);
+    return jsonResponse({ success: false, message: error.message || "An unexpected error occurred" }, 500);
   }
 }

@@ -42,7 +42,7 @@ export default async function handler(req: Request) {
     const data = await req.json();
 
     // Validate required fields
-    const requiredFields = ['society_id', 'member_id', 'principal_amount', 'rate_percent', 'tenure_months', 'start_date'];
+    const requiredFields = ['society_id', 'member_id', 'amount', 'interest_rate', 'tenure_months', 'start_date'];
     const missingFields = requiredFields.filter(field => !data[field]);
     
     if (missingFields.length > 0) {

@@ -11,7 +11,7 @@ export default async function handler(req: any) {
   try {
     const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     
-    // Robust parsing for Vercel environment
+    // Resilient parsing to handle different Vercel environments
     let data;
     try {
       data = await req.json();
@@ -19,18 +19,19 @@ export default async function handler(req: any) {
       data = req.body;
     }
 
-    // Use your specific Society ID from the database
+    // Use your specific Society ID found in the database
     const societyId = data.society_id || "SCS-001";
 
     const { error } = await supabase.from("fixed_deposits").insert([{
       society_id: societyId,
       member_id: data.member_id,
-      amount: parseFloat(data.principal_amount), // Matches CSV column name
-      interest_rate: parseFloat(data.rate_percent), // Matches CSV column name
+      amount: parseFloat(data.amount || data.principal_amount), // Matches CSV column
+      interest_rate: parseFloat(data.interest_rate || data.rate_percent), // Matches CSV column
       tenure_months: parseInt(data.tenure_months),
       start_date: data.start_date,
-      status: 'Active',
-      slip_url: data.deposit_slip_url || null
+      status: 'Active', // Matches CSV status
+      slip_url: data.deposit_slip_url || null,
+      mtdr_no: data.mtdr_no || null
     }]);
 
     if (error) throw error;

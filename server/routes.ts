@@ -144,45 +144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json([]);
   });
 
-  // ===== PROFILE =====
-
-  app.post("/api/update-profile", async (req, res) => {
-    try {
-      const { member_id, data } = req.body;
-      const { error } = await supabase.from('members').update(data).eq('id', member_id);
-      if (error) throw error;
-      res.json({ success: true });
-    } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
-  });
-
-  // ===== FIXED DEPOSITS =====
-
-  app.post("/api/fixed-deposit", async (req, res) => {
-    try {
-      const { action, data, fd_id } = req.body;
-
-      if (action === "add") {
-        const { error } = await supabase.from('fixed_deposits').insert([data]);
-        if (error) throw error;
-        return res.json({ success: true });
-      }
-
-      if (action === "update") {
-        const { error } = await supabase.from('fixed_deposits').update(data).eq('id', fd_id);
-        if (error) throw error;
-        return res.json({ success: true });
-      }
-
-      if (action === "delete") {
-        const { error } = await supabase.from('fixed_deposits').delete().eq('id', fd_id);
-        if (error) throw error;
-        return res.json({ success: true });
-      }
-
-      res.status(400).json({ success: false, message: "Invalid action" });
-    } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
-  });
-
+  
   // ===== SEND EMAIL =====
 
   app.post("/api/send-email", async (req, res) => {

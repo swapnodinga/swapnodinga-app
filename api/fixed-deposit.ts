@@ -8,39 +8,62 @@ const jsonResponse = (data: any, status = 200) => new Response(JSON.stringify(da
   }
 });
 
-export default async function handler(req: any) {
-  if (req.method === "OPTIONS") return jsonResponse(null, 204);
+export default async function handler(req: any, res?: any) {
+  // 1. Handle CORS/Methods
+  if (req.method === "OPTIONS") {
+    return res ? res.status(204).end() : jsonResponse(null, 204);
+  }
 
   try {
     const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     
-    // Safety check for request body to prevent crash
-    let data = req.body;
-    if (typeof data === 'string') {
-      data = JSON.parse(data);
-    } else if (!data && typeof req.json === 'function') {
-      data = await req.json();
+    // 2. Extract JSON safely
+    let reqData;
+    if (typeof req.json === 'function') {
+      reqData = await req.json();
+    } else {
+      reqData = req.body;
     }
 
-    // Alignment with CSV schema
-    const societyId = data.society_id || "SCS-001"; 
+    const { action, data, fd_id } = reqData;
+    const payload = data || {};
 
-    const { error } = await supabase.from("fixed_deposits").insert([{
-      society_id: societyId, // Required
-      member_id: data.member_id,
-      amount: parseFloat(data.amount || data.principal_amount), // CSV Header: amount
-      interest_rate: parseFloat(data.interest_rate || data.rate_percent), // CSV Header: interest_rate
-      tenure_months: parseInt(data.tenure_months),
-      start_date: data.start_date,
-      status: 'Active',
-      slip_url: data.slip_url || data.deposit_slip_url || null, // CSV Header: slip_url
-      mtdr_no: data.mtdr_no || null
-    }]);
+    // 3. Logic for Add or Update
+    if (action === "add" || action === "update") {
+      const fdEntry = {
+        society_id: payload.society_id || "SCS-001", 
+        member_id: payload.member_id,
+        amount: parseFloat(payload.amount || payload.principal_amount || 0), 
+        interest_rate: parseFloat(payload.interest_rate || payload.rate_percent || 0), 
+        tenure_months: parseInt(payload.tenure_months || 0),
+        start_date: payload.start_date,
+        month: payload.month, 
+        year: payload.year,   
+        status: payload.status || 'Active',
+        slip_url: payload.slip_url || payload.deposit_slip_url || null, 
+        mtdr_no: payload.mtdr_no || null
+      };
 
-    if (error) throw error;
-    return jsonResponse({ success: true });
+      if (action === "add") {
+        const { error } = await supabase.from("fixed_deposits").insert([fdEntry]);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("fixed_deposits").update(fdEntry).eq("id", fd_id);
+        if (error) throw error;
+      }
+    } 
+    // 4. Logic for Delete (Moved outside the add/update block)
+    else if (action === "delete") {
+      const { error } = await supabase.from("fixed_deposits").delete().eq("id", fd_id);
+      if (error) throw error;
+    }
+
+    const successData = { success: true };
+    return res ? res.status(200).json(successData) : jsonResponse(successData);
+
   } catch (e: any) {
     console.error("FD Error:", e.message);
-    return jsonResponse({ success: false, message: e.message }, 500);
+    const errorData = { success: false, message: e.message };
+    return res ? res.status(500).json(errorData) : jsonResponse(errorData, 500);
   }
 }

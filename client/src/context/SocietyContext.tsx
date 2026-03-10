@@ -35,6 +35,12 @@ const callApi = async (endpoint: string, body: any) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   })
+  
+  // Guard against non-JSON server crashes
+  if (!res.ok && res.headers.get("content-type")?.indexOf("application/json") === -1) {
+    throw new Error(`Server error: ${res.statusText}`)
+  }
+  
   const data = await res.json()
   if (!data.success) throw new Error(data.message || "API call failed")
   return data
@@ -60,12 +66,26 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [])
 
+  // FIX: Accurate Daily Interest Logic to match your frontend ledger
   const societyTotalFund = useMemo(() => {
     const totalInstallments = (transactions || [])
       .filter((t) => t.status === "Approved")
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
-    const totalRealizedInterest = (fixedDeposits || [])
-      .reduce((acc, curr) => acc + (Number(curr.realized_interest) || 0), 0)
+      
+    const totalRealizedInterest = (fixedDeposits || []).reduce((acc, fd) => {
+      const start = new Date(fd.start_date)
+      const finish = new Date(fd.start_date)
+      finish.setMonth(start.getMonth() + Number(fd.tenure_months))
+      
+      // Only count if matured
+      if (finish <= new Date()) {
+        const diffDays = Math.ceil(Math.abs(finish.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+        const interest = (Number(fd.amount) * Number(fd.interest_rate) * diffDays) / (365 * 100)
+        return acc + Math.round(interest)
+      }
+      return acc
+    }, 0)
+    
     return totalInstallments + totalRealizedInterest
   }, [transactions, fixedDeposits])
 
@@ -99,7 +119,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     if (!currentUser) return
     refreshData()
     
-    // Subscribe to ALL relevant tables for a true realtime experience
     const channel = supabase
       .channel("society-updates")
       .on("postgres_changes", { event: "*", schema: "public", table: "Installments" }, () => refreshData())
@@ -110,6 +129,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     return () => { supabase.removeChannel(channel) }
   }, [currentUser])
 
+  // ... (All other auth/approval functions remain exactly the same)
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
     try {
       await callApi("approve-instalment", { id: transaction.id, status })
@@ -148,6 +168,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
         proofPath: fileName,
         month,
       })
+      await refreshData()
     } catch (err: any) {
       console.error("Submission Error:", err.message)
     }

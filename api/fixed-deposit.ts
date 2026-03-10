@@ -17,18 +17,24 @@ export default async function handler(req: any, res?: any) {
   try {
     const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     
-    // 2. Extract JSON safely
+    // 2. Extract Request Data Safely
     let reqData;
     if (typeof req.json === 'function') {
       reqData = await req.json();
+    } else if (req.body) {
+      reqData = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     } else {
-      reqData = req.body;
+      throw new Error("No request body found");
     }
 
-    const { action, data, fd_id } = reqData;
-    const payload = data || {};
+    // 3. Define variables at the highest possible scope
+    const action = reqData.action;
+    const fd_id = reqData.fd_id;
+    const payload = reqData.data || {}; 
 
-    // 3. Logic for Add or Update
+    console.log(`Executing ${action} for ID: ${fd_id}`); // Debugging log
+
+    // 4. Logic for Add or Update
     if (action === "add" || action === "update") {
       const fdEntry = {
         society_id: payload.society_id || "SCS-001", 
@@ -48,12 +54,14 @@ export default async function handler(req: any, res?: any) {
         const { error } = await supabase.from("fixed_deposits").insert([fdEntry]);
         if (error) throw error;
       } else {
+        if (!fd_id) throw new Error("fd_id is required for update");
         const { error } = await supabase.from("fixed_deposits").update(fdEntry).eq("id", fd_id);
         if (error) throw error;
       }
     } 
-    // 4. Logic for Delete (Moved outside the add/update block)
+    // 5. Logic for Delete
     else if (action === "delete") {
+      if (!fd_id) throw new Error("fd_id is required for delete");
       const { error } = await supabase.from("fixed_deposits").delete().eq("id", fd_id);
       if (error) throw error;
     }
@@ -62,7 +70,7 @@ export default async function handler(req: any, res?: any) {
     return res ? res.status(200).json(successData) : jsonResponse(successData);
 
   } catch (e: any) {
-    console.error("FD Error:", e.message);
+    console.error("FD API Error:", e.message);
     const errorData = { success: false, message: e.message };
     return res ? res.status(500).json(errorData) : jsonResponse(errorData, 500);
   }

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-import logo from "@assets/generated_images/SwapnoDinga_Logo_Update.png";
+import logo from "@/assets/generated_images/SwapnoDinga_Logo_Update.png";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { currentUser, logout, members, transactions } = useSociety();

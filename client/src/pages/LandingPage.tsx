@@ -12,8 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { Info, Briefcase, ShieldAlert, Phone } from "lucide-react"
 
-import logoUpdate from "@assets/generated_images/SwapnoDinga_Logo_Update.png"
-import heroBg from "@assets/generated_images/housing_community_hero_background.png"
+import logoUpdate from "@/assets/generated_images/SwapnoDinga_Logo_Update.png"
+import heroBg from "@/assets/generated_images/housing_community_hero_background.png"
 
 export default function LandingPage() {
   const { login, register, currentUser } = useSociety()

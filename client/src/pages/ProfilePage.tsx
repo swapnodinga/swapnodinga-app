@@ -45,7 +45,6 @@ export default function ProfilePage() {
         email: currentUser.email || "" 
       });
       
-      // Use a timestamp to prevent browser caching of the profile image
       const timestamp = new Date().getTime();
       setDisplayImage(currentUser.profile_pic ? `${currentUser.profile_pic}?t=${timestamp}` : null);
     }
@@ -53,7 +52,7 @@ export default function ProfilePage() {
 
   if (!currentUser) return null;
 
-  // Handle Profile Picture Upload
+  // Best Practice: Handle Profile Picture Upload via Storage + API
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -61,19 +60,28 @@ export default function ProfilePage() {
     try {
       setIsUploading(true);
       
-      // 1. Upload to Supabase Storage Bucket
+      // 1. Upload to Supabase Storage Bucket (calls your context logic)
       const newUrl = await uploadProfilePic(file);
       if (!newUrl) throw new Error("Storage failed to return URL.");
       
-      // 2. Persist to 'members' table immediately
-      const { error: dbError } = await supabase
-        .from('members') 
-        .update({ profile_pic: newUrl })
-        .eq('id', currentUser.id);
+      // 2. Persist URL to 'members' table via your Vercel API for security
+      const response = await fetch('/api/update-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          member_email: currentUser.email,
+          data: {
+            profile_pic: newUrl 
+          }
+        })
+      });
 
-      if (dbError) throw dbError;
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to update database record.");
+      }
       
-      // 3. Update local UI state
+      // 3. Update local UI state immediately
       const timestampedUrl = `${newUrl}?t=${new Date().getTime()}`;
       setDisplayImage(timestampedUrl);
       
@@ -90,7 +98,6 @@ export default function ProfilePage() {
   // Handle Full Name and Info Updates
   const handleSaveInfo = async () => {
     try {
-      // 1. Save to Database (using 'full_name' column per your DB schema)
       const { error } = await supabase
         .from('members')
         .update({ full_name: formData.name })
@@ -98,7 +105,6 @@ export default function ProfilePage() {
 
       if (error) throw error;
 
-      // 2. Update the SocietyContext state so other pages update too
       await updateProfile({ name: formData.name });
       
       setIsEditing(false);

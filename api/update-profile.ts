@@ -11,7 +11,7 @@ const jsonResponse = (data: any, status = 200) => {
 };
 
 export default async function handler(req: any) {
-  // 1. Handle Preflight
+  // 1. Handle Preflight and Methods
   if (req.method === "OPTIONS") return jsonResponse(null, 204);
   if (req.method !== "POST") return jsonResponse({ message: "Method not allowed" }, 405);
 
@@ -20,7 +20,7 @@ export default async function handler(req: any) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 2. Flexible JSON Parsing (Handles Vercel Edge vs Node)
+    // 2. Extract body properly
     let body;
     try {
       if (typeof req.json === 'function') {
@@ -32,17 +32,16 @@ export default async function handler(req: any) {
       throw new Error("Invalid JSON payload");
     }
 
-    // 3. Extract data based on your SocietyContext call
-    // SocietyContext sends: { member_email: string, data: { profile_pic: string, ... } }
     const { member_email, data } = body;
 
     if (!member_email) throw new Error("member_email is required");
+    if (!data) throw new Error("Data object is required");
 
-    // 4. Update the database
-    // We use .eq('email', ...) to match your request for email-based unique keys
+    // 3. Update the database
+    // We match by email to ensure the correct member is updated
     const { error } = await supabase
       .from("members")
-      .update(data) // Updates profile_pic or any other fields passed in 'data'
+      .update(data) // This will update 'profile_pic' or any other field in the data object
       .eq("email", member_email);
 
     if (error) throw error;

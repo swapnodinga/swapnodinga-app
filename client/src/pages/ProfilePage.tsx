@@ -59,17 +59,13 @@ export default function ProfilePage() {
 
     try {
       setIsUploading(true);
-      
-      // 1. This single function from your context handles the storage upload, 
-      // the DB update, AND the global React state update automatically.
       const newUrl = await uploadProfilePic(file);
       if (!newUrl) throw new Error("Storage failed to return URL.");
-      
-      // 2. Update the local UI state immediately to bypass browser caching
+    
       const timestampedUrl = `${newUrl}?t=${new Date().getTime()}`;
       setDisplayImage(timestampedUrl);
       
-      toast({ title: "Success", description: "Profile picture updated instantly." });
+      toast({ title: "Success", description: "Profile picture updated." });
     } catch (error: any) {
       console.error("Upload Error:", error);
       toast({ variant: "destructive", title: "Upload Failed", description: error.message });

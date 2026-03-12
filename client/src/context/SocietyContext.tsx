@@ -237,7 +237,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 const updateProfile = async (data: any) => {
     try {
       // 1. Update the database via API
-      await callApi("/api/update-profile", { member_email: currentUser.email, data });
+      await callApi("update-profile", { member_email: currentUser.email, data });
       
       // 2. FORCE update the local state immediately
       // We use a functional update (prev => ...) to ensure we have the latest user data

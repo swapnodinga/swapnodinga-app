@@ -235,80 +235,74 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   }
 
 // ADD THIS NEW FUNCTION - to fetch and verify current user from database
+// ---------- add this helper somewhere above updateProfile ----------
 const refreshCurrentUser = async () => {
   try {
-    if (!currentUser?.id) return
+    if (!currentUser?.id) return;
     const { data: userData, error } = await supabase
       .from("members")
       .select("*")
       .eq("id", currentUser.id)
-      .single()
-    
-    if (error) throw error
+      .single();
+    if (error) throw error;
     if (userData) {
-      setCurrentUser(userData)
-      localStorage.setItem("user", JSON.stringify(userData))
+      setCurrentUser(userData);
+      localStorage.setItem("user", JSON.stringify(userData));
     }
   } catch (err) {
-    console.error("Failed to refresh current user:", err)
+    console.error("Failed to refresh current user:", err);
   }
-}
+};
 
-// REVISED: updateProfile - with database verification
+// ---------- replaces the old updateProfile ----------
 const updateProfile = async (data: any) => {
   try {
-    // 1. Call API to update database
-    await callApi("update-profile", { member_email: currentUser.email, data })
-    
-    // 2. Update local state immediately for UI responsiveness
-    setCurrentUser((prev: any) => {
-      const updated = { ...prev, ...data }
-      localStorage.setItem("user", JSON.stringify(updated))
-      return updated
-    })
+    // 1. send change to backend
+    await callApi("update-profile", { member_email: currentUser.email, data });
 
-    // 3. IMPORTANT: Verify the database actually saved the update
-    // This refetches currentUser from DB to confirm the API call worked
-    await refreshCurrentUser()
-    
+    // 2. optimistic update for snappy UI
+    setCurrentUser(prev => {
+      const updated = { ...prev, ...data };
+      localStorage.setItem("user", JSON.stringify(updated));
+      return updated;
+    });
+
+    // 3. then verify by re‑fetching the user row
+    await refreshCurrentUser();
   } catch (err: any) {
-    console.error("Context Update Error:", err)
-    // Revert optimistic update by refreshing from DB
-    await refreshCurrentUser()
-    throw err
+    console.error("Context Update Error:", err);
+    // roll back any optimistic change
+    await refreshCurrentUser();
+    throw err;
   }
-}
+};
 
-// REVISED: uploadProfilePic - with proper error handling and verification
+// ---------- replaces the old uploadProfilePic ----------
 const uploadProfilePic = async (file: File): Promise<string> => {
   try {
-    // 1. Upload to storage
-    const fileExt = file.name.split(".").pop()
-    const safeEmail = currentUser.email.replace(/[^a-zA-Z0-9]/g, '_')
-    const fileName = `avatar-${safeEmail}-${Date.now()}.${fileExt}`
-    
+    const fileExt = file.name.split(".").pop();
+    const safeEmail = currentUser.email.replace(/[^a-zA-Z0-9]/g, "_");
+    const fileName = `avatar-${safeEmail}-${Date.now()}.${fileExt}`;
+
     const { error: uploadError } = await supabase.storage
       .from("avatars")
-      .upload(fileName, file)
-    
-    if (uploadError) throw uploadError
-    
-    // 2. Get public URL
-    const { data: urlData } = supabase.storage
+      .upload(fileName, file);
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = await supabase.storage
       .from("avatars")
-      .getPublicUrl(fileName)
-    
-    // 3. Update profile with URL AND wait for verification
-    await updateProfile({ profile_pic: urlData.publicUrl })
-    
-    // 4. Return the URL only after database verification succeeds
-    return urlData.publicUrl
-    
+      .getPublicUrl(fileName);
+
+    // updateProfile now performs the verification step
+    await updateProfile({ profile_pic: urlData.publicUrl });
+
+    // return only after the DB has been confirmed
+    return urlData.publicUrl;
   } catch (err: any) {
-    console.error("Upload Error:", err)
-    throw err
+    console.error("Upload Error:", err);
+    throw err;
   }
-}
+};
 
   return (
     <SocietyContext.Provider

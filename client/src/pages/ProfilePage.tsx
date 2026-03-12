@@ -53,27 +53,31 @@ export default function ProfilePage() {
   if (!currentUser) return null;
 
   // Best Practice: Handle Profile Picture Upload (Logic delegated to SocietyContext)
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
 
-    try {
-      setIsUploading(true);
-      const newUrl = await uploadProfilePic(file);
-      if (!newUrl) throw new Error("Storage failed to return URL.");
+const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  try {
+    setIsUploading(true);
     
-      const timestampedUrl = `${newUrl}?t=${new Date().getTime()}`;
-      setDisplayImage(timestampedUrl);
-      
-      toast({ title: "Success", description: "Profile picture updated." });
-    } catch (error: any) {
-      console.error("Upload Error:", error);
-      toast({ variant: "destructive", title: "Upload Failed", description: error.message });
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
+    // 1. This function ALREADY updates the Storage AND the 'members' table via API
+    const newUrl = await uploadProfilePic(file);
+    if (!newUrl) throw new Error("Storage failed to return URL.");
+    
+    // 2. Just update the local visual state
+    const timestampedUrl = `${newUrl}?t=${new Date().getTime()}`;
+    setDisplayImage(timestampedUrl);
+    
+    toast({ title: "Success", description: "Profile picture updated." });
+  } catch (error: any) {
+    console.error("Upload Error:", error);
+    toast({ variant: "destructive", title: "Upload Failed", description: error.message });
+  } finally {
+    setIsUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+};
 
   // Handle Full Name and Info Updates
   const handleSaveInfo = async () => {

@@ -234,26 +234,25 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-const updateProfile = async (data: any) => {
-    try {
-      // 1. Update the database via API
-      await callApi("update-profile", { member_email: currentUser.email, data });
-      
-      // 2. FORCE update the local state immediately
-      // We use a functional update (prev => ...) to ensure we have the latest user data
-      setCurrentUser((prev: any) => {
-        const updated = { ...prev, ...data };
-        localStorage.setItem("user", JSON.stringify(updated));
-        return updated;
-      });
+// client/src/context/SocietyContext.tsx
 
-      // 3. Refresh members list so other parts of the app see the change
-      await refreshData();
-    } catch (err: any) {
-      console.error("Context Update Error:", err);
-      throw err;
-    }
-  };
+const updateProfile = async (data: any) => {
+  try {
+    // FIX: Remove leading /api/ so it correctly points to /api/update-profile
+    await callApi("update-profile", { member_email: currentUser.email, data });
+    
+    setCurrentUser((prev: any) => {
+      const updated = { ...prev, ...data };
+      localStorage.setItem("user", JSON.stringify(updated));
+      return updated;
+    });
+
+    await refreshData();
+  } catch (err: any) {
+    console.error("Context Update Error:", err);
+    throw err;
+  }
+};
 
   const uploadProfilePic = async (file: File): Promise<string> => {
     try {

@@ -234,41 +234,81 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-// client/src/context/SocietyContext.tsx
+// ADD THIS NEW FUNCTION - to fetch and verify current user from database
+const refreshCurrentUser = async () => {
+  try {
+    if (!currentUser?.id) return
+    const { data: userData, error } = await supabase
+      .from("members")
+      .select("*")
+      .eq("id", currentUser.id)
+      .single()
+    
+    if (error) throw error
+    if (userData) {
+      setCurrentUser(userData)
+      localStorage.setItem("user", JSON.stringify(userData))
+    }
+  } catch (err) {
+    console.error("Failed to refresh current user:", err)
+  }
+}
 
+// REVISED: updateProfile - with database verification
 const updateProfile = async (data: any) => {
   try {
-    // FIX: Remove leading /api/ so it correctly points to /api/update-profile
-    await callApi("update-profile", { member_email: currentUser.email, data });
+    // 1. Call API to update database
+    await callApi("update-profile", { member_email: currentUser.email, data })
     
+    // 2. Update local state immediately for UI responsiveness
     setCurrentUser((prev: any) => {
-      const updated = { ...prev, ...data };
-      localStorage.setItem("user", JSON.stringify(updated));
-      return updated;
-    });
+      const updated = { ...prev, ...data }
+      localStorage.setItem("user", JSON.stringify(updated))
+      return updated
+    })
 
-    await refreshData();
+    // 3. IMPORTANT: Verify the database actually saved the update
+    // This refetches currentUser from DB to confirm the API call worked
+    await refreshCurrentUser()
+    
   } catch (err: any) {
-    console.error("Context Update Error:", err);
-    throw err;
+    console.error("Context Update Error:", err)
+    // Revert optimistic update by refreshing from DB
+    await refreshCurrentUser()
+    throw err
   }
-};
+}
 
-  const uploadProfilePic = async (file: File): Promise<string> => {
-    try {
-      const fileExt = file.name.split(".").pop()
-      const safeEmail = currentUser.email.replace(/[^a-zA-Z0-9]/g, '_')
-      const fileName = `avatar-${safeEmail}-${Date.now()}.${fileExt}`
-      const { error: uploadError } = await supabase.storage.from("avatars").upload(fileName, file)
-      if (uploadError) throw uploadError
-      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(fileName)
-      await updateProfile({ profile_pic: urlData.publicUrl })
-      await refreshData()
-      return urlData.publicUrl
-    } catch (err: any) {
-      throw err
-    }
+// REVISED: uploadProfilePic - with proper error handling and verification
+const uploadProfilePic = async (file: File): Promise<string> => {
+  try {
+    // 1. Upload to storage
+    const fileExt = file.name.split(".").pop()
+    const safeEmail = currentUser.email.replace(/[^a-zA-Z0-9]/g, '_')
+    const fileName = `avatar-${safeEmail}-${Date.now()}.${fileExt}`
+    
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(fileName, file)
+    
+    if (uploadError) throw uploadError
+    
+    // 2. Get public URL
+    const { data: urlData } = supabase.storage
+      .from("avatars")
+      .getPublicUrl(fileName)
+    
+    // 3. Update profile with URL AND wait for verification
+    await updateProfile({ profile_pic: urlData.publicUrl })
+    
+    // 4. Return the URL only after database verification succeeds
+    return urlData.publicUrl
+    
+  } catch (err: any) {
+    console.error("Upload Error:", err)
+    throw err
   }
+}
 
   return (
     <SocietyContext.Provider

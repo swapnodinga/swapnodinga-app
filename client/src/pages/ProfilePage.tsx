@@ -52,7 +52,7 @@ export default function ProfilePage() {
 
   if (!currentUser) return null;
 
-  // Best Practice: Handle Profile Picture Upload via Storage + API
+  // Best Practice: Handle Profile Picture Upload (Logic delegated to SocietyContext)
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -60,32 +60,16 @@ export default function ProfilePage() {
     try {
       setIsUploading(true);
       
-      // 1. Upload to Supabase Storage Bucket (calls your context logic)
+      // 1. This single function from your context handles the storage upload, 
+      // the DB update, AND the global React state update automatically.
       const newUrl = await uploadProfilePic(file);
       if (!newUrl) throw new Error("Storage failed to return URL.");
       
-      // 2. Persist URL to 'members' table via your Vercel API for security
-      const response = await fetch('/api/update-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          member_email: currentUser.email,
-          data: {
-            profile_pic: newUrl 
-          }
-        })
-      });
-
-      const result = await response.json();
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Failed to update database record.");
-      }
-      
-      // 3. Update local UI state immediately
+      // 2. Update the local UI state immediately to bypass browser caching
       const timestampedUrl = `${newUrl}?t=${new Date().getTime()}`;
       setDisplayImage(timestampedUrl);
       
-      toast({ title: "Success", description: "Profile picture updated." });
+      toast({ title: "Success", description: "Profile picture updated instantly." });
     } catch (error: any) {
       console.error("Upload Error:", error);
       toast({ variant: "destructive", title: "Upload Failed", description: error.message });

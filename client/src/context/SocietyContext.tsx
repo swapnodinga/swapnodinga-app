@@ -254,6 +254,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
       if (uploadError) throw uploadError
       const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(fileName)
       await updateProfile({ profile_pic: urlData.publicUrl })
+      await refreshData()
       return urlData.publicUrl
     } catch (err: any) {
       throw err

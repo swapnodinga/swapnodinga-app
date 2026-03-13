@@ -32,13 +32,16 @@ export default function InterestDistribution() {
     );
   }, [fixedDeposits, selectedYear]);
 
-  // 3. Calculation Logic (Based on amount, rate, and tenure)
+// Updated calculation to match Fixed Deposit Page logic
   const stats = useMemo(() => {
     let totalInvested = 0;
     let calculatedInterest = 0;
     let ratesSum = 0;
 
-    filteredFDs.forEach(fd => {
+    // Filter for Active ONLY to match FD page totals
+    const activeFDs = filteredFDs.filter(fd => fd.status === "Active");
+
+    activeFDs.forEach(fd => {
       const principal = Number(fd.amount) || 0;
       const rate = Number(fd.interest_rate) || 0;
       const months = Number(fd.tenure_months) || 12;
@@ -46,15 +49,17 @@ export default function InterestDistribution() {
       totalInvested += principal;
       ratesSum += rate;
       
-      // Formula: (Principal * Rate * (Months/12)) / 100
-      calculatedInterest += (principal * (rate / 100) * (months / 12));
+      // Standard Formula used in the FD Page
+      // (Principal * Rate * Tenure_Months) / (12 * 100)
+      const interestForThisFD = (principal * rate * months) / 1200;
+      calculatedInterest += interestForThisFD;
     });
 
     return {
       totalInvested,
       totalInterest: calculatedInterest,
-      avgRate: filteredFDs.length > 0 ? ratesSum / filteredFDs.length : 0,
-      activeCount: filteredFDs.filter(f => f.status === "Active").length
+      avgRate: activeFDs.length > 0 ? ratesSum / activeFDs.length : 0,
+      activeCount: activeFDs.length
     };
   }, [filteredFDs]);
 

@@ -7,12 +7,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-async function resolveInstallmentsTable(supabase: any) {
-  for (const tableName of ["Installments", "installments"]) {
-    const { error } = await supabase.from(tableName).select("id").limit(1);
-    if (!error) return tableName;
+async function fetchTransaction(supabase: any, id: number) {
+  const tableNames = ["Installments", "installments"];
+
+  for (const tableName of tableNames) {
+    const { data, error } = await supabase
+      .from(tableName)
+      .select(`
+        *,
+        members:member_id (
+          email,
+          full_name
+        )
+      `)
+      .eq("id", id)
+      .single();
+
+    if (!error && data) return { tx: data, tableName };
   }
-  return null;
+
+  return { tx: null, tableName: null };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -26,23 +40,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const { id, status } = body || {};
 
-    // Resolve the correct table name (case-sensitive)
-    const tableName = await resolveInstallmentsTable(supabase);
-    if (!tableName) throw new Error("Could not locate installments table (tried: Installments, installments)");
+    const numericId = Number(id);
+    const { tx, tableName } = await fetchTransaction(supabase, numericId);
 
-    const { data: tx, error: fetchError } = await supabase
-      .from(tableName)
-      .select(`
-        *,
-        members:member_id (
-          email,
-          full_name
-        )
-      `)
-      .eq("id", Number(id))
-      .single();
-
-    if (fetchError || !tx) throw new Error(`Transaction not found (id: ${id}, table: ${tableName})`);
+    if (!tx || !tableName) {
+      throw new Error(`Transaction not found (id: ${id}). Tried tables: Installments, installments`);
+    }
 
     const memberEmail = tx.members?.email;
     const memberName = tx.members?.full_name;
@@ -55,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         status,
         approved_at: status === "Approved" ? new Date().toISOString() : null,
       })
-      .eq("id", Number(id));
+      .eq("id", numericId);
 
     if (updateError) throw updateError;
 
@@ -71,7 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         member_email: memberEmail,
         amount: tx.amount,
         month: tx.month,
-        status: status,
+        status,
         proof_url: tx.payment_proof_url,
         time: localTime,
       }),
@@ -79,7 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (tx.proofPath) {
       await supabase.storage.from("payments").remove([tx.proofPath]);
-      await supabase.from(tableName).update({ payment_proof_url: null, proofPath: null }).eq("id", id);
+      await supabase.from(tableName).update({ payment_proof_url: null, proofPath: null }).eq("id", numericId);
     }
 
     return res.status(200).json({ success: true });

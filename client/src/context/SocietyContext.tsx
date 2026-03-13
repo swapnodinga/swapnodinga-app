@@ -234,16 +234,21 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-// ADD THIS NEW FUNCTION - to fetch and verify current user from database
-// ---------- add this helper somewhere above updateProfile ----------
-const refreshCurrentUser = async () => {
+// FIX: Accept id as parameter instead of relying on stale closure
+const refreshCurrentUser = async (userId?: string) => {
   try {
-    if (!currentUser?.id) return;
+    const idToUse = userId || currentUser?.id;
+    if (!idToUse) {
+      console.warn("refreshCurrentUser: No user ID available");
+      return;
+    }
+    
     const { data: userData, error } = await supabase
       .from("members")
       .select("*")
-      .eq("id", currentUser.id)
+      .eq("id", idToUse)
       .single();
+    
     if (error) throw error;
     if (userData) {
       setCurrentUser(userData);
@@ -267,12 +272,12 @@ const updateProfile = async (data: any) => {
       return updated;
     });
 
-    // 3. then verify by re‑fetching the user row
-    await refreshCurrentUser();
+    // 3. then verify by re‑fetching the user row (pass the ID explicitly)
+    await refreshCurrentUser(currentUser.id);
   } catch (err: any) {
     console.error("Context Update Error:", err);
     // roll back any optimistic change
-    await refreshCurrentUser();
+    await refreshCurrentUser(currentUser.id);
     throw err;
   }
 };

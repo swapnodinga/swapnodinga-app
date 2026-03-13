@@ -37,86 +37,84 @@ export default function ReportsPage() {
     };
   };
 
-  const fetchReportData = async () => {
-    setIsLoading(true);
-    try {
-      const { data: members } = await supabase.from('members').select('id, full_name, society_id').order('id', { ascending: true });
-      let installments: any[] | null = null;
-      for (const tbl of ['Installments', 'installments']) {
-        const { data, error } = await supabase.from(tbl).select('*').eq('status', 'Approved');
-        if (!error) { installments = data; break; }
+  // Inside your fetchReportData function or relevant useEffect logic:
+
+const fetchReportData = async () => {
+  setIsLoading(true);
+  try {
+    const { data: membersData } = await supabase.from('members').select('*').eq('status', 'active');
+    const { data: instData } = await supabase.from('Installments').select('*').eq('status', 'Approved');
+    const { data: fds } = await supabase.from('fixed_deposits').select('*');
+
+    const today = new Date();
+    
+    // 1. Calculate Realized Interest (Same logic as Interest Page)
+    const groupedByMtdr = new Map<string, any[]>();
+    fds?.forEach(fd => {
+      const mtdr = (fd.mtdr_no || "UNASSIGNED").trim().replace(":", "-");
+      if (!groupedByMtdr.has(mtdr)) groupedByMtdr.set(mtdr, []);
+      groupedByMtdr.get(mtdr)!.push(fd);
+    });
+
+    let totalRealizedInterest = 0;
+    let totalFdPrincipal = 0;
+
+    groupedByMtdr.forEach((rows) => {
+      const sorted = [...rows].sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+      const latest = sorted[0];
+
+      if (latest.status === "Active") {
+        totalFdPrincipal += Number(latest.amount) || 0;
+        
+        let mtdrInterest = 0;
+        rows.forEach(row => {
+          const start = new Date(row.start_date);
+          const tenure = Number(row.tenure_months) || 3;
+          const maturity = new Date(start);
+          maturity.setMonth(maturity.getMonth() + tenure);
+
+          if (maturity <= today) {
+            mtdrInterest += (Number(row.amount) * Number(row.interest_rate) * tenure) / 1200;
+          }
+        });
+        totalRealizedInterest += Math.round(mtdrInterest);
       }
-      const { data: deposits } = await supabase.from('fixed_deposits').select('*');
+    });
 
-      let totalEarnedInterest = 0;
-      let finishedFdPrincipal = 0;
+    // 2. Calculate Member Stats
+    const totalInstalments = instData?.reduce((sum, i) => sum + (Number(i.amount) || 0), 0) || 0;
 
-      const processedFds = (deposits || []).map(fd => {
-        const m = getMaturityData(
-          Number(fd.amount), 
-          Number(fd.interest_rate), 
-          fd.start_date, 
-          Number(fd.tenure_months)
-        );
+    const finalReport = membersData?.map(m => {
+      const memberTotalInst = instData
+        ?.filter(i => i.member_id === m.id)
+        .reduce((sum, i) => sum + (Number(i.amount) || 0), 0) || 0;
 
-        if (m.isFinished) {
-          totalEarnedInterest += m.interest;
-          finishedFdPrincipal += Number(fd.amount);
-        }
+      const equityShare = totalInstalments > 0 ? (memberTotalInst / totalInstalments) : 0;
+      const interestShare = equityShare * totalRealizedInterest;
 
-        return {
-          ...fd,
-          status: m.isFinished ? "FINISHED" : "ACTIVE",
-          displayInterest: m.interest,
-          total: m.isFinished ? (Number(fd.amount) + m.interest) : Number(fd.amount),
-          tenure_display: `${fd.tenure_months} Months`,
-          finishDate: m.finishDateStr
-        };
-      });
+      return {
+        ...m,
+        display_id: m.society_id,
+        inst: memberTotalInst,
+        interestShare: interestShare,
+        totalEquity: memberTotalInst + interestShare
+      };
+    }).sort((a, b) => b.inst - a.inst);
 
-      const tInst = installments?.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
-      const tFD = processedFds.reduce((s, d) => s + (d.status === "ACTIVE" ? Number(d.amount) : 0), 0) || 0;
+    setReportData(finalReport || []);
+    setStats({
+      totalFund: totalInstalments + totalRealizedInterest,
+      totalInstalments,
+      totalFD: totalFdPrincipal,
+      totalInterest: totalRealizedInterest
+    });
 
-      const memberEquity = (members || [])
-        .filter(m => (m.full_name || "").toLowerCase() !== "admin")
-        .map((m) => {
-          const mId = m.id;
-          const mName = (m.full_name || "").trim();
-          
-          const mContribution = installments?.filter(i => 
-            Number(i.member_id) === Number(mId) || 
-            (i.memberName?.trim().toLowerCase() === mName.toLowerCase())
-          ).reduce((sum, i) => sum + Number(i.amount || 0), 0) || 0;
-
-          // Member gets share of interest based on their contribution to total pool
-          const mInterestShare = finishedFdPrincipal > 0 
-            ? (totalEarnedInterest / finishedFdPrincipal) * mContribution 
-            : 0;
-
-          return {
-            id: m.id,
-            name: mName,
-            display_id: m.society_id || "N/A",
-            inst: mContribution,
-            interestShare: mInterestShare,
-            totalEquity: mContribution + mInterestShare
-          };
-        }).filter(row => row.inst > 0);
-
-      setReportData(memberEquity);
-      setSocietyFds(processedFds);
-      setStats({ 
-        totalInstalments: tInst, 
-        totalFD: tFD, 
-        totalInterest: totalEarnedInterest, 
-        totalFund: tInst + totalEarnedInterest // Total liquid value
-      });
-    } catch (e) { 
-      console.error(e); 
-    } finally { 
-      setIsLoading(false); 
-    }
-  };
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const filteredMembers = reportData.filter(m => 
     (m.name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 

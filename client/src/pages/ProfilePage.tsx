@@ -80,23 +80,26 @@ const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
 };
 
   // Handle Full Name and Info Updates
-  const handleSaveInfo = async () => {
-    try {
-      const { error } = await supabase
-        .from('members')
-        .update({ full_name: formData.name })
-        .eq('id', currentUser.id);
-
-      if (error) throw error;
-
-      await updateProfile({ name: formData.name });
-      
-      setIsEditing(false);
-      toast({ title: "Profile Updated", description: "Your information was saved successfully." });
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to save changes." });
-    }
-  };
+const handleSaveInfo = async () => {
+  try {
+    // 1. Use ONLY the context function. 
+    // It handles the API call, state update, and verification.
+    await updateProfile({ full_name: formData.name });
+    
+    setIsEditing(false);
+    toast({ 
+      title: "Profile Updated", 
+      description: "Your information was saved successfully." 
+    });
+  } catch (error: any) {
+    console.error("Save Info Error:", error);
+    toast({ 
+      variant: "destructive", 
+      title: "Error", 
+      description: "Failed to save changes." 
+    });
+  }
+};
 
   // Handle Password Reset Email
   const handlePasswordReset = async () => {

@@ -30,13 +30,12 @@ export default function InterestDistribution() {
     );
   }, [fixedDeposits, selectedYear]);
 
-  // 🚀 FIXED LOGIC: Group by MTDR to prevent duplicating Principal Amounts
-  const stats = useMemo(() => {
-    // 1. Group all records by their MTDR number
+ // 🔥 realized interest calculation
+const stats = useMemo(() => {
     const groupedByMtdr = new Map<string, any[]>();
+    const today = new Date();
     
     filteredFDs.forEach(fd => {
-      // Normalize MTDR string to prevent mismatch (e.g., MTDR:123 vs MTDR-123)
       const mtdr = (fd.mtdr_no || "UNASSIGNED").trim().replace(":", "-");
       if (!groupedByMtdr.has(mtdr)) groupedByMtdr.set(mtdr, []);
       groupedByMtdr.get(mtdr)!.push(fd);
@@ -48,41 +47,41 @@ export default function InterestDistribution() {
     let activeGroupsCount = 0;
     const uniqueFDsToShow: any[] = [];
 
-    // 2. Process each MTDR group exactly like the Fixed Deposit page
     groupedByMtdr.forEach((historyRows, mtdr) => {
-      // Sort to find the latest record for this MTDR
       const sortedHistory = [...historyRows].sort((a, b) => {
         const dateA = new Date(a.start_date || a.created_at).getTime();
         const dateB = new Date(b.start_date || b.created_at).getTime();
-        return dateB - dateA; // Descending
+        return dateB - dateA;
       });
       
       const latestFD = sortedHistory[0];
 
-      // Only count if the latest status is Active
       if (latestFD.status === "Active") {
-        const principal = Number(latestFD.amount) || 0;
-        totalInvested += principal; // Add principal ONLY ONCE per MTDR
+        totalInvested += Number(latestFD.amount) || 0;
         ratesSum += (Number(latestFD.interest_rate) || 0);
         activeGroupsCount++;
         
-        // Sum up the interest from ALL historical rows for this MTDR
         let cumulativeInterest = 0;
         historyRows.forEach(row => {
-           const p = Number(row.amount) || 0;
-           const r = Number(row.interest_rate) || 0;
-           const m = Number(row.tenure_months) || 12;
-           cumulativeInterest += (p * r * m) / 1200;
+           const startDate = new Date(row.start_date);
+           
+           // 🔥 CRITICAL FIX: Only sum interest if the FD cycle has actually started
+           // This prevents future-dated FDs (like June 2025) from adding to the total
+           if (startDate <= today) {
+             const p = Number(row.amount) || 0;
+             const r = Number(row.interest_rate) || 0;
+             const m = Number(row.tenure_months) || 12;
+             cumulativeInterest += (p * r * m) / 1200;
+           }
         });
 
         calculatedInterest += cumulativeInterest;
 
-        // Save for the right-side breakdown UI
         uniqueFDsToShow.push({
           ...latestFD,
           display_mtdr: mtdr,
-          total_realized_interest: cumulativeInterest,
-          history_count: historyRows.length
+          total_realized_interest: Math.round(cumulativeInterest),
+          history_count: historyRows.filter(r => new Date(r.start_date) <= today).length
         });
       }
     });

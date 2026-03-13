@@ -42,7 +42,9 @@ export default async function handler(req: any) {
     const { error } = await supabase
       .from("members")
       .update(data) // This will update 'profile_pic' or any other field in the data object
-      .eq("email", member_email);
+      .eq("email", member_email)
+      .select()  // ← ADD THIS to return the updated record
+      .single(); // ← ADD THIS to get a single object instead of array
 
     if (error) throw error;
 

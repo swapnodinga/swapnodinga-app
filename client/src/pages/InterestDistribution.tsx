@@ -64,31 +64,39 @@ const stats = useMemo(() => {
         let cumulativeInterest = 0;
         historyRows.forEach(row => {
            const startDate = new Date(row.start_date);
+           const tenure = Number(row.tenure_months) || 3; // Default 3 months
            
-           // 🔥 CRITICAL FIX: Only sum interest if the FD cycle has actually started
-           // This prevents future-dated FDs (like June 2025) from adding to the total
-           if (startDate <= today) {
+           // Calculate Maturity Date
+           const maturityDate = new Date(startDate);
+           maturityDate.setMonth(maturityDate.getMonth() + tenure);
+
+           // 🔥 THE FIX: Only count interest if the FD has MATURED
+           if (maturityDate <= today) {
              const p = Number(row.amount) || 0;
              const r = Number(row.interest_rate) || 0;
-             const m = Number(row.tenure_months) || 12;
-             cumulativeInterest += (p * r * m) / 1200;
+             cumulativeInterest += (p * r * tenure) / 1200;
            }
         });
 
-        calculatedInterest += cumulativeInterest;
+        // Round each MTDR's cumulative interest to match FD page rounding behavior
+        calculatedInterest += Math.round(cumulativeInterest);
 
         uniqueFDsToShow.push({
           ...latestFD,
           display_mtdr: mtdr,
           total_realized_interest: Math.round(cumulativeInterest),
-          history_count: historyRows.filter(r => new Date(r.start_date) <= today).length
+          history_count: historyRows.filter(r => {
+            const d = new Date(r.start_date);
+            d.setMonth(d.getMonth() + (Number(r.tenure_months) || 3));
+            return d <= today;
+          }).length
         });
       }
     });
 
     return {
       totalInvested,
-      totalInterest: Math.round(calculatedInterest),
+      totalInterest: calculatedInterest,
       avgRate: activeGroupsCount > 0 ? ratesSum / activeGroupsCount : 0,
       activeCount: activeGroupsCount,
       uniqueFDs: uniqueFDsToShow

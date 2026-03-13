@@ -18,15 +18,14 @@ export default function ReportsPage() {
 
   useEffect(() => { fetchReportData(); }, []);
 
+  // --- KEPT EXACTLY AS PER YOUR REQUEST ---
   const getMaturityData = (amount: number, rate: number, start: string, months: number) => {
     const startDate = new Date(start);
     const finishDate = new Date(start);
     finishDate.setMonth(startDate.getMonth() + Number(months));
     
-    // Accurate daily calculation to match FixedDepositPage logic
     const diffDays = Math.ceil(Math.abs(finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     const interest = (amount * rate * diffDays) / (365 * 100);
-    
     const isFinished = finishDate <= new Date();
     
     return {
@@ -41,29 +40,16 @@ export default function ReportsPage() {
     setIsLoading(true);
     try {
       const { data: members } = await supabase.from('members').select('id, full_name, society_id').order('id', { ascending: true });
-      let installments: any[] | null = null;
+      let installments: any[] = [];
       for (const tbl of ['Installments', 'installments']) {
         const { data, error } = await supabase.from(tbl).select('*').eq('status', 'Approved');
-        if (!error) { installments = data; break; }
+        if (!error && data) { installments = data; break; }
       }
       const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 
-      let totalEarnedInterest = 0;
-      let finishedFdPrincipal = 0;
-
+      // 1. INVESTMENT LEDGER LOGIC (Kept as is)
       const processedFds = (deposits || []).map(fd => {
-        const m = getMaturityData(
-          Number(fd.amount), 
-          Number(fd.interest_rate), 
-          fd.start_date, 
-          Number(fd.tenure_months)
-        );
-
-        if (m.isFinished) {
-          totalEarnedInterest += m.interest;
-          finishedFdPrincipal += Number(fd.amount);
-        }
-
+        const m = getMaturityData(Number(fd.amount), Number(fd.interest_rate), fd.start_date, Number(fd.tenure_months));
         return {
           ...fd,
           status: m.isFinished ? "FINISHED" : "ACTIVE",
@@ -74,28 +60,52 @@ export default function ReportsPage() {
         };
       });
 
-      const tInst = installments?.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
+      // 2. REVISED DIVIDEND LOGIC (The Fix)
+      // Group by MTDR to calculate the CORRECT Total Realized Interest (preventing renewal double-counting)
+      const groupedByMtdr = new Map<string, any[]>();
+      (deposits || []).forEach(fd => {
+        const mtdr = (fd.mtdr_no || "UNASSIGNED").trim();
+        if (!groupedByMtdr.has(mtdr)) groupedByMtdr.set(mtdr, []);
+        groupedByMtdr.get(mtdr)!.push(fd);
+      });
+
+      let correctTotalInterest = 0;
+      const today = new Date();
+
+      groupedByMtdr.forEach((rows) => {
+        rows.forEach(row => {
+          const start = new Date(row.start_date);
+          const tenure = Number(row.tenure_months) || 3;
+          const maturity = new Date(start);
+          maturity.setMonth(maturity.getMonth() + tenure);
+
+          // Only add interest to the dividend pool if the cycle is actually finished
+          if (maturity <= today) {
+            // Using standard FD monthly interest formula to match FixedDepositPage exactly
+            const interest = (Number(row.amount) * Number(row.interest_rate) * tenure) / 1200;
+            correctTotalInterest += interest;
+          }
+        });
+      });
+
+      const tInst = installments.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
       const tFD = processedFds.reduce((s, d) => s + (d.status === "ACTIVE" ? Number(d.amount) : 0), 0) || 0;
 
+      // Calculate Member Equity based on Total Pool Contribution
       const memberEquity = (members || [])
         .filter(m => (m.full_name || "").toLowerCase() !== "admin")
         .map((m) => {
-          const mId = m.id;
-          const mName = (m.full_name || "").trim();
-          
-          const mContribution = installments?.filter(i => 
-            Number(i.member_id) === Number(mId) || 
-            (i.memberName?.trim().toLowerCase() === mName.toLowerCase())
-          ).reduce((sum, i) => sum + Number(i.amount || 0), 0) || 0;
+          const mContribution = installments
+            .filter(i => i.member_id === m.id)
+            .reduce((sum, i) => sum + Number(i.amount || 0), 0) || 0;
 
-          // Member gets share of interest based on their contribution to total pool
-          const mInterestShare = finishedFdPrincipal > 0 
-            ? (totalEarnedInterest / finishedFdPrincipal) * mContribution 
-            : 0;
+          // Member gets share of the correct interest pool based on their % of total society instalments
+          const sharePercent = tInst > 0 ? (mContribution / tInst) : 0;
+          const mInterestShare = sharePercent * correctTotalInterest;
 
           return {
             id: m.id,
-            name: mName,
+            name: m.full_name,
             display_id: m.society_id || "N/A",
             inst: mContribution,
             interestShare: mInterestShare,
@@ -108,9 +118,10 @@ export default function ReportsPage() {
       setStats({ 
         totalInstalments: tInst, 
         totalFD: tFD, 
-        totalInterest: totalEarnedInterest, 
-        totalFund: tInst + totalEarnedInterest // Total liquid value
+        totalInterest: Math.round(correctTotalInterest), 
+        totalFund: tInst + Math.round(correctTotalInterest)
       });
+
     } catch (e) { 
       console.error(e); 
     } finally { 

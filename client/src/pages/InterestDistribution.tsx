@@ -4,16 +4,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useSociety } from "@/context/SocietyContext";
-import { LineChart, TrendingUp, Users, Banknote, PieChart, CalendarDays, ArrowUpRight, Calculator } from "lucide-react";
+import { LineChart, TrendingUp, Users, Banknote, PieChart, CalendarDays, ArrowUpRight, Calculator, History } from "lucide-react";
 
 const fmt = (n: number) => "৳" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmtInt = (n: number) => "৳" + Math.floor(n).toLocaleString("en-IN");
+const fmtInt = (n: number) => "৳" + Math.round(n).toLocaleString("en-IN"); 
 
 export default function InterestDistribution() {
   const { members, transactions, fixedDeposits, isLoading } = useSociety();
   const [selectedYear, setSelectedYear] = useState("all");
 
-  // 1. Extract years from start_date or year column
   const years = useMemo(() => {
     const ySet = new Set<string>();
     fixedDeposits.forEach((fd) => {
@@ -23,7 +22,6 @@ export default function InterestDistribution() {
     return Array.from(ySet).sort((a, b) => Number(b) - Number(a));
   }, [fixedDeposits]);
 
-  // 2. Filter FDs
   const filteredFDs = useMemo(() => {
     if (selectedYear === "all") return fixedDeposits;
     return fixedDeposits.filter((fd) => 
@@ -32,38 +30,72 @@ export default function InterestDistribution() {
     );
   }, [fixedDeposits, selectedYear]);
 
-// Updated calculation to match Fixed Deposit Page logic
+  // 🚀 FIXED LOGIC: Group by MTDR to prevent duplicating Principal Amounts
   const stats = useMemo(() => {
+    // 1. Group all records by their MTDR number
+    const groupedByMtdr = new Map<string, any[]>();
+    
+    filteredFDs.forEach(fd => {
+      // Normalize MTDR string to prevent mismatch (e.g., MTDR:123 vs MTDR-123)
+      const mtdr = (fd.mtdr_no || "UNASSIGNED").trim().replace(":", "-");
+      if (!groupedByMtdr.has(mtdr)) groupedByMtdr.set(mtdr, []);
+      groupedByMtdr.get(mtdr)!.push(fd);
+    });
+
     let totalInvested = 0;
     let calculatedInterest = 0;
     let ratesSum = 0;
+    let activeGroupsCount = 0;
+    const uniqueFDsToShow: any[] = [];
 
-    // Filter for Active ONLY to match FD page totals
-    const activeFDs = filteredFDs.filter(fd => fd.status === "Active");
+    // 2. Process each MTDR group exactly like the Fixed Deposit page
+    groupedByMtdr.forEach((historyRows, mtdr) => {
+      // Sort to find the latest record for this MTDR
+      const sortedHistory = [...historyRows].sort((a, b) => {
+        const dateA = new Date(a.start_date || a.created_at).getTime();
+        const dateB = new Date(b.start_date || b.created_at).getTime();
+        return dateB - dateA; // Descending
+      });
+      
+      const latestFD = sortedHistory[0];
 
-    activeFDs.forEach(fd => {
-      const principal = Number(fd.amount) || 0;
-      const rate = Number(fd.interest_rate) || 0;
-      const months = Number(fd.tenure_months) || 12;
-      
-      totalInvested += principal;
-      ratesSum += rate;
-      
-      // Standard Formula used in the FD Page
-      // (Principal * Rate * Tenure_Months) / (12 * 100)
-      const interestForThisFD = (principal * rate * months) / 1200;
-      calculatedInterest += interestForThisFD;
+      // Only count if the latest status is Active
+      if (latestFD.status === "Active") {
+        const principal = Number(latestFD.amount) || 0;
+        totalInvested += principal; // Add principal ONLY ONCE per MTDR
+        ratesSum += (Number(latestFD.interest_rate) || 0);
+        activeGroupsCount++;
+        
+        // Sum up the interest from ALL historical rows for this MTDR
+        let cumulativeInterest = 0;
+        historyRows.forEach(row => {
+           const p = Number(row.amount) || 0;
+           const r = Number(row.interest_rate) || 0;
+           const m = Number(row.tenure_months) || 12;
+           cumulativeInterest += (p * r * m) / 1200;
+        });
+
+        calculatedInterest += cumulativeInterest;
+
+        // Save for the right-side breakdown UI
+        uniqueFDsToShow.push({
+          ...latestFD,
+          display_mtdr: mtdr,
+          total_realized_interest: cumulativeInterest,
+          history_count: historyRows.length
+        });
+      }
     });
 
     return {
       totalInvested,
-      totalInterest: calculatedInterest,
-      avgRate: activeFDs.length > 0 ? ratesSum / activeFDs.length : 0,
-      activeCount: activeFDs.length
+      totalInterest: Math.round(calculatedInterest),
+      avgRate: activeGroupsCount > 0 ? ratesSum / activeGroupsCount : 0,
+      activeCount: activeGroupsCount,
+      uniqueFDs: uniqueFDsToShow
     };
   }, [filteredFDs]);
 
-  // 4. Proportional Distribution Logic
   const distribution = useMemo(() => {
     const approvedTxns = transactions.filter(t => t.status?.toLowerCase() === "approved");
     const totalContributionPool = approvedTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
@@ -94,7 +126,6 @@ export default function InterestDistribution() {
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-8 pb-20">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-800 flex items-center gap-3 tracking-tight">
@@ -114,16 +145,14 @@ export default function InterestDistribution() {
         </Select>
       </div>
 
-      {/* Summary Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard icon={<Banknote />} label="Total Principal" value={fmtInt(stats.totalInvested)} color="bg-emerald-600" />
-        <SummaryCard icon={<TrendingUp />} label="Est. Earnings" value={fmtInt(stats.totalInterest)} color="bg-blue-600" />
+        <SummaryCard icon={<TrendingUp />} label="Realized Interest" value={fmtInt(stats.totalInterest)} color="bg-blue-600" />
         <SummaryCard icon={<PieChart />} label="Avg. Rate" value={`${stats.avgRate.toFixed(2)}%`} color="bg-amber-500" />
         <SummaryCard icon={<Users />} label="Active FDs" value={stats.activeCount.toString()} color="bg-violet-600" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        {/* Proportional Dividend (Left) */}
         <Card className="xl:col-span-2 shadow-sm border-slate-200 overflow-hidden">
           <CardHeader className="bg-slate-50/50 border-b border-slate-100">
             <div className="flex justify-between items-end">
@@ -159,7 +188,7 @@ export default function InterestDistribution() {
                     </TableCell>
                     <TableCell className="text-right pr-6 p-4">
                       <div className="flex items-center justify-end gap-1">
-                        <span className="text-lg font-black text-slate-800 tracking-tighter">৳{Math.floor(m.dividend).toLocaleString()}</span>
+                        <span className="text-lg font-black text-slate-800 tracking-tighter">৳{Math.round(m.dividend).toLocaleString()}</span>
                         <ArrowUpRight size={14} className="text-emerald-500" />
                       </div>
                     </TableCell>
@@ -170,52 +199,37 @@ export default function InterestDistribution() {
           </CardContent>
         </Card>
 
-        {/* FD Breakdown (Right) */}
         <Card className="shadow-sm border-slate-200">
           <CardHeader>
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-400">Active MTDR Sources</CardTitle>
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-400">Unique Active MTDRs</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {filteredFDs.map(fd => {
-              const earned = (Number(fd.amount) * (Number(fd.interest_rate) / 100) * ((Number(fd.tenure_months) || 12) / 12));
-              return (
-                <div key={fd.id} className="p-3 rounded-xl border border-slate-100 bg-slate-50/30">
-                  <div className="flex justify-between items-start mb-1">
-                    <h4 className="font-bold text-slate-800 text-sm leading-tight">{fd.mtdr_no || "MTDR-UNASSIGNED"}</h4>
-                    <Badge className={`text-[9px] h-4 uppercase ${fd.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : ''}`}>{fd.status}</Badge>
+            {stats.uniqueFDs.map(fd => (
+              <div key={fd.id} className="p-3 rounded-xl border border-slate-100 bg-slate-50/30">
+                <div className="flex justify-between items-start mb-1">
+                  <h4 className="font-bold text-slate-800 text-sm leading-tight">{fd.display_mtdr}</h4>
+                  <Badge className="bg-emerald-100 text-emerald-700 text-[9px] h-4 uppercase border-none">{fd.status}</Badge>
+                </div>
+                <div className="flex justify-between items-end">
+                  <div className="text-[10px] text-slate-400 font-medium">
+                    Principal: {fmtInt(fd.amount)} <br/>
+                    Latest Rate: {fd.interest_rate}%
+                    {fd.history_count > 1 && (
+                      <span className="flex items-center gap-1 mt-1 text-blue-500 font-bold">
+                        <History size={10} /> {fd.history_count} cycles merged
+                      </span>
+                    )}
                   </div>
-                  <div className="flex justify-between items-end">
-                    <div className="text-[10px] text-slate-400 font-medium">
-                      Principal: {fmtInt(fd.amount)} <br/>
-                      Rate: {fd.interest_rate}%
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[9px] text-slate-400 block font-bold uppercase">Estimated Int.</span>
-                      <span className="font-bold text-emerald-600 text-sm">+{fmtInt(earned)}</span>
-                    </div>
+                  <div className="text-right">
+                    <span className="text-[9px] text-slate-400 block font-bold uppercase">Realized Interest</span>
+                    <span className="font-bold text-emerald-600 text-sm">+{fmtInt(fd.total_realized_interest)}</span>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>
-
-      {/* Distribution Formula Card */}
-      <Card className="bg-emerald-900 text-emerald-50 border-none shadow-xl">
-        <CardContent className="p-6">
-          <div className="flex gap-4 items-start">
-            <div className="p-3 bg-emerald-800 rounded-2xl"><Calculator size={24} /></div>
-            <div>
-              <h3 className="font-bold text-lg">Proportional Distribution Policy</h3>
-              <p className="text-emerald-200 text-sm mt-1 max-w-3xl">
-                The total interest pool is distributed based on the percentage of total approved contributions made by each member. 
-                This ensures that members with higher financial commitment receive a larger share of the profits.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

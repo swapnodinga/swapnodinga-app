@@ -7,28 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-async function fetchTransaction(supabase: any, id: number) {
-  const tableNames = ["Installments", "installments"];
-
-  for (const tableName of tableNames) {
-    const { data, error } = await supabase
-      .from(tableName)
-      .select(`
-        *,
-        members:member_id (
-          email,
-          full_name
-        )
-      `)
-      .eq("id", id)
-      .single();
-
-    if (!error && data) return { tx: data, tableName };
-  }
-
-  return { tx: null, tableName: null };
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
 
@@ -40,53 +18,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const { id, status } = body || {};
 
-    const numericId = Number(id);
-    const { tx, tableName } = await fetchTransaction(supabase, numericId);
+    if (!id) throw new Error("ID is required");
 
-    if (!tx || !tableName) {
-      throw new Error(`Transaction not found (id: ${id}). Tried tables: Installments, installments`);
-    }
-
-    const memberEmail = tx.members?.email;
-    const memberName = tx.members?.full_name;
-
-    if (!memberEmail) throw new Error("Could not find a unique email for this member");
-
-    const { error: updateError } = await supabase
-      .from(tableName)
-      .update({
-        status,
-        approved_at: status === "Approved" ? new Date().toISOString() : null,
+    // 1. UPDATE THE STATUS IMMEDIATELY (Most Important Step)
+    const { data: tx, error: updateError } = await supabase
+      .from("Installments")
+      .update({ 
+        status, 
+        approved_at: status === "Approved" ? new Date().toISOString() : null 
       })
-      .eq("id", numericId);
+      .eq("id", Number(id))
+      .select()
+      .single();
 
     if (updateError) throw updateError;
 
-    const protocol = req.headers["x-forwarded-proto"] || "http";
-    const host = req.headers.host;
-    const localTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" });
+    // 2. FETCH MEMBER DATA SEPARATELY (Safely)
+    const { data: member } = await supabase
+      .from("members")
+      .select("email, full_name")
+      .eq("id", tx.member_id)
+      .single();
 
-    await fetch(`${protocol}://${host}/api/send-email`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        member_name: memberName,
-        member_email: memberEmail,
-        amount: tx.amount,
-        month: tx.month,
-        status,
-        proof_url: tx.payment_proof_url,
-        time: localTime,
-      }),
-    });
-
-    if (tx.proofPath) {
-      await supabase.storage.from("payments").remove([tx.proofPath]);
-      await supabase.from(tableName).update({ payment_proof_url: null, proofPath: null }).eq("id", numericId);
+    // 3. TRIGGER NOTIFICATION (Non-blocking)
+    if (member?.email) {
+      const protocol = req.headers["x-forwarded-proto"] || "http";
+      const host = req.headers.host;
+      
+      fetch(`${protocol}://${host}/api/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          member_name: member.full_name,
+          member_email: member.email,
+          amount: tx.amount,
+          month: tx.month,
+          status: status,
+          time: new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" })
+        }),
+      }).catch(e => console.error("Email notification failed, but payment was approved."));
     }
 
-    return res.status(200).json({ success: true });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, message: err.message });
+    // 4. CLEANUP STORAGE (If Approved)
+    if (status === "Approved" && tx.proofPath) {
+      await supabase.storage.from("payments").remove([tx.proofPath]);
+      await supabase.from("Installments")
+        .update({ payment_proof_url: null, proofPath: null })
+        .eq("id", id);
+    }
+
+    return res.status(200).json({ success: true, message: `Payment ${status} successfully` });
+
+  } catch (error: any) {
+    console.error("Critical API Error:", error.message);
+    return res.status(500).json({ success: false, message: error.message });
   }
 }

@@ -7,6 +7,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
+async function resolveInstallmentsTable(supabase: any) {
+  for (const tableName of ["Installments", "installments"]) {
+    const { error } = await supabase.from(tableName).select("id").limit(1);
+    if (!error) return tableName;
+  }
+  return null;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
 
@@ -18,10 +26,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const { id, status } = body || {};
 
-    // 1. Fetch Installment and JOIN with Members table to get the Email
-    // We use the 'unique' email from the related member record
+    // Resolve the correct table name (case-sensitive)
+    const tableName = await resolveInstallmentsTable(supabase);
+    if (!tableName) throw new Error("Could not locate installments table (tried: Installments, installments)");
+
     const { data: tx, error: fetchError } = await supabase
-      .from("Installments")
+      .from(tableName)
       .select(`
         *,
         members:member_id (
@@ -32,25 +42,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq("id", Number(id))
       .single();
 
-    if (fetchError || !tx) throw new Error("Transaction not found");
+    if (fetchError || !tx) throw new Error(`Transaction not found (id: ${id}, table: ${tableName})`);
 
     const memberEmail = tx.members?.email;
     const memberName = tx.members?.full_name;
 
     if (!memberEmail) throw new Error("Could not find a unique email for this member");
 
-    // 2. Update the status
     const { error: updateError } = await supabase
-      .from("Installments")
-      .update({ 
-        status, 
-        approved_at: status === "Approved" ? new Date().toISOString() : null 
+      .from(tableName)
+      .update({
+        status,
+        approved_at: status === "Approved" ? new Date().toISOString() : null,
       })
       .eq("id", Number(id));
 
     if (updateError) throw updateError;
 
-    // 3. Trigger Email using the member's unique email
     const protocol = req.headers["x-forwarded-proto"] || "http";
     const host = req.headers.host;
     const localTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" });
@@ -60,19 +68,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         member_name: memberName,
-        member_email: memberEmail, // Using the unique email here
+        member_email: memberEmail,
         amount: tx.amount,
         month: tx.month,
         status: status,
         proof_url: tx.payment_proof_url,
-        time: localTime
+        time: localTime,
       }),
     });
 
-    // 4. Cleanup storage
     if (tx.proofPath) {
       await supabase.storage.from("payments").remove([tx.proofPath]);
-      await supabase.from("Installments").update({ payment_proof_url: null, proofPath: null }).eq("id", id);
+      await supabase.from(tableName).update({ payment_proof_url: null, proofPath: null }).eq("id", id);
     }
 
     return res.status(200).json({ success: true });

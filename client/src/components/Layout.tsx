@@ -8,8 +8,7 @@ import { useMobile } from "@/hooks/use-mobile";
 import { 
   LayoutDashboard, Users, ShieldCheck, LogOut, 
   ChevronRight, Home, Info, Briefcase, ShieldAlert, Phone,
-  CreditCard, Menu, LogIn, FileText, PiggyBank, LineChart, Settings,
-  FileDown 
+  CreditCard, Menu, LogIn, FileText, PiggyBank, LineChart, Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -226,30 +225,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <span className="capitalize font-medium text-slate-900">{part.replace(/-/g, ' ')}</span>
                 </React.Fragment>
               ))}
-
-              <a 
-                href="/society-rules.pdf" 
-                target="_blank" 
-                className="ml-4 p-1.5 bg-rose-50 rounded-lg text-rose-600 hover:bg-rose-100 transition-colors border border-rose-100"
-                title="View Society Rules"
-              >
-                <FileDown size={18} />
-              </a>
             </nav>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* NOTICE BUTTON WITH BADGE - POSITIONED PER BLUE MARK AREA */}
+          <div className="flex items-center gap-6">
+            {/* NOTICE BUTTON - LINKED TO PDF AND SPACED AWAY FROM PROFILE */}
             {currentUser && (
               <div className="relative">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-9 px-4 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 font-bold gap-2 hidden sm:flex"
-                >
-                  <FileText size={16} />
-                  <span>Notice</span>
-                </Button>
+                <a href="/society-rules.pdf" target="_blank">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-9 px-4 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 font-bold gap-2 hidden sm:flex shadow-sm"
+                  >
+                    <FileText size={16} />
+                    <span>Notice</span>
+                  </Button>
+                </a>
                 {/* Notification Badge */}
                 <span className="absolute -top-1 -right-1 flex h-3 w-3">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
@@ -259,7 +251,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             )}
 
             {currentUser ? (
-              <div className="flex items-center gap-3 border-l pl-4">
+              <div className="flex items-center gap-3 border-l pl-6">
                 <div className="text-right hidden sm:block">
                   <p className="text-xs font-bold text-slate-900">{currentUser.full_name}</p>
                   <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{currentUser.is_admin ? "Administrator" : "Member"}</p>
@@ -282,7 +274,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-y-auto bg-slate-50/30">
           <div className="p-4 md:p-8 space-y-6">
             
-            {/* UPDATED MARQUEE BANNER - MATCHED TO THEME (Emerald) */}
+            {/* MARQUEE BANNER */}
             {currentUser && (
               <div className="w-full h-11 bg-[#065f46] rounded-xl flex items-center overflow-hidden shadow-sm border border-[#064e3b]">
                 <div className="bg-[#064e3b] h-full flex items-center px-5 z-10">

@@ -20,8 +20,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const isMobile = useMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [dynamicNotice, setDynamicNotice] = useState("Loading official notice...");
 
-  // Calculate notification counts for Admin
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const { data } = await supabase
+        .from('site_settings')
+        .select('value')
+        .eq('key', 'dashboard_notice')
+        .single();
+      
+      if (data?.value) setDynamicNotice(data.value);
+    };
+    if (currentUser) fetchSettings();
+  }, [currentUser]);
+
   const pendingMembersCount = useMemo(() => 
     members.filter(m => m.status === 'pending').length, 
   [members]);
@@ -166,6 +179,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden relative">
+      <style jsx global>{`
+        @keyframes marquee {
+          0% { transform: translateX(100%); }
+          100% { transform: translateX(-100%); }
+        }
+        .animate-marquee {
+          display: inline-block;
+          white-space: nowrap;
+          animation: marquee 25s linear infinite;
+        }
+        .animate-marquee:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
+
       <aside className="hidden md:flex flex-col w-64 shrink-0 shadow-xl border-r border-white/5">
         <SidebarContent />
       </aside>
@@ -199,29 +227,39 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </React.Fragment>
               ))}
 
-              {/* NEW NOTICE BUTTON WITH NOTIFICATION BADGE */}
-              <div className="relative ml-4">
-                <a 
-                  href="/society-rules.pdf" 
-                  target="_blank" 
-                  className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 rounded-lg text-amber-700 hover:bg-amber-100 transition-all border border-amber-200 text-[11px] font-bold"
-                  title="View Official Notice"
-                >
-                  <FileText size={16} />
-                  <span>Notice</span>
-                </a>
-                {/* Notification Badge at Top Right */}
-                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600 border border-white"></span>
-                </span>
-              </div>
+              <a 
+                href="/society-rules.pdf" 
+                target="_blank" 
+                className="ml-4 p-1.5 bg-rose-50 rounded-lg text-rose-600 hover:bg-rose-100 transition-colors border border-rose-100"
+                title="View Society Rules"
+              >
+                <FileDown size={18} />
+              </a>
             </nav>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+            {/* NOTICE BUTTON WITH BADGE - POSITIONED PER BLUE MARK AREA */}
+            {currentUser && (
+              <div className="relative">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-9 px-4 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 font-bold gap-2 hidden sm:flex"
+                >
+                  <FileText size={16} />
+                  <span>Notice</span>
+                </Button>
+                {/* Notification Badge */}
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-600 border-2 border-white"></span>
+                </span>
+              </div>
+            )}
+
             {currentUser ? (
-              <div className="flex items-center gap-3 border-l pl-4 ml-2">
+              <div className="flex items-center gap-3 border-l pl-4">
                 <div className="text-right hidden sm:block">
                   <p className="text-xs font-bold text-slate-900">{currentUser.full_name}</p>
                   <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{currentUser.is_admin ? "Administrator" : "Member"}</p>
@@ -241,9 +279,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50/30">
-          {/* BANNER REMOVED TO ELIMINATE GAP */}
-          {children}
+        <main className="flex-1 overflow-y-auto bg-slate-50/30">
+          <div className="p-4 md:p-8 space-y-6">
+            
+            {/* UPDATED MARQUEE BANNER - MATCHED TO THEME (Emerald) */}
+            {currentUser && (
+              <div className="w-full h-11 bg-[#065f46] rounded-xl flex items-center overflow-hidden shadow-sm border border-[#064e3b]">
+                <div className="bg-[#064e3b] h-full flex items-center px-5 z-10">
+                    <span className="text-[10px] font-black text-white uppercase tracking-widest whitespace-nowrap">Official Notice</span>
+                </div>
+                <div className="flex-1">
+                  <div className="animate-marquee">
+                    <span className="text-emerald-50 text-sm font-medium px-4 tracking-wide">
+                      {dynamicNotice} &nbsp;&nbsp; • &nbsp;&nbsp; {dynamicNotice}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {children}
+          </div>
         </main>
       </div>
     </div>

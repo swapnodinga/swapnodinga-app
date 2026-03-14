@@ -2,14 +2,14 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useSociety } from "@/context/SocietyContext";
-import { supabase } from "@/lib/supabase"; // For dynamic notice fetching
+import { supabase } from "@/lib/supabase"; 
 import { cn } from "@/lib/utils";
 import { useMobile } from "@/hooks/use-mobile";
 import { 
   LayoutDashboard, Users, ShieldCheck, LogOut, 
   ChevronRight, Home, Info, Briefcase, ShieldAlert, Phone,
   CreditCard, Menu, LogIn, FileText, PiggyBank, LineChart, Settings,
-  FileDown // Added for PDF icon
+  FileDown 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -20,23 +20,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const isMobile = useMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-  // --- DYNAMIC NOTICE STATE ---
-  const [dynamicNotice, setDynamicNotice] = useState("Loading official notice...");
-
-  // Fetch notice from site_settings table
-  useEffect(() => {
-    const fetchSettings = async () => {
-      const { data } = await supabase
-        .from('site_settings')
-        .select('value')
-        .eq('key', 'dashboard_notice')
-        .single();
-      
-      if (data?.value) setDynamicNotice(data.value);
-    };
-    if (currentUser) fetchSettings();
-  }, [currentUser]);
 
   // Calculate notification counts for Admin
   const pendingMembersCount = useMemo(() => 
@@ -183,21 +166,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden relative">
-      <style jsx global>{`
-        @keyframes marquee {
-          0% { transform: translateX(100%); }
-          100% { transform: translateX(-100%); }
-        }
-        .animate-marquee {
-          display: inline-block;
-          white-space: nowrap;
-          animation: marquee 25s linear infinite;
-        }
-        .animate-marquee:hover {
-          animation-play-state: paused;
-        }
-      `}</style>
-
       <aside className="hidden md:flex flex-col w-64 shrink-0 shadow-xl border-r border-white/5">
         <SidebarContent />
       </aside>
@@ -231,15 +199,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </React.Fragment>
               ))}
 
-              {/* PDF ICON RELOCATED TO BREADCRUMB AREA */}
-              <a 
-                href="/society-rules.pdf" 
-                target="_blank" 
-                className="ml-4 p-1.5 bg-rose-50 rounded-lg text-rose-600 hover:bg-rose-100 transition-colors border border-rose-100"
-                title="View Society Rules"
-              >
-                <FileDown size={18} />
-              </a>
+              {/* NEW NOTICE BUTTON WITH NOTIFICATION BADGE */}
+              <div className="relative ml-4">
+                <a 
+                  href="/society-rules.pdf" 
+                  target="_blank" 
+                  className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 rounded-lg text-amber-700 hover:bg-amber-100 transition-all border border-amber-200 text-[11px] font-bold"
+                  title="View Official Notice"
+                >
+                  <FileText size={16} />
+                  <span>Notice</span>
+                </a>
+                {/* Notification Badge at Top Right */}
+                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600 border border-white"></span>
+                </span>
+              </div>
             </nav>
           </div>
 
@@ -265,27 +241,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-slate-50/30">
-          <div className="p-4 md:p-8 space-y-6">
-            
-            {/* NOTICE BANNER - Aligned to Content Width & Increased Height (h-12) */}
-            {currentUser && (
-              <div className="w-full h-12 bg-rose-600 rounded-xl flex items-center overflow-hidden shadow-md border border-rose-700">
-                <div className="bg-rose-700 h-full flex items-center px-6 shadow-xl z-10">
-                   <span className="text-[10px] font-black text-white uppercase tracking-widest whitespace-nowrap">Notice</span>
-                </div>
-                <div className="flex-1">
-                  <div className="animate-marquee">
-                    <span className="text-white text-sm font-bold px-4 tracking-wide">
-                      {dynamicNotice} &nbsp;&nbsp; • &nbsp;&nbsp; {dynamicNotice}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {children}
-          </div>
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50/30">
+          {/* BANNER REMOVED TO ELIMINATE GAP */}
+          {children}
         </main>
       </div>
     </div>

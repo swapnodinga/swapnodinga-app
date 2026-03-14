@@ -7,7 +7,8 @@ import { useMobile } from "@/hooks/use-mobile";
 import { 
   LayoutDashboard, Users, ShieldCheck, LogOut, 
   ChevronRight, Home, Info, Briefcase, ShieldAlert, Phone,
-  CreditCard, Menu, LogIn, FileText, PiggyBank, LineChart, Settings
+  CreditCard, Menu, LogIn, FileText, PiggyBank, LineChart, Settings,
+  FileDown // Added for PDF icon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -18,6 +19,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const isMobile = useMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // --- NOTICE BANNER TEXT ---
+  const noticeText = "IMPORTANT: Monthly installments are due by the 10th. Please verify your payment slips in the contributions tab. Society Annual General Meeting (AGM) will be held next month.";
 
   // Calculate notification counts for Admin
   const pendingMembersCount = useMemo(() => 
@@ -164,6 +168,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden relative">
+      {/* --- MARQUEE STYLES --- */}
+      <style jsx global>{`
+        @keyframes marquee {
+          0% { transform: translateX(100%); }
+          100% { transform: translateX(-100%); }
+        }
+        .animate-marquee {
+          display: inline-block;
+          white-space: nowrap;
+          animation: marquee 25s linear infinite;
+        }
+        .animate-marquee:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
+
       <aside className="hidden md:flex flex-col w-64 shrink-0 shadow-xl border-r border-white/5">
         <SidebarContent />
       </aside>
@@ -178,7 +198,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white border-b flex items-center px-4 md:px-8 justify-between shrink-0 shadow-sm">
+        <header className="h-16 bg-white border-b flex items-center px-4 md:px-8 justify-between shrink-0 shadow-sm z-30">
           <div className="flex items-center gap-3">
             {isMobile && (
               <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}>
@@ -203,7 +223,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {currentUser ? (
               <div className="flex items-center gap-3 border-l pl-4 ml-2">
                 <div className="text-right hidden sm:block">
-                  <p className="text-xs font-bold text-slate-900">{currentUser.full_name}</p>
+                  <div className="flex items-center justify-end gap-2">
+                    {/* --- PDF FILE LINK --- */}
+                    <a 
+                      href="/society-rules.pdf" 
+                      target="_blank" 
+                      className="text-rose-600 hover:text-rose-800 transition-colors"
+                      title="View Society Rules"
+                    >
+                      <FileDown size={16} />
+                    </a>
+                    <p className="text-xs font-bold text-slate-900">{currentUser.full_name}</p>
+                  </div>
                   <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{currentUser.is_admin ? "Administrator" : "Member"}</p>
                 </div>
                 <div className="w-8 h-8 rounded-full overflow-hidden border bg-slate-100">
@@ -220,6 +251,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             )}
           </div>
         </header>
+
+        {/* --- SCROLLABLE NOTICE BANNER --- */}
+        {currentUser && (
+          <div className="h-8 bg-rose-600 flex items-center overflow-hidden border-b border-rose-700 shadow-sm relative z-20">
+            <div className="bg-rose-700 px-4 h-full flex items-center z-10 shadow-lg">
+               <span className="text-[10px] font-black text-white uppercase tracking-widest whitespace-nowrap">Notice</span>
+            </div>
+            <div className="flex-1">
+              <div className="animate-marquee">
+                <span className="text-white text-xs font-bold px-4 tracking-wide">
+                  {noticeText} &nbsp;&nbsp; • &nbsp;&nbsp; {noticeText}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50/30">{children}</main>
       </div>
     </div>

@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useSociety } from "@/context/SocietyContext";
+import { supabase } from "@/lib/supabase"; // For dynamic notice fetching
 import { cn } from "@/lib/utils";
 import { useMobile } from "@/hooks/use-mobile";
 import { 
@@ -20,8 +21,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isMobile = useMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // --- NOTICE BANNER TEXT ---
-  const noticeText = "IMPORTANT: Monthly installments are due by the 10th. Please verify your payment slips in the contributions tab. Society Annual General Meeting (AGM) will be held next month.";
+  // --- DYNAMIC NOTICE STATE ---
+  const [dynamicNotice, setDynamicNotice] = useState("Loading official notice...");
+
+  // Fetch notice from site_settings table
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const { data } = await supabase
+        .from('site_settings')
+        .select('value')
+        .eq('key', 'dashboard_notice')
+        .single();
+      
+      if (data?.value) setDynamicNotice(data.value);
+    };
+    if (currentUser) fetchSettings();
+  }, [currentUser]);
 
   // Calculate notification counts for Admin
   const pendingMembersCount = useMemo(() => 
@@ -168,7 +183,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden relative">
-      {/* --- MARQUEE STYLES --- */}
       <style jsx global>{`
         @keyframes marquee {
           0% { transform: translateX(100%); }
@@ -216,6 +230,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <span className="capitalize font-medium text-slate-900">{part.replace(/-/g, ' ')}</span>
                 </React.Fragment>
               ))}
+
+              {/* PDF ICON RELOCATED TO BREADCRUMB AREA */}
+              <a 
+                href="/society-rules.pdf" 
+                target="_blank" 
+                className="ml-4 p-1.5 bg-rose-50 rounded-lg text-rose-600 hover:bg-rose-100 transition-colors border border-rose-100"
+                title="View Society Rules"
+              >
+                <FileDown size={18} />
+              </a>
             </nav>
           </div>
 
@@ -223,18 +247,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {currentUser ? (
               <div className="flex items-center gap-3 border-l pl-4 ml-2">
                 <div className="text-right hidden sm:block">
-                  <div className="flex items-center justify-end gap-2">
-                    {/* --- PDF FILE LINK --- */}
-                    <a 
-                      href="/society-rules.pdf" 
-                      target="_blank" 
-                      className="text-rose-600 hover:text-rose-800 transition-colors"
-                      title="View Society Rules"
-                    >
-                      <FileDown size={16} />
-                    </a>
-                    <p className="text-xs font-bold text-slate-900">{currentUser.full_name}</p>
-                  </div>
+                  <p className="text-xs font-bold text-slate-900">{currentUser.full_name}</p>
                   <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{currentUser.is_admin ? "Administrator" : "Member"}</p>
                 </div>
                 <div className="w-8 h-8 rounded-full overflow-hidden border bg-slate-100">
@@ -252,23 +265,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* --- SCROLLABLE NOTICE BANNER --- */}
-        {currentUser && (
-          <div className="h-8 bg-rose-600 flex items-center overflow-hidden border-b border-rose-700 shadow-sm relative z-20">
-            <div className="bg-rose-700 px-4 h-full flex items-center z-10 shadow-lg">
-               <span className="text-[10px] font-black text-white uppercase tracking-widest whitespace-nowrap">Notice</span>
-            </div>
-            <div className="flex-1">
-              <div className="animate-marquee">
-                <span className="text-white text-xs font-bold px-4 tracking-wide">
-                  {noticeText} &nbsp;&nbsp; • &nbsp;&nbsp; {noticeText}
-                </span>
+        <main className="flex-1 overflow-y-auto bg-slate-50/30">
+          <div className="p-4 md:p-8 space-y-6">
+            
+            {/* NOTICE BANNER - Aligned to Content Width & Increased Height (h-12) */}
+            {currentUser && (
+              <div className="w-full h-12 bg-rose-600 rounded-xl flex items-center overflow-hidden shadow-md border border-rose-700">
+                <div className="bg-rose-700 h-full flex items-center px-6 shadow-xl z-10">
+                   <span className="text-[10px] font-black text-white uppercase tracking-widest whitespace-nowrap">Notice</span>
+                </div>
+                <div className="flex-1">
+                  <div className="animate-marquee">
+                    <span className="text-white text-sm font-bold px-4 tracking-wide">
+                      {dynamicNotice} &nbsp;&nbsp; • &nbsp;&nbsp; {dynamicNotice}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50/30">{children}</main>
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   );

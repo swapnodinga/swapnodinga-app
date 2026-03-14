@@ -229,10 +229,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-6">
-            {/* NOTICE BUTTON - LINKED TO PDF AND SPACED AWAY FROM PROFILE */}
+            {/* UPDATED: NOTICE BUTTON - LINKED TO SUPABASE PDF */}
             {currentUser && (
               <div className="relative">
-                <a href="/society-rules.pdf" target="_blank">
+                <a 
+                  href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/documents/official-notice.pdf`} 
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -274,7 +278,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-y-auto bg-slate-50/30">
           <div className="p-4 md:p-8 space-y-6">
             
-            {/* MARQUEE BANNER */}
+            {/* MARQUEE BANNER - Kept exactly as you designed it */}
             {currentUser && (
               <div className="w-full h-11 bg-[#065f46] rounded-xl flex items-center overflow-hidden shadow-sm border border-[#064e3b]">
                 <div className="bg-[#064e3b] h-full flex items-center px-5 z-10">

@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Save, Loader2, RefreshCw, UserCog, Phone, 
+  Save, Loader2, RefreshCw, UserCog, Phone, Megaphone, FileUp,
   Globe, MapPin, Briefcase, Facebook, Plus, Trash2, Image as ImageIcon
 } from "lucide-react";
 
@@ -21,6 +21,9 @@ export default function AdminSettings() {
   const [settings, setSettings] = useState<any>({});
   const [committee, setCommittee] = useState<any[]>([]);
   
+  // Notice States
+  const [noticeFile, setNoticeFile] = useState<File | null>(null);
+
   // Project Management States
   const [projects, setProjects] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -93,7 +96,6 @@ export default function AdminSettings() {
   const addProject = async (type: string) => {
     setSaving(true);
     try {
-      // FIX: Handle empty strings for dates to avoid PostgreSQL error
       const projectData = {
         ...newProject,
         project_type: type,
@@ -127,11 +129,28 @@ export default function AdminSettings() {
   const saveAllData = async () => {
     setSaving(true);
     try {
-      const updates = Object.keys(settings).map(key => ({ setting_key: key, setting_value: settings[key] }));
+      // 1. Save Text Settings (Includes the scrolling notice)
+      const updates = Object.keys(settings).map(key => ({ 
+        setting_key: key, 
+        setting_value: settings[key] 
+      }));
       await supabase.from('site_settings').upsert(updates, { onConflict: 'setting_key' });
+
+      // 2. Handle PDF Upload to 'documents' bucket
+      if (noticeFile) {
+        const { error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload('official-notice.pdf', noticeFile, { upsert: true });
+
+        if (uploadError) throw uploadError;
+        setNoticeFile(null); // Clear selection after success
+      }
+
+      // 3. Save Committee
       const committeeUpdates = committee.map(m => ({ member_id: m.member_id || null, role: m.role, rank: m.rank }));
       await supabase.from('committee').upsert(committeeUpdates, { onConflict: 'rank' });
-      toast({ title: "Configuration Saved" });
+      
+      toast({ title: "Configuration & Notice Saved" });
       fetchData();
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error", description: error.message });
@@ -156,10 +175,11 @@ export default function AdminSettings() {
       </div>
 
       <Tabs defaultValue="contact" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-8 bg-emerald-50 p-1">
-          <TabsTrigger value="contact" className="gap-2"><Phone size={16}/> Contact & Address</TabsTrigger>
-          <TabsTrigger value="board" className="gap-2"><UserCog size={16}/> Board Members</TabsTrigger>
-          <TabsTrigger value="project" className="gap-2"><Briefcase size={16}/> Projects CMS</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 mb-8 bg-emerald-50 p-1">
+          <TabsTrigger value="contact" className="gap-2"><Phone size={16}/> Contact</TabsTrigger>
+          <TabsTrigger value="board" className="gap-2"><UserCog size={16}/> Board</TabsTrigger>
+          <TabsTrigger value="project" className="gap-2"><Briefcase size={16}/> Projects</TabsTrigger>
+          <TabsTrigger value="notice" className="gap-2"><Megaphone size={16}/> Notice</TabsTrigger>
         </TabsList>
 
         <TabsContent value="contact" className="space-y-6">
@@ -252,26 +272,21 @@ export default function AdminSettings() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
               <div className="space-y-4 p-6 border rounded-xl bg-slate-50/50">
-                <h3 className="font-bold text-emerald-900 flex items-center gap-2"><Plus size={18}/> Add New Project Entry</h3>
+                <h3 className="font-bold text-emerald-900 flex items-center gap-2"><Plus size={18}/> Add New Project</h3>
                 <div className="space-y-3">
                   <div className="space-y-1"><Label>Title</Label><Input value={newProject.title} onChange={(e) => setNewProject({...newProject, title: e.target.value})} /></div>
-                  
                   <TabsContent value="ongoing" className="space-y-3 m-0">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1"><Label>Location</Label><Input value={newProject.location} onChange={(e) => setNewProject({...newProject, location: e.target.value})} /></div>
                       <div className="space-y-1"><Label>Share Price (৳)</Label><Input type="number" value={newProject.share_amount} onChange={(e) => setNewProject({...newProject, share_amount: e.target.value})} /></div>
                       <div className="space-y-1"><Label>Floors</Label><Input type="number" value={newProject.floors} onChange={(e) => setNewProject({...newProject, floors: e.target.value})} /></div>
                       <div className="space-y-1"><Label>Flat Size (sqft)</Label><Input value={newProject.flat_size} onChange={(e) => setNewProject({...newProject, flat_size: e.target.value})} /></div>
-                      <div className="col-span-2 space-y-1"><Label>Discount for Full Payment (৳)</Label><Input type="number" value={newProject.at_once_discount} onChange={(e) => setNewProject({...newProject, at_once_discount: e.target.value})} /></div>
                     </div>
                   </TabsContent>
-
                   <TabsContent value="finished" className="space-y-3 m-0">
                     <div className="space-y-1"><Label>Completion Date</Label><Input type="date" value={newProject.completion_date} onChange={(e) => setNewProject({...newProject, completion_date: e.target.value})} /></div>
                   </TabsContent>
-
                   <div className="space-y-1"><Label>Description</Label><Textarea className="h-24" value={newProject.description} onChange={(e) => setNewProject({...newProject, description: e.target.value})} /></div>
-
                   <div className="space-y-2">
                     <Label>Thumbnail Image</Label>
                     <div className="flex items-center gap-4">
@@ -282,15 +297,13 @@ export default function AdminSettings() {
                       {newProject.image_url && <span className="text-xs text-emerald-600 font-bold">✓ Ready</span>}
                     </div>
                   </div>
-
-                  <TabsContent value="ongoing" className="m-0 pt-2"><Button onClick={() => addProject('ongoing')} className="w-full bg-emerald-700">Publish Ongoing Project</Button></TabsContent>
-                  <TabsContent value="finished" className="m-0 pt-2"><Button onClick={() => addProject('finished')} className="w-full bg-slate-800">Archive as Finished</Button></TabsContent>
-                  <TabsContent value="roadmap" className="m-0 pt-2"><Button onClick={() => addProject('roadmap')} className="w-full bg-blue-700">Add to Roadmap</Button></TabsContent>
+                  <TabsContent value="ongoing" className="m-0 pt-2"><Button onClick={() => addProject('ongoing')} className="w-full bg-emerald-700">Publish Ongoing</Button></TabsContent>
+                  <TabsContent value="finished" className="m-0 pt-2"><Button onClick={() => addProject('finished')} className="w-full bg-slate-800">Archive Finished</Button></TabsContent>
+                  <TabsContent value="roadmap" className="m-0 pt-2"><Button onClick={() => addProject('roadmap')} className="w-full bg-blue-700">Add Roadmap</Button></TabsContent>
                 </div>
               </div>
-
               <div className="space-y-4">
-                <h3 className="font-bold text-slate-700 uppercase text-xs tracking-widest">Live Database Entries</h3>
+                <h3 className="font-bold text-slate-700 uppercase text-xs tracking-widest">Database Entries</h3>
                 <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
                   {projects.map((p) => (
                     <div key={p.id} className="flex items-center justify-between p-3 bg-white border rounded-lg shadow-sm">
@@ -305,6 +318,64 @@ export default function AdminSettings() {
               </div>
             </div>
           </Tabs>
+        </TabsContent>
+
+        <TabsContent value="notice" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="border-emerald-100 shadow-sm">
+              <CardHeader className="bg-emerald-50/50">
+                <CardTitle className="text-emerald-800 text-sm flex items-center gap-2">
+                  <Megaphone size={16} /> Dashboard Banner Text
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-4">
+                <div className="space-y-2">
+                  <Label>Scrolling Notice Content</Label>
+                  <Input 
+                    placeholder="Enter urgent announcement text..." 
+                    value={settings.dashboard_notice || ""} 
+                    onChange={(e) => setSettings({...settings, dashboard_notice: e.target.value})} 
+                  />
+                  <p className="text-[10px] text-slate-400">This text scrolls across the red banner at the top of member dashboards.</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-amber-100 shadow-sm">
+              <CardHeader className="bg-amber-50/50">
+                <CardTitle className="text-amber-800 text-sm flex items-center gap-2">
+                  <FileUp size={16} /> Official PDF Attachment
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-4">
+                <div className="space-y-3">
+                  <Label>Upload New Notice (PDF Only)</Label>
+                  <div className="flex items-center gap-4">
+                    <Input 
+                      type="file" 
+                      accept=".pdf" 
+                      id="pdf-notice" 
+                      className="hidden" 
+                      onChange={(e) => setNoticeFile(e.target.files?.[0] || null)}
+                    />
+                    <Label htmlFor="pdf-notice" className="flex-1 cursor-pointer flex items-center justify-center gap-2 bg-white border border-dashed border-amber-300 py-6 rounded-xl hover:bg-amber-50 transition-colors">
+                      <FileUp size={20} className="text-amber-500" />
+                      <span className="text-sm font-medium text-amber-900">
+                        {noticeFile ? noticeFile.name : "Select Official PDF"}
+                      </span>
+                    </Label>
+                  </div>
+                  {noticeFile && (
+                    <div className="flex items-center gap-2 p-2 bg-emerald-50 rounded-lg border border-emerald-100">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[10px] font-bold text-emerald-700 uppercase">File Ready for upload</span>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-slate-400 italic text-center">Replaces the PDF linked to the 'Notice' button in the header.</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

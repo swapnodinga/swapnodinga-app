@@ -17,13 +17,12 @@ export default function MemberDashboard() {
     myInstallments: 0
   });
 
-  // Admin-synced helper function for interest calculation
+  // Precise interest calculation helper
   const getMaturityData = (amount: number, rate: number, start: string, months: number) => {
     const startDate = new Date(start);
     const finishDate = new Date(start);
     finishDate.setMonth(startDate.getMonth() + Number(months));
     
-    // Exact day-based calculation as per Admin logic
     const diffDays = Math.ceil(Math.abs(finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     const interest = (amount * rate * diffDays) / (365 * 100);
     const isFinished = finishDate <= new Date();
@@ -33,55 +32,39 @@ export default function MemberDashboard() {
 
   useEffect(() => {
     const fetchMemberData = async () => {
-      if (!currentUser || !currentUser.id) return;
+      if (!currentUser?.id) return;
 
       try {
         const { data: installments } = await supabase.from('Installments').select('*').eq('status', 'Approved');
         const { data: deposits } = await supabase.from('fixed_deposits').select('*');
 
-        // Logic to group by MTDR and take only the latest entry principal
-        const groupedDeposits = (deposits || []).reduce((groups: any, fd: any) => {
-          const key = fd.mtdr_no || "Unassigned";
-          if (!groups[key]) groups[key] = [];
-          groups[key].push(fd);
-          groups[key].sort((a: any, b: any) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
-          return groups;
-        }, {});
-
         let totalActivePrincipal = 0;
-        let totalFinishedPrincipal = 0; 
         let totalRealizedInterest = 0; 
 
-        // Apply same loop logic as Admin Dashboard
+        // 1. Society-wide FD Analysis
         (deposits || []).forEach(fd => {
           const m = getMaturityData(Number(fd.amount), Number(fd.interest_rate), fd.start_date, Number(fd.tenure_months));
           if (m.isFinished) { 
             totalRealizedInterest += m.interest; 
-            totalFinishedPrincipal += Number(fd.amount); 
           } else { 
             totalActivePrincipal += Number(fd.amount); 
           }
         });
 
-        // Fixed Global Principal logic for the display card
-        let totalGlobalPrincipalForDisplay = 0;
-        Object.values(groupedDeposits).forEach((group: any) => {
-          totalGlobalPrincipalForDisplay += Number(group[0].amount || 0);
-        });
-
+        // 2. Installment Totals (The true denominator for dividends)
         const societyTotalInstalments = (installments || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
         
         const myInstallments = (installments || [])
           .filter(inst => inst.member_id === currentUser.id)
           .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-        // Member share calculation synced with Admin's formula
-        const myInterestShare = totalFinishedPrincipal > 0 
-          ? (totalRealizedInterest / totalFinishedPrincipal) * myInstallments 
+        // 3. The Core Correction: Dividends based on the total installment pool
+        const myInterestShare = societyTotalInstalments > 0 
+          ? (totalRealizedInterest / societyTotalInstalments) * myInstallments 
           : 0;
 
         setLocalStats({
-          societyFixedDeposit: totalActivePrincipal, // Synced with "Active FD Capital"
+          societyFixedDeposit: totalActivePrincipal, 
           societyDepositInterest: totalRealizedInterest,
           societyTotalFund: societyTotalInstalments + totalRealizedInterest,
           myAccumulatedInterest: myInterestShare,
@@ -110,7 +93,7 @@ export default function MemberDashboard() {
           </div>
           <div>
             <h1 className="text-lg md:text-xl font-bold text-white uppercase">
-              {currentUser.full_name || currentUser.name || currentUser.memberName}
+              {currentUser.full_name || currentUser.name || "Member"}
             </h1>
             <p className="text-emerald-300/80 text-[10px] font-medium tracking-widest uppercase">
               ID: {currentUser.society_id || "PENDING"} 
@@ -138,7 +121,7 @@ export default function MemberDashboard() {
           />
           <StatCard 
             title="ACCUMULATED INTEREST" 
-            value={`৳${Math.round(localStats.myAccumulatedInterest).toLocaleString()}`} 
+            value={`৳${localStats.myAccumulatedInterest.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}`} 
             icon={Percent} 
             className={unifiedCardStyle}
             valueClassName={`${amountFontStyle} text-3xl text-emerald-600`}
@@ -150,7 +133,7 @@ export default function MemberDashboard() {
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Society Capital Status</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatCard 
-            title="FIXED DEPOSIT" 
+            title="ACTIVE FD CAPITAL" 
             value={`৳${localStats.societyFixedDeposit.toLocaleString()}`} 
             icon={LandPlot} 
             className={unifiedCardStyle}

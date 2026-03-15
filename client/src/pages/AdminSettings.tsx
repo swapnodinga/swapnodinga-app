@@ -22,7 +22,8 @@ export default function AdminSettings() {
   const [committee, setCommittee] = useState<any[]>([]);
   
   // Notice States
-  const [noticeFile, setNoticeFile] = useState<File | null>(null);
+  const [allNotices, setAllNotices] = useState<any[]>([]);
+  const [noticeTitle, setNoticeTitle] = useState("");
 
   // Project Management States
   const [projects, setProjects] = useState<any[]>([]);
@@ -46,6 +47,8 @@ export default function AdminSettings() {
 
   async function fetchData() {
     setLoading(true);
+    
+    // Fetch Settings
     const { data: sData } = await supabase.from('site_settings').select('*');
     if (sData) {
       const settingsMap = sData.reduce((acc: any, item: any) => {
@@ -55,6 +58,7 @@ export default function AdminSettings() {
       setSettings(settingsMap);
     }
 
+    // Fetch Committee
     const { data: cData } = await supabase.from('committee').select('*').order('rank', { ascending: true });
     const defaultRoles = ["Founder & Chairman", "General Secretary", "Executive Member", "Executive Member", "Executive Member", "Executive Member"];
     const cleanBoard = Array.from({ length: 6 }).map((_, i) => {
@@ -63,8 +67,13 @@ export default function AdminSettings() {
     });
     setCommittee(cleanBoard);
 
+    // Fetch Projects
     const { data: pData } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
     if (pData) setProjects(pData);
+
+    // Fetch Notices
+    const { data: nData } = await supabase.from('notices').select('*').order('created_at', { ascending: false });
+    if (nData) setAllNotices(nData);
 
     setLoading(false);
   }
@@ -86,6 +95,39 @@ export default function AdminSettings() {
       const { data } = supabase.storage.from('project-images').getPublicUrl(filePath);
       setNewProject({ ...newProject, image_url: data.publicUrl });
       toast({ title: "Image Uploaded" });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Upload Failed", description: error.message });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleNoticeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploading(true);
+      const file = e.target.files?.[0];
+      if (!file || !noticeTitle) {
+        toast({ variant: "destructive", title: "Missing Title", description: "Please enter a title before uploading the PDF." });
+        return;
+      }
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `notices/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file);
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+
+      const { error: dbError } = await supabase.from('notices').insert([
+        { title: noticeTitle, file_url: urlData.publicUrl }
+      ]);
+      if (dbError) throw dbError;
+
+      toast({ title: "Notice Published Successfully" });
+      setNoticeTitle(""); 
+      fetchData(); 
     } catch (error: any) {
       toast({ variant: "destructive", title: "Upload Failed", description: error.message });
     } finally {
@@ -129,28 +171,18 @@ export default function AdminSettings() {
   const saveAllData = async () => {
     setSaving(true);
     try {
-      // 1. Save Text Settings (Includes the scrolling notice)
+      // 1. Save Text Settings 
       const updates = Object.keys(settings).map(key => ({ 
         setting_key: key, 
         setting_value: settings[key] 
       }));
       await supabase.from('site_settings').upsert(updates, { onConflict: 'setting_key' });
 
-      // 2. Handle PDF Upload to 'documents' bucket
-      if (noticeFile) {
-        const { error: uploadError } = await supabase.storage
-          .from('documents')
-          .upload('official-notice.pdf', noticeFile, { upsert: true });
-
-        if (uploadError) throw uploadError;
-        setNoticeFile(null); // Clear selection after success
-      }
-
-      // 3. Save Committee
+      // 2. Save Committee
       const committeeUpdates = committee.map(m => ({ member_id: m.member_id || null, role: m.role, rank: m.rank }));
       await supabase.from('committee').upsert(committeeUpdates, { onConflict: 'rank' });
       
-      toast({ title: "Configuration & Notice Saved" });
+      toast({ title: "Configuration Saved" });
       fetchData();
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error", description: error.message });
@@ -321,60 +353,94 @@ export default function AdminSettings() {
         </TabsContent>
 
         <TabsContent value="notice" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="border-emerald-100 shadow-sm">
-              <CardHeader className="bg-emerald-50/50">
-                <CardTitle className="text-emerald-800 text-sm flex items-center gap-2">
-                  <Megaphone size={16} /> Dashboard Banner Text
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-4">
-                <div className="space-y-2">
-                  <Label>Scrolling Notice Content</Label>
-                  <Input 
-                    placeholder="Enter urgent announcement text..." 
-                    value={settings.dashboard_notice || ""} 
-                    onChange={(e) => setSettings({...settings, dashboard_notice: e.target.value})} 
-                  />
-                  <p className="text-[10px] text-slate-400">This text scrolls across the red banner at the top of member dashboards.</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-amber-100 shadow-sm">
-              <CardHeader className="bg-amber-50/50">
-                <CardTitle className="text-amber-800 text-sm flex items-center gap-2">
-                  <FileUp size={16} /> Official PDF Attachment
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-4">
-                <div className="space-y-3">
-                  <Label>Upload New Notice (PDF Only)</Label>
-                  <div className="flex items-center gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              <Card className="border-emerald-100 shadow-sm">
+                <CardHeader className="bg-emerald-50/50">
+                  <CardTitle className="text-emerald-800 text-sm flex items-center gap-2">
+                    <Megaphone size={16} /> Dashboard Banner Text
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="space-y-2">
+                    <Label>Scrolling Notice Content</Label>
                     <Input 
-                      type="file" 
-                      accept=".pdf" 
-                      id="pdf-notice" 
-                      className="hidden" 
-                      onChange={(e) => setNoticeFile(e.target.files?.[0] || null)}
+                      placeholder="Enter urgent announcement text..." 
+                      value={settings.dashboard_notice || ""} 
+                      onChange={(e) => setSettings({...settings, dashboard_notice: e.target.value})} 
                     />
-                    <Label htmlFor="pdf-notice" className="flex-1 cursor-pointer flex items-center justify-center gap-2 bg-white border border-dashed border-amber-300 py-6 rounded-xl hover:bg-amber-50 transition-colors">
-                      <FileUp size={20} className="text-amber-500" />
-                      <span className="text-sm font-medium text-amber-900">
-                        {noticeFile ? noticeFile.name : "Select Official PDF"}
-                      </span>
-                    </Label>
+                    <p className="text-[10px] text-slate-400">This text scrolls across the red banner on the member dashboard.</p>
                   </div>
-                  {noticeFile && (
-                    <div className="flex items-center gap-2 p-2 bg-emerald-50 rounded-lg border border-emerald-100">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="text-[10px] font-bold text-emerald-700 uppercase">File Ready for upload</span>
+                </CardContent>
+              </Card>
+
+              <Card className="border-amber-100 shadow-sm">
+                <CardHeader className="bg-amber-50/50">
+                  <CardTitle className="text-amber-800 text-sm flex items-center gap-2">
+                    <FileUp size={16} /> Upload New PDF Notice
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label>Notice Title</Label>
+                      <Input 
+                        placeholder="e.g., Monthly Meeting Minutes - Oct" 
+                        value={noticeTitle}
+                        onChange={(e) => setNoticeTitle(e.target.value)}
+                      />
                     </div>
-                  )}
-                  <p className="text-[10px] text-slate-400 italic text-center">Replaces the PDF linked to the 'Notice' button in the header.</p>
-                </div>
-              </CardContent>
-            </Card>
+                    <div className="flex items-center gap-4">
+                      <Input type="file" accept=".pdf" id="pdf-notice" className="hidden" onChange={handleNoticeUpload} />
+                      <Label htmlFor="pdf-notice" className="w-full cursor-pointer flex flex-col items-center justify-center gap-2 bg-white border border-dashed border-amber-300 py-8 rounded-xl hover:bg-amber-50 transition-all">
+                        {uploading ? <Loader2 className="animate-spin text-amber-500" /> : <FileUp size={24} className="text-amber-500" />}
+                        <span className="text-sm font-semibold text-amber-900">
+                          {uploading ? "Uploading..." : "Click to select and publish PDF"}
+                        </span>
+                        <span className="text-[10px] text-amber-600 font-medium uppercase tracking-wider">Members will be notified</span>
+                      </Label>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="font-bold text-slate-700 uppercase text-xs tracking-widest flex items-center gap-2">
+                <Briefcase size={14}/> Published Notices ({allNotices.length})
+              </h3>
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                {allNotices.map((n) => (
+                  <div key={n.id} className="flex items-center justify-between p-4 bg-white border rounded-xl shadow-sm hover:border-emerald-200 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-red-50 rounded-lg text-red-600">
+                        <FileUp size={18} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-slate-900 leading-tight">{n.title}</p>
+                        <p className="text-[10px] text-slate-500">{new Date(n.created_at).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                       <Button variant="ghost" size="icon" onClick={() => window.open(n.file_url, '_blank')} className="text-blue-500 hover:bg-blue-50">
+                        <Globe size={16}/>
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={async () => {
+                        await supabase.from('notices').delete().eq('id', n.id);
+                        fetchData();
+                      }} className="text-red-500 hover:bg-red-50">
+                        <Trash2 size={16}/>
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {allNotices.length === 0 && (
+                  <div className="text-center py-10 border border-dashed rounded-xl text-slate-400 text-sm">
+                    No notices published yet.
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </TabsContent>
       </Tabs>

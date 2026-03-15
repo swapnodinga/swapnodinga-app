@@ -1,4 +1,5 @@
 "use client"
+
 import React, { useEffect, useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useSociety } from "@/context/SocietyContext";
@@ -11,7 +12,7 @@ import {
   CreditCard, Menu, LogIn, FileText, PiggyBank, LineChart, Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import logo from "@/assets/generated_images/SwapnoDinga_Logo_Update.png";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -19,20 +20,36 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const isMobile = useMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
   const [dynamicNotice, setDynamicNotice] = useState("Loading official notice...");
+  const [allNotices, setAllNotices] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    const fetchSettings = async () => {
-      const { data } = await supabase
+    const fetchNoticeData = async () => {
+      // 1. Fetch Banner Text
+      const { data: settingsData } = await supabase
         .from('site_settings')
-        .select('value')
-        .eq('key', 'dashboard_notice')
+        .select('setting_value')
+        .eq('setting_key', 'dashboard_notice')
         .single();
       
-      if (data?.value) setDynamicNotice(data.value);
+      if (settingsData?.setting_value) setDynamicNotice(settingsData.setting_value);
+
+      // 2. Fetch Notice List for the Dropdown
+      const { data: noticesData } = await supabase
+        .from('notices')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (noticesData) {
+        setAllNotices(noticesData);
+        setUnreadCount(noticesData.length);
+      }
     };
-    if (currentUser) fetchSettings();
-  }, [currentUser]);
+
+    if (currentUser) fetchNoticeData();
+  }, [currentUser, location]);
 
   const pendingMembersCount = useMemo(() => 
     members.filter(m => m.status === 'pending').length, 
@@ -229,28 +246,60 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-6">
-            {/* UPDATED: NOTICE BUTTON - LINKED TO SUPABASE PDF */}
+            
+            {/* UPDATED: NOTICE LIST DROPDOWN */}
             {currentUser && (
               <div className="relative">
-                <a 
-                  href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/documents/official-notice.pdf`} 
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-9 px-4 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 font-bold gap-2 hidden sm:flex shadow-sm"
-                  >
-                    <FileText size={16} />
-                    <span>Notice</span>
-                  </Button>
-                </a>
-                {/* Notification Badge */}
-                <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-600 border-2 border-white"></span>
-                </span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-9 px-4 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 font-bold gap-2 hidden sm:flex shadow-sm"
+                    >
+                      <FileText size={16} />
+                      <span>Notice</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-0 mr-4 mt-2" align="end">
+                    <div className="bg-amber-50 p-3 border-b border-amber-100">
+                      <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider">Official Notices</h4>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {allNotices.length > 0 ? (
+                        allNotices.map((notice) => (
+                          <a 
+                            key={notice.id} 
+                            href={notice.file_url} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="flex items-center gap-3 p-3 hover:bg-slate-50 border-b last:border-0 transition-colors"
+                          >
+                            <div className="bg-red-100 p-2 rounded text-red-600">
+                              <FileText size={14} />
+                            </div>
+                            <div className="flex-1 overflow-hidden">
+                              <p className="text-sm font-medium text-slate-900 truncate">{notice.title}</p>
+                              <p className="text-[10px] text-slate-400">{new Date(notice.created_at).toLocaleDateString()}</p>
+                            </div>
+                          </a>
+                        ))
+                      ) : (
+                        <div className="p-8 text-center text-xs text-slate-400">No active notices found.</div>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Dynamic Notification Badge */}
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-600 border border-white text-[9px] text-white font-bold items-center justify-center">
+                      {unreadCount}
+                    </span>
+                  </span>
+                )}
               </div>
             )}
 
@@ -278,9 +327,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-y-auto bg-slate-50/30">
           <div className="p-4 md:p-8 space-y-6">
             
-            {/* MARQUEE BANNER - Kept exactly as you designed it */}
-            {currentUser && (
-              <div className="w-full h-11 bg-[#065f46] rounded-xl flex items-center overflow-hidden shadow-sm border border-[#064e3b]">
+            {/* MARQUEE BANNER - Show only on Dashboard or Admin */}
+            {currentUser && (location === "/dashboard" || location === "/admin") && (
+              <div className="w-full h-11 bg-[#065f46] rounded-xl flex items-center overflow-hidden shadow-sm border border-[#064e3b] mb-2">
                 <div className="bg-[#064e3b] h-full flex items-center px-5 z-10">
                     <span className="text-[10px] font-black text-white uppercase tracking-widest whitespace-nowrap">Official Notice</span>
                 </div>

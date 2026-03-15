@@ -51,10 +51,15 @@ export default function MemberDashboard() {
         let totalActivePrincipal = 0;
         let totalFinishedPrincipal = 0; 
         let totalRealizedInterest = 0; 
+        let totalSocietyInterest = 0; // Added to track the complete interest pool
 
         // Apply same loop logic as Admin Dashboard
         (deposits || []).forEach(fd => {
           const m = getMaturityData(Number(fd.amount), Number(fd.interest_rate), fd.start_date, Number(fd.tenure_months));
+          
+          // Pool the total expected interest for dividend distribution
+          totalSocietyInterest += m.interest;
+
           if (m.isFinished) { 
             totalRealizedInterest += m.interest; 
             totalFinishedPrincipal += Number(fd.amount); 
@@ -75,13 +80,14 @@ export default function MemberDashboard() {
           .filter(inst => inst.member_id === currentUser.id)
           .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-        // Member share calculation synced with Admin's formula
-        const myInterestShare = totalFinishedPrincipal > 0 
-          ? (totalRealizedInterest / totalFinishedPrincipal) * myInstallments 
+        // CORRECTED: Member share calculation synced with Report & Interest page formula
+        // Share = (Total Society Interest / Total Society Installments) * Member Installments
+        const myInterestShare = societyTotalInstalments > 0 
+          ? (totalSocietyInterest / societyTotalInstalments) * myInstallments 
           : 0;
 
         setLocalStats({
-          societyFixedDeposit: totalActivePrincipal, // Synced with "Active FD Capital"
+          societyFixedDeposit: totalActivePrincipal, 
           societyDepositInterest: totalRealizedInterest,
           societyTotalFund: societyTotalInstalments + totalRealizedInterest,
           myAccumulatedInterest: myInterestShare,

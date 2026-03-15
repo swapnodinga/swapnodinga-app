@@ -1,22 +1,63 @@
-import React from "react";
+"use client"
+
+import React, { useState } from "react";
+import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Scale, FileText, Download, ExternalLink, 
   ShieldCheck, Info, Gavel, Users, 
-  TrendingUp, Lock 
+  TrendingUp, Lock, Upload, Loader2 
 } from "lucide-react";
 import { useSociety } from "@/context/SocietyContext";
 
 export default function PolicyPage() {
   const { currentUser } = useSociety();
-  const isAdmin = currentUser?.email === 'swapnodinga.scs@gmail.com';
+  const { toast } = useToast();
+  const [uploading, setUploading] = useState(false);
+  
+  // Use a state for the URL to trigger a re-render after upload
+  const [policyUrl, setPolicyUrl] = useState("https://ivhjokefdwospalrqcmk.supabase.co/storage/v1/object/public/documents/society_policy.pdf");
 
-  // Verified live URL
-  const POLICY_URL = "https://ivhjokefdwospalrqcmk.supabase.co/storage/v1/object/public/documents/society_policy.pdf";
+  const isAdmin = currentUser?.email === 'swapnodinga.scs@gmail.com';
 
   const handleDownload = () => {
     // timestamp prevents browser from showing old cached versions
-    window.open(`${POLICY_URL}?t=${new Date().getTime()}`, "_blank");
+    window.open(`${policyUrl}?t=${new Date().getTime()}`, "_blank");
+  };
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploading(true);
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      // Ensure it's a PDF
+      if (file.type !== "application/pdf") {
+        toast({ variant: "destructive", title: "Invalid File", description: "Please upload a PDF document." });
+        return;
+      }
+
+      // Upload to Supabase Storage (upsert: true replaces the existing file)
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload('society_policy.pdf', file, {
+          upsert: true,
+          cacheControl: '0' // Prevents caching issues
+        });
+
+      if (uploadError) throw uploadError;
+
+      toast({ title: "Policy Updated Successfully", description: "The new constitution is now live." });
+      
+      // Update local state to refresh the "Download" link target
+      setPolicyUrl(`${policyUrl.split('?')[0]}?t=${new Date().getTime()}`);
+      
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Upload Failed", description: error.message });
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -71,7 +112,6 @@ export default function PolicyPage() {
               </div>
             </div>
 
-            {/* RESTORED GREEN THEME BUTTON */}
             <button 
               onClick={handleDownload}
               className="w-full max-w-xs flex items-center justify-center gap-3 bg-emerald-700 text-white px-8 py-5 rounded-2xl font-bold hover:bg-emerald-800 transition-all shadow-xl shadow-emerald-700/20 hover:shadow-emerald-700/40 active:scale-95 group"
@@ -81,36 +121,51 @@ export default function PolicyPage() {
             </button>
 
             <p className="text-[10px] text-slate-400 uppercase font-bold tracking-[0.15em]">
-              Last Verified: Dec 29, 2025
+              Last Verified: {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </p>
           </div>
         </div>
 
-        {/* Admin Management Section */}
+        {/* Updated Admin Management Section with Direct Upload */}
         {isAdmin && (
           <div className="bg-emerald-50/40 border-t border-emerald-100 px-10 py-6">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
+                <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 shadow-inner">
                   <ShieldCheck size={18} />
                 </div>
-                <span className="text-xs font-black text-emerald-900 tracking-widest uppercase">Admin Dashboard Sync</span>
+                <div>
+                  <span className="text-xs font-black text-emerald-900 tracking-widest uppercase block">Admin Control</span>
+                  <span className="text-[10px] text-emerald-600 font-bold">Replace live policy document</span>
+                </div>
               </div>
-              <a 
-                href="https://supabase.com/dashboard/project/_/storage/buckets/documents" 
-                target="_blank" 
-                rel="noreferrer"
-                className="flex items-center gap-2 text-emerald-700 hover:text-emerald-900 font-bold text-sm bg-white border border-emerald-200 px-5 py-2.5 rounded-xl shadow-sm transition-all hover:border-emerald-300"
-              >
-                Sync New File <ExternalLink size={14} />
-              </a>
-            </div>
-            <div className="mt-4 flex gap-3 items-center text-[11px] text-emerald-800 leading-relaxed bg-white/60 p-3 rounded-xl border border-emerald-100">
-              <Info size={16} className="text-emerald-600 shrink-0" />
-              <p>
-                To update the live document, replace the file in Supabase with the exact name 
-                <span className="font-mono font-bold text-emerald-700 px-1.5 py-0.5 bg-emerald-100/50 rounded mx-1">society_policy.pdf</span>.
-              </p>
+
+              <div className="flex items-center gap-3">
+                <input 
+                  type="file" 
+                  accept=".pdf" 
+                  id="policy-upload" 
+                  className="hidden" 
+                  onChange={handleUpload}
+                  disabled={uploading}
+                />
+                <label 
+                  htmlFor="policy-upload"
+                  className="flex items-center gap-2 cursor-pointer bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-emerald-800 transition-all disabled:opacity-50"
+                >
+                  {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                  {uploading ? "Updating..." : "Upload New PDF"}
+                </label>
+                
+                <a 
+                  href="https://supabase.com/dashboard/project/_/storage/buckets/documents" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="flex items-center gap-2 text-emerald-700 hover:text-emerald-900 font-bold text-sm bg-white border border-emerald-200 px-5 py-2.5 rounded-xl shadow-sm transition-all hover:border-emerald-300"
+                >
+                  Supabase <ExternalLink size={14} />
+                </a>
+              </div>
             </div>
           </div>
         )}

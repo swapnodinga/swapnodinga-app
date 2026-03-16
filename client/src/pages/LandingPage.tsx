@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState } from "react"
 import { useSociety } from "@/context/SocietyContext"
+import { supabase } from "@/lib/supabase" // Ensure this is imported
 import { Link, useLocation } from "wouter"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,16 +11,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import { Info, Briefcase, ShieldAlert, Phone } from "lucide-react"
+import { Loader2, ArrowLeft } from "lucide-react"
 
 import logoUpdate from "@/assets/generated_images/SwapnoDinga_Logo_Update.png"
 import heroBg from "@/assets/generated_images/housing_community_hero_background.png"
 
 export default function LandingPage() {
-  const { login, register, currentUser } = useSociety()
+  const { login, register } = useSociety()
   const [, setLocation] = useLocation()
   const { toast } = useToast()
+  
   const [loading, setLoading] = useState(false)
+  const [forgotPasswordMode, setForgotPasswordMode] = useState(false) // New state
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -45,6 +48,37 @@ export default function LandingPage() {
         title: "Login Failed",
         description: "Invalid credentials or account not active.",
       })
+    }
+  }
+
+  // Handle the Password Reset Email request
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) {
+      return toast({ variant: "destructive", description: "Please enter your email address." })
+    }
+
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+
+      if (error) throw error
+
+      toast({
+        title: "Link Sent",
+        description: "Check your email for the password reset link.",
+      })
+      setForgotPasswordMode(false) // Switch back to login after sending
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -75,6 +109,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2 overflow-hidden">
+      {/* Sidebar Section (Unchanged) */}
       <div className="relative hidden lg:flex flex-col p-12 text-white bg-[#1a4d3c]">
         <div className="absolute inset-0 bg-cover bg-center opacity-40 mix-blend-overlay" style={{ backgroundImage: `url(${heroBg})` }} />
         <div className="absolute inset-0 bg-gradient-to-br from-[#1a4d3c]/90 to-[#1a4d3c]/60" />
@@ -101,38 +136,86 @@ export default function LandingPage() {
         </div>
       </div>
 
+      {/* Login Card Section */}
       <div className="flex items-center justify-center p-8 bg-slate-50">
         <div className="w-full max-w-md">
           <Card className="border-none shadow-2xl bg-white rounded-2xl overflow-hidden">
             <div className="h-2 bg-[#1a4d3c]" />
             <CardHeader className="text-center pt-8 pb-4">
-              <CardTitle className="text-2xl font-bold text-slate-800">Member Access</CardTitle>
-              <CardDescription>Manage your installments and savings</CardDescription>
+              <CardTitle className="text-2xl font-bold text-slate-800">
+                {forgotPasswordMode ? "Reset Password" : "Member Access"}
+              </CardTitle>
+              <CardDescription>
+                {forgotPasswordMode ? "Enter your email to receive a recovery link" : "Manage your installments and savings"}
+              </CardDescription>
             </CardHeader>
             <CardContent className="px-8 pb-10">
               <Tabs defaultValue="login" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-8 bg-slate-100 rounded-xl p-1">
-                  <TabsTrigger value="login">Login</TabsTrigger>
-                  <TabsTrigger value="register">Join Society</TabsTrigger>
-                </TabsList>
+                {/* Hide tabs if we are in Forgot Password mode */}
+                {!forgotPasswordMode && (
+                  <TabsList className="grid w-full grid-cols-2 mb-8 bg-slate-100 rounded-xl p-1">
+                    <TabsTrigger value="login">Login</TabsTrigger>
+                    <TabsTrigger value="register">Join Society</TabsTrigger>
+                  </TabsList>
+                )}
+
                 <TabsContent value="login" className="space-y-4">
-                  <form onSubmit={handleLogin} className="space-y-4">
+                  <form onSubmit={forgotPasswordMode ? handleForgotPassword : handleLogin} className="space-y-4">
                     <div className="space-y-1.5">
                       <Label htmlFor="email">Email Address</Label>
-                      <Input id="email" type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                      <Input 
+                        id="email" 
+                        type="email" 
+                        placeholder="your@email.com" 
+                        value={email} 
+                        onChange={(e) => setEmail(e.target.value)} 
+                        required 
+                      />
                     </div>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
+                    
+                    {!forgotPasswordMode && (
+                      <div className="space-y-1.5">
                         <Label htmlFor="password">Password</Label>
-                        <Link href="/reset-password"><a className="text-xs text-emerald-600 hover:underline">Change Password</a></Link>
+                        <Input 
+                          id="password" 
+                          type="password" 
+                          placeholder="••••••••" 
+                          value={password} 
+                          onChange={(e) => setPassword(e.target.value)} 
+                          required 
+                        />
                       </div>
-                      <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
-                    </div>
-                    <Button type="submit" className="w-full h-12 bg-[#1a4d3c] hover:bg-[#133a2d] rounded-xl font-bold text-white shadow-lg" disabled={loading}>
-                      {loading ? "Authenticating..." : "Login to Portal"}
+                    )}
+
+                    <Button 
+                      type="submit" 
+                      className="w-full h-12 bg-[#1a4d3c] hover:bg-[#133a2d] rounded-xl font-bold text-white shadow-lg" 
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <Loader2 className="animate-spin" size={20} />
+                      ) : (
+                        forgotPasswordMode ? "Send Reset Link" : "Login to Portal"
+                      )}
                     </Button>
                   </form>
+
+                  {/* Toggle Link below the button */}
+                  <div className="mt-4 text-center">
+                    <button 
+                      type="button"
+                      onClick={() => setForgotPasswordMode(!forgotPasswordMode)}
+                      className="text-sm font-semibold text-emerald-700 hover:text-emerald-800 flex items-center justify-center gap-2 mx-auto"
+                    >
+                      {forgotPasswordMode ? (
+                        <><ArrowLeft size={14} /> Back to Login</>
+                      ) : (
+                        "Forgot Password?"
+                      )}
+                    </button>
+                  </div>
                 </TabsContent>
+
                 <TabsContent value="register" className="space-y-4">
                   <form onSubmit={handleRegister} className="space-y-4">
                     <Input placeholder="Full Name" value={regName} onChange={(e) => setRegName(e.target.value)} required />

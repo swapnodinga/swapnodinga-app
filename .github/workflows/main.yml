@@ -1,0 +1,37 @@
+name: Keep App Awake
+
+on:
+  schedule:
+    - cron: "0 */12 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ping site
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          BASE_URL="${SITE_URL:-https://swapnodinga-app.vercel.app}"
+          TARGET_URL="${BASE_URL%/}/"
+
+          echo "Pinging: $TARGET_URL"
+
+          for attempt in 1 2 3; do
+            status_code=$(curl -sS -o /tmp/keepalive.html -w "%{http_code}" "$TARGET_URL" || true)
+            echo "Attempt $attempt status: $status_code"
+
+            if [ "$status_code" = "200" ]; then
+              echo "Keep-alive succeeded."
+              exit 0
+            fi
+
+            sleep 20
+          done
+
+          echo "Keep-alive failed after retries."
+          cat /tmp/keepalive.html || true
+          exit 1

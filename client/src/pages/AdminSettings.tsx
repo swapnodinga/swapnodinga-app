@@ -120,10 +120,19 @@ export default function AdminSettings() {
 
       const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
 
-      const { error: dbError } = await supabase.from('notices').insert([
-        { title: noticeTitle, file_url: urlData.publicUrl }
-      ]);
-      if (dbError) throw dbError;
+      // Use API endpoint to insert notice (with service role key to bypass RLS)
+      const response = await fetch('/api/manage-notice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'insert',
+          title: noticeTitle,
+          file_url: urlData.publicUrl
+        })
+      });
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.message);
 
       toast({ title: "Notice Published Successfully" });
       setNoticeTitle(""); 
@@ -426,8 +435,24 @@ export default function AdminSettings() {
                         <Globe size={16}/>
                       </Button>
                       <Button variant="ghost" size="icon" onClick={async () => {
-                        await supabase.from('notices').delete().eq('id', n.id);
-                        fetchData();
+                        try {
+                          const response = await fetch('/api/manage-notice', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              action: 'delete',
+                              id: n.id
+                            })
+                          });
+
+                          const result = await response.json();
+                          if (!result.success) throw new Error(result.message);
+
+                          toast({ title: "Notice Deleted" });
+                          fetchData();
+                        } catch (error: any) {
+                          toast({ variant: "destructive", title: "Delete Failed", description: error.message });
+                        }
                       }} className="text-red-500 hover:bg-red-50">
                         <Trash2 size={16}/>
                       </Button>

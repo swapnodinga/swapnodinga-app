@@ -26,6 +26,37 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
+    const refreshNoticeData = async () => {
+      if (!currentUser) return;
+
+      const { data: settingsData } = await supabase
+        .from('site_settings')
+        .select('setting_value')
+        .eq('setting_key', 'dashboard_notice')
+        .single();
+
+      if (settingsData?.setting_value) setDynamicNotice(settingsData.setting_value);
+
+      const { data: noticesData } = await supabase
+        .from('notices')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (noticesData) {
+        setAllNotices(noticesData);
+        setUnreadCount(noticesData.length);
+      }
+    };
+
+    const handleNoticeRefresh = () => {
+      refreshNoticeData();
+    };
+
+    window.addEventListener("notices-updated", handleNoticeRefresh);
+    return () => window.removeEventListener("notices-updated", handleNoticeRefresh);
+  }, [currentUser]);
+
+  useEffect(() => {
     const fetchNoticeData = async () => {
       // 1. Fetch Banner Text
       const { data: settingsData } = await supabase

@@ -148,6 +148,7 @@ export default function AdminSettings() {
 
       toast({ title: "Notice Published Successfully" });
       setNoticeTitle(""); 
+      window.dispatchEvent(new Event("notices-updated"));
       fetchData(); 
     } catch (error: any) {
       toast({ variant: "destructive", title: "Upload Failed", description: error.message });
@@ -461,6 +462,7 @@ export default function AdminSettings() {
                           if (!result.success) throw new Error(result.message);
 
                           toast({ title: "Notice Deleted" });
+                          window.dispatchEvent(new Event("notices-updated"));
                           fetchData();
                         } catch (error: any) {
                           toast({ variant: "destructive", title: "Delete Failed", description: error.message });

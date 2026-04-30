@@ -41,6 +41,23 @@ export default function AdminSettings() {
     completion_date: ""
   });
 
+  const fileToBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result !== "string") {
+          reject(new Error("Failed to read file"));
+          return;
+        }
+
+        const base64 = result.includes(",") ? result.split(",")[1] : result;
+        resolve(base64);
+      };
+      reader.onerror = () => reject(reader.error || new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -111,23 +128,18 @@ export default function AdminSettings() {
         return;
       }
 
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `notices/${fileName}`;
+      const fileBase64 = await fileToBase64(file);
 
-      const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file);
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
-
-      // Use API endpoint to insert notice (with service role key to bypass RLS)
+      // Upload PDF and create the notice through the backend so storage RLS is bypassed too
       const response = await fetch('/api/manage-notice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'insert',
           title: noticeTitle,
-          file_url: urlData.publicUrl
+          file_name: file.name,
+          file_type: file.type,
+          file_base64: fileBase64
         })
       });
 

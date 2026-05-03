@@ -25,6 +25,7 @@ interface SocietyContextType {
   addFixedDeposit: (data: any) => Promise<void>
   updateFixedDeposit: (id: string, data: any) => Promise<void>
   deleteFixedDeposit: (id: string) => Promise<void>
+  calculateMemberSettlement: (member_id: string, deductions: any[]) => Promise<any>
 }
 
 const SocietyContext = createContext<SocietyContextType | undefined>(undefined)
@@ -185,6 +186,18 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     await refreshData()
   }
 
+  const calculateMemberSettlement = async (member_id: string, deductions: any[]) => {
+    try {
+      const result = await callApi("calculate-member-settlement", {
+        departing_member_id: member_id,
+        deductions,
+      })
+      return result
+    } catch (err: any) {
+      throw new Error(err.message || "Settlement calculation failed")
+    }
+  }
+
   const addFixedDeposit = async (data: any) => {
     await callApi("fixed-deposit", { action: "add", data })
     await refreshData()
@@ -316,6 +329,7 @@ const uploadProfilePic = async (file: File): Promise<string> => {
         login, register, logout, updateProfile, uploadProfilePic, refreshData,
         approveMember, deleteMember, submitInstalment, approveInstalment,
         addFixedDeposit, updateFixedDeposit, deleteFixedDeposit,
+        calculateMemberSettlement,
       }}
     >
       {children}

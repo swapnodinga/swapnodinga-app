@@ -98,7 +98,7 @@ export default function AdminMembers() {
                         size="sm"
                         variant="outline"
                         onClick={() => handleViewSettlement(member)}
-                        className="h-8 gap-2"
+                        className="h-8 gap-2 cursor-pointer hover:bg-blue-100 hover:border-blue-500 hover:text-blue-700 transition-all"
                       >
                         <Calculator className="h-4 w-4" /> Settlement
                       </Button>

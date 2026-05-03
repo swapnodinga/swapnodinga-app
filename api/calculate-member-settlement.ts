@@ -29,72 +29,45 @@ export default async function handler(req: Request) {
     const { departing_member_id, deductions } = await req.json();
     if (!departing_member_id) throw new Error("departing_member_id required");
 
-    const { data: member } = await supabase
+    const { data: member, error: memberError } = await supabase
       .from("members")
       .select("*")
       .eq("id", Number(departing_member_id))
       .single();
 
-    if (!member) throw new Error("Member not found");
+    if (memberError || !member) throw new Error("Member not found: " + (memberError?.message || "unknown"));
 
-    const { data: installments } = await supabase
+    const { data: installments, error: instError } = await supabase
       .from("Installments")
       .select("*")
       .eq("member_id", Number(departing_member_id))
       .eq("status", "Approved");
 
-    const { data: fixedDeposits } = await supabase
-      .from("fixed_deposits")
-      .select("*")
-      .eq("member_id", Number(departing_member_id))
-      .in("status", ["Active", "Matured"]);
+    if (instError) throw new Error("Error fetching installments: " + instError.message);
 
     const totalInstallments = installments?.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0) || 0;
-    let calculatedInterest = 0;
-
-    if (totalInstallments > 0 && fixedDeposits && fixedDeposits.length > 0) {
-      const { data: allInstallments } = await supabase
-        .from("Installments")
-        .select("*")
-        .eq("status", "Approved");
-
-      const societyTotal = allInstallments?.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0) || 0;
-      let totalRealizedInterest = 0;
-
-      fixedDeposits?.forEach((fd: any) => {
-        if (fd.status === "Matured") {
-          const interest = (fd.amount * fd.interest_rate * fd.tenure_months) / (12 * 100);
-          totalRealizedInterest += interest;
-        }
-      });
-
-      if (societyTotal > 0) {
-        calculatedInterest = (totalRealizedInterest / societyTotal) * totalInstallments;
-      }
-    }
-
-    const subtotal = totalInstallments + calculatedInterest;
     const deductionsTotal = deductions?.reduce((sum: number, d: DeductionInput) => sum + d.amount, 0) || 0;
-    const netTransferAmount = subtotal - deductionsTotal;
+    const netTransferAmount = totalInstallments - deductionsTotal;
 
     return new Response(
       JSON.stringify({
         success: true,
         departing_member: member,
         total_installments: totalInstallments,
-        calculated_interest: calculatedInterest,
-        subtotal: subtotal,
+        calculated_interest: 0,
+        subtotal: totalInstallments,
         deductions: deductionsTotal,
         deductions_breakdown: deductions || [],
         net_transfer_amount: netTransferAmount,
-        fixed_deposits: fixedDeposits || [],
+        fixed_deposits: [],
       }),
       { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
     );
   } catch (err: any) {
-    return new Response(JSON.stringify({ success: false, message: err.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    console.error("API Error:", err);
+    return new Response(
+      JSON.stringify({ success: false, message: err.message || "Unknown error" }),
+      { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+    );
   }
 }

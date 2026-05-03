@@ -30,8 +30,10 @@ export default function AdminMembers() {
     setLoading(true);
     try {
       const result = await calculateMemberSettlement(member.id, []);
+      alert("Settlement Result: " + JSON.stringify(result, null, 2));
       setSettlement(result);
-    } catch (err) {
+    } catch (err: any) {
+      alert("Error: " + err.message);
       setSettlement(null);
     }
     setLoading(false);

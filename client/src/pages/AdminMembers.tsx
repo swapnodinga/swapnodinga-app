@@ -26,13 +26,17 @@ export default function AdminMembers() {
   });
 
   const handleViewSettlement = async (member: any) => {
+    console.log("Settlement clicked for:", member);
     setSelectedMember(member);
     setLoading(true);
     try {
+      console.log("Calling calculateMemberSettlement for member:", member.id);
       const result = await calculateMemberSettlement(member.id, []);
+      console.log("Settlement result:", result);
       setSettlement(result);
-    } catch (err) {
-      setSettlement(null);
+    } catch (err: any) {
+      console.error("Settlement calculation error:", err);
+      setSettlement({ error: err.message });
     }
     setLoading(false);
   };
@@ -134,36 +138,51 @@ export default function AdminMembers() {
               </Button>
             </div>
 
-            <div className="bg-white p-4 rounded space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Total Installments:</span>
-                <span className="font-mono">৳{settlement.total_installments?.toFixed(2) || 0}</span>
+            {settlement.error ? (
+              <div className="bg-red-100 border border-red-300 rounded p-3 text-red-700">
+                <p className="font-bold">Error:</p>
+                <p>{settlement.error}</p>
               </div>
-              <div className="flex justify-between">
-                <span>Calculated Interest:</span>
-                <span className="font-mono">৳{settlement.calculated_interest?.toFixed(2) || 0}</span>
-              </div>
-              <div className="flex justify-between font-bold border-t pt-2">
-                <span>Net Transfer Amount:</span>
-                <span className="font-mono text-emerald-600">৳{settlement.net_transfer_amount?.toFixed(2) || 0}</span>
-              </div>
-            </div>
-
-            {settlement.fixed_deposits && settlement.fixed_deposits.length > 0 && (
-              <div className="bg-white p-4 rounded">
-                <p className="font-bold text-sm mb-2">Fixed Deposits:</p>
-                <div className="space-y-2 text-sm">
-                  {settlement.fixed_deposits.map((fd: any, i: number) => (
-                    <div key={i} className="text-slate-700">
-                      ৳{fd.amount} @ {fd.interest_rate}% for {fd.tenure_months} months ({fd.status})
-                    </div>
-                  ))}
+            ) : (
+              <>
+                <div className="bg-white p-4 rounded space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Total Installments:</span>
+                    <span className="font-mono">৳{settlement.total_installments?.toFixed(2) || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Calculated Interest:</span>
+                    <span className="font-mono">৳{settlement.calculated_interest?.toFixed(2) || 0}</span>
+                  </div>
+                  <div className="flex justify-between font-bold border-t pt-2">
+                    <span>Net Transfer Amount:</span>
+                    <span className="font-mono text-emerald-600">৳{settlement.net_transfer_amount?.toFixed(2) || 0}</span>
+                  </div>
                 </div>
-              </div>
+
+                {settlement.fixed_deposits && settlement.fixed_deposits.length > 0 && (
+                  <div className="bg-white p-4 rounded">
+                    <p className="font-bold text-sm mb-2">Fixed Deposits:</p>
+                    <div className="space-y-2 text-sm">
+                      {settlement.fixed_deposits.map((fd: any, i: number) => (
+                        <div key={i} className="text-slate-700">
+                          ৳{fd.amount} @ {fd.interest_rate}% for {fd.tenure_months} months ({fd.status})
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
-      ) : (
+      ) : loading ? (
+        <Card className="border-2 border-blue-200 bg-blue-50">
+          <CardContent className="pt-6">
+            <p>Loading settlement data...</p>
+          </CardContent>
+        </Card>
+      ) : null}
         <Tabs defaultValue="pending" className="w-full">
           <TabsList className="bg-slate-100 p-1 rounded-xl mb-6">
             <TabsTrigger value="pending" className="rounded-lg px-6">

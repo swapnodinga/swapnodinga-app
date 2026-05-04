@@ -32,6 +32,7 @@ export default defineConfig({
       '/api/submit-instalment': { target: 'http://localhost:3000', changeOrigin: true },
       '/api/send-email': { target: 'http://localhost:3000', changeOrigin: true },
       '/api/transactions': { target: 'http://localhost:3000', changeOrigin: true },
+      '/api/calculate-member-settlement': { target: 'http://localhost:5000', changeOrigin: true },
 
       // 2. Catch-all for any remaining Express routes (Port 5000)
       '/api': {

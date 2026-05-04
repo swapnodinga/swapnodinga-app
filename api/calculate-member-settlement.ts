@@ -6,27 +6,21 @@ interface DeductionInput {
   description: string;
 }
 
-export default async function handler(req: Request) {
+export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
-    return new Response(
-      JSON.stringify({ success: false, message: "Method not allowed" }),
-      { status: 405, headers: { "Content-Type": "application/json" } }
-    );
+    return res.status(405).json({ success: false, message: "Method not allowed" });
   }
 
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
   if (!url || !key) {
-    return new Response(
-      JSON.stringify({ success: false, message: "Supabase credentials missing" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return res.status(500).json({ success: false, message: "Supabase credentials missing" });
   }
 
   const supabase = createClient(url, key);
 
   try {
-    const { departing_member_id, deductions } = await req.json();
+    const { departing_member_id, deductions } = req.body;
     if (!departing_member_id) throw new Error("departing_member_id required");
 
     const { data: member, error: memberError } = await supabase
@@ -49,25 +43,19 @@ export default async function handler(req: Request) {
     const deductionsTotal = deductions?.reduce((sum: number, d: DeductionInput) => sum + d.amount, 0) || 0;
     const netTransferAmount = totalInstallments - deductionsTotal;
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        departing_member: member,
-        total_installments: totalInstallments,
-        calculated_interest: 0,
-        subtotal: totalInstallments,
-        deductions: deductionsTotal,
-        deductions_breakdown: deductions || [],
-        net_transfer_amount: netTransferAmount,
-        fixed_deposits: [],
-      }),
-      { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
-    );
+    return res.status(200).json({
+      success: true,
+      departing_member: member,
+      total_installments: totalInstallments,
+      calculated_interest: 0,
+      subtotal: totalInstallments,
+      deductions: deductionsTotal,
+      deductions_breakdown: deductions || [],
+      net_transfer_amount: netTransferAmount,
+      fixed_deposits: [],
+    });
   } catch (err: any) {
     console.error("API Error:", err);
-    return new Response(
-      JSON.stringify({ success: false, message: err.message || "Unknown error" }),
-      { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
-    );
+    return res.status(500).json({ success: false, message: err.message || "Unknown error" });
   }
 }

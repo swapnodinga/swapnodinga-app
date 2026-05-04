@@ -28,11 +28,13 @@ export default function AdminMembers() {
   const handleViewSettlement = async (member: any) => {
     setSelectedMember(member);
     setLoading(true);
+    setSettlement(null);
     try {
       const result = await calculateMemberSettlement(member.id, []);
-      alert("Settlement Result: " + JSON.stringify(result, null, 2));
-      setSettlement(result);
+      console.log("Settlement result:", result);
+      setSettlement(result.data || result);
     } catch (err: any) {
+      console.error("Settlement error:", err);
       alert("Error: " + err.message);
       setSettlement(null);
     }

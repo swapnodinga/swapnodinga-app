@@ -41,17 +41,17 @@ export default async function handler(req: any, res: any) {
 
     const totalInstallments = installments?.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0) || 0;
 
-    // Calculate interest from fixed deposits
-    const { data: memberFDs, error: fdError } = await supabase
+    // Get ALL society's fixed deposits to calculate total interest pool
+    const { data: allFDs, error: allFdError } = await supabase
       .from("fixed_deposits")
-      .select("*")
-      .eq("member_id", Number(departing_member_id));
+      .select("*");
 
-    if (fdError) throw new Error("Error fetching fixed deposits: " + fdError.message);
+    if (allFdError) throw new Error("Error fetching all fixed deposits: " + allFdError.message);
 
-    let calculatedInterest = 0;
+    // Calculate total society interest from finished FDs
+    let totalSocietyInterest = 0;
     const now = new Date();
-    memberFDs?.forEach((fd: any) => {
+    allFDs?.forEach((fd: any) => {
       const startDate = new Date(fd.start_date);
       const maturityDate = new Date(startDate);
       maturityDate.setMonth(maturityDate.getMonth() + (fd.tenure_months || 3));
@@ -61,9 +61,23 @@ export default async function handler(req: any, res: any) {
         const rate = Number(fd.interest_rate) || 0;
         const tenure = fd.tenure_months || 3;
         const interest = (principal * rate * tenure) / 1200;
-        calculatedInterest += interest;
+        totalSocietyInterest += interest;
       }
     });
+
+    // Get total society installments
+    const { data: allInstallments, error: allInstError } = await supabase
+      .from("Installments")
+      .select("amount")
+      .eq("status", "Approved");
+
+    if (allInstError) throw new Error("Error fetching all installments: " + allInstError.message);
+
+    const totalSocietyInstallments = allInstallments?.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0) || 1;
+
+    // Member gets their share of total interest based on their contribution %
+    const memberSharePercent = totalSocietyInstallments > 0 ? (totalInstallments / totalSocietyInstallments) : 0;
+    const calculatedInterest = Math.round(memberSharePercent * totalSocietyInterest);
 
     const deductionsTotal = deductions?.reduce((sum: number, d: DeductionInput) => sum + d.amount, 0) || 0;
     const subtotal = totalInstallments + calculatedInterest;

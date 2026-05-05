@@ -7,10 +7,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, CheckCircle, UserPlus, Calculator } from 'lucide-react';
+import { Users, CheckCircle, UserPlus, Calculator, Power, Lock, Trash2 } from 'lucide-react';
 
 export default function AdminMembers() {
-  const { members, approveMember, calculateMemberSettlement } = useSociety();
+  const { members, approveMember, deactivateMember, freezeMember, deleteMember, calculateMemberSettlement } = useSociety();
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [settlement, setSettlement] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -41,7 +41,7 @@ export default function AdminMembers() {
     setLoading(false);
   };
 
-  const MemberTable = ({ data, showApprove = false, showExit = false }: { data: any[], showApprove?: boolean, showExit?: boolean }) => (
+  const MemberTable = ({ data, showApprove = false, showExit = false, showActions = false }: { data: any[], showApprove?: boolean, showExit?: boolean, showActions?: boolean }) => (
     <Card className="border-none shadow-sm">
       <CardContent className="pt-6">
         <Table>
@@ -51,13 +51,13 @@ export default function AdminMembers() {
               <TableHead className="font-bold">Name</TableHead>
               <TableHead className="font-bold">Email</TableHead>
               <TableHead className="font-bold">Status</TableHead>
-              {(showApprove || showExit) && <TableHead className="font-bold text-right">Action</TableHead>}
+              {(showApprove || showExit || showActions) && <TableHead className="font-bold text-right">Action</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={showApprove || showExit ? 5 : 4} className="text-center py-12 text-slate-400">
+                <TableCell colSpan={showApprove || showExit || showActions ? 5 : 4} className="text-center py-12 text-slate-400">
                   <UserPlus className="w-12 h-12 mx-auto mb-2 opacity-20" />
                   <p>No members found in this category.</p>
                 </TableCell>
@@ -103,6 +103,37 @@ export default function AdminMembers() {
                         className="h-8 gap-2 cursor-pointer hover:bg-blue-100 hover:border-blue-500 hover:text-blue-700 transition-all"
                       >
                         <Calculator className="h-4 w-4" /> Settlement
+                      </Button>
+                    </TableCell>
+                  )}
+                  {showActions && (
+                    <TableCell className="text-right space-x-2 flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => deactivateMember(member.id)}
+                        className="h-8 gap-2 hover:bg-red-100 hover:border-red-500 hover:text-red-700 transition-all"
+                        title="Deactivate member"
+                      >
+                        <Power className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => freezeMember(member.id)}
+                        className="h-8 gap-2 hover:bg-yellow-100 hover:border-yellow-500 hover:text-yellow-700 transition-all"
+                        title="Freeze member"
+                      >
+                        <Lock className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => deleteMember(member.id)}
+                        className="h-8 gap-2 hover:bg-red-100 hover:border-red-500 hover:text-red-700 transition-all"
+                        title="Delete member"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   )}
@@ -186,7 +217,7 @@ export default function AdminMembers() {
           </TabsContent>
 
           <TabsContent value="active">
-            <MemberTable data={activeMembers} />
+            <MemberTable data={activeMembers} showActions={true} />
           </TabsContent>
 
           <TabsContent value="settlement">

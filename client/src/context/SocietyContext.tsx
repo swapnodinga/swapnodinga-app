@@ -19,6 +19,8 @@ interface SocietyContextType {
   uploadProfilePic: (file: File) => Promise<string>
   refreshData: () => Promise<void>
   approveMember: (id: string) => Promise<void>
+  deactivateMember: (id: string) => Promise<void>
+  freezeMember: (id: string) => Promise<void>
   deleteMember: (id: string) => Promise<void>
   submitInstalment: (amount: number, file: File, month: string) => Promise<void>
   approveInstalment: (transaction: any, status: "Approved" | "Rejected") => Promise<any>
@@ -186,6 +188,18 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     await refreshData()
   }
 
+  const deactivateMember = async (id: string) => {
+    if (!window.confirm("Deactivate this member? They will no longer be able to participate.")) return
+    await callApi("deactivate-member", { member_id: id })
+    await refreshData()
+  }
+
+  const freezeMember = async (id: string) => {
+    if (!window.confirm("Freeze this member? Their account will be temporarily suspended.")) return
+    await callApi("freeze-member", { member_id: id })
+    await refreshData()
+  }
+
   const calculateMemberSettlement = async (member_id: string, deductions: any[]) => {
     try {
       const result = await callApi("calculate-member-settlement", {
@@ -327,7 +341,7 @@ const uploadProfilePic = async (file: File): Promise<string> => {
       value={{
         currentUser, members, transactions, fixedDeposits, societyTotalFund, isLoading,
         login, register, logout, updateProfile, uploadProfilePic, refreshData,
-        approveMember, deleteMember, submitInstalment, approveInstalment,
+        approveMember, deactivateMember, freezeMember, deleteMember, submitInstalment, approveInstalment,
         addFixedDeposit, updateFixedDeposit, deleteFixedDeposit,
         calculateMemberSettlement,
       }}

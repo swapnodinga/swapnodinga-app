@@ -8,6 +8,8 @@ export async function registerRoutes(app: Express) {
   // Member endpoints
   const approveMember = (await import("../api/approve-member")).default;
   const deleteMember = (await import("../api/delete-member")).default;
+  const deactivateMember = (await import("../api/deactivate-member")).default;
+  const freezeMember = (await import("../api/freeze-member")).default;
 
   // Settlement endpoint
   const calculateMemberSettlement = (await import("../api/calculate-member-settlement")).default;
@@ -37,6 +39,8 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/approve-member", approveMember);
   app.post("/api/delete-member", deleteMember);
+  app.post("/api/deactivate-member", deactivateMember);
+  app.post("/api/freeze-member", freezeMember);
 
   app.post("/api/calculate-member-settlement", calculateMemberSettlement);
 

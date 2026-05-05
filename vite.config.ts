@@ -29,6 +29,8 @@ export default defineConfig({
       '/api/approve-instalment': { target: 'http://localhost:3000', changeOrigin: true },
       '/api/approve-member': { target: 'http://localhost:3000', changeOrigin: true },
       '/api/delete-member': { target: 'http://localhost:3000', changeOrigin: true },
+      '/api/deactivate-member': { target: 'http://localhost:3000', changeOrigin: true },
+      '/api/freeze-member': { target: 'http://localhost:3000', changeOrigin: true },
       '/api/submit-instalment': { target: 'http://localhost:3000', changeOrigin: true },
       '/api/send-email': { target: 'http://localhost:3000', changeOrigin: true },
       '/api/transactions': { target: 'http://localhost:3000', changeOrigin: true },

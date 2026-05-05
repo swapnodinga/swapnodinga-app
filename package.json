@@ -8,6 +8,7 @@
     "dev:client": "vite --port 5173",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "build": "vite build",
+    "start": "NODE_ENV=production tsx server/index.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },

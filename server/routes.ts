@@ -8,8 +8,8 @@ export async function registerRoutes(app: Express) {
   // Member endpoints
   const approveMember = (await import("../api/approve-member")).default;
   const deleteMember = (await import("../api/delete-member")).default;
-  const deactivateMember = (await import("../api/deactivate-member")).default;
-  const freezeMember = (await import("../api/freeze-member")).default;
+  const deactivateMember = (await import("./handlers/deactivate-member")).default;
+  const freezeMember = (await import("./handlers/freeze-member")).default;
 
   // Settlement endpoint
   const calculateMemberSettlement = (await import("../api/calculate-member-settlement")).default;

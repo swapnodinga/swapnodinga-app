@@ -190,14 +190,22 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const deactivateMember = async (id: string) => {
     if (!window.confirm("Deactivate this member? They will no longer be able to participate.")) return
-    await callApi("deactivate-member", { member_id: id })
-    await refreshData()
+    try {
+      await callApi("deactivate-member", { member_id: id })
+      await refreshData()
+    } catch (err: any) {
+      throw new Error(err.message || "Failed to deactivate member")
+    }
   }
 
   const freezeMember = async (id: string) => {
     if (!window.confirm("Freeze this member? Their account will be temporarily suspended.")) return
-    await callApi("freeze-member", { member_id: id })
-    await refreshData()
+    try {
+      await callApi("freeze-member", { member_id: id })
+      await refreshData()
+    } catch (err: any) {
+      throw new Error(err.message || "Failed to freeze member")
+    }
   }
 
   const calculateMemberSettlement = async (member_id: string, deductions: any[]) => {

@@ -8,12 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, CheckCircle, UserPlus, Calculator, Power, Lock, Trash2 } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminMembers() {
   const { members, approveMember, deactivateMember, freezeMember, deleteMember, calculateMemberSettlement } = useSociety();
+  const { toast } = useToast();
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [settlement, setSettlement] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const pendingMembers = members.filter(m => {
     const status = (m.status || 'pending').toLowerCase().trim();
@@ -39,6 +42,42 @@ export default function AdminMembers() {
       setSettlement(null);
     }
     setLoading(false);
+  };
+
+  const handleDeactivate = async (memberId: string) => {
+    setActionLoading(memberId);
+    try {
+      await deactivateMember(memberId);
+      toast({ title: "Success", description: "Member deactivated successfully" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleFreeze = async (memberId: string) => {
+    setActionLoading(memberId);
+    try {
+      await freezeMember(memberId);
+      toast({ title: "Success", description: "Member frozen successfully" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDelete = async (memberId: string) => {
+    setActionLoading(memberId);
+    try {
+      await deleteMember(memberId);
+      toast({ title: "Success", description: "Member deleted successfully" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const MemberTable = ({ data, showApprove = false, showExit = false, showActions = false }: { data: any[], showApprove?: boolean, showExit?: boolean, showActions?: boolean }) => (
@@ -111,7 +150,8 @@ export default function AdminMembers() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => deactivateMember(member.id)}
+                        disabled={actionLoading === member.id}
+                        onClick={() => handleDeactivate(member.id)}
                         className="h-8 gap-2 hover:bg-red-100 hover:border-red-500 hover:text-red-700 transition-all"
                         title="Deactivate member"
                       >
@@ -120,7 +160,8 @@ export default function AdminMembers() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => freezeMember(member.id)}
+                        disabled={actionLoading === member.id}
+                        onClick={() => handleFreeze(member.id)}
                         className="h-8 gap-2 hover:bg-yellow-100 hover:border-yellow-500 hover:text-yellow-700 transition-all"
                         title="Freeze member"
                       >
@@ -129,7 +170,8 @@ export default function AdminMembers() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => deleteMember(member.id)}
+                        disabled={actionLoading === member.id}
+                        onClick={() => handleDelete(member.id)}
                         className="h-8 gap-2 hover:bg-red-100 hover:border-red-500 hover:text-red-700 transition-all"
                         title="Delete member"
                       >

@@ -19,7 +19,7 @@ export default async function handler(req: any, res: any) {
 
     const { error } = await supabase
       .from("members")
-      .update({ status: "inactive", updated_at: new Date().toISOString() })
+      .update({ status: "inactive" })
       .eq("id", Number(member_id));
 
     if (error) throw error;

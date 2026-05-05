@@ -8,8 +8,23 @@ export async function registerRoutes(app: Express) {
   // Member endpoints
   const approveMember = (await import("../api/approve-member")).default;
   const deleteMember = (await import("../api/delete-member")).default;
-  const deactivateMember = (await import("./handlers/deactivate-member")).default;
-  const freezeMember = (await import("./handlers/freeze-member")).default;
+
+  let deactivateMember, freezeMember;
+  try {
+    deactivateMember = (await import("./handlers/deactivate-member")).default;
+    console.log("✓ deactivate-member loaded");
+  } catch (err) {
+    console.error("✗ Failed to load deactivate-member:", err);
+    deactivateMember = (_req: any, res: any) => res.status(500).json({ success: false, message: "Handler not loaded" });
+  }
+
+  try {
+    freezeMember = (await import("./handlers/freeze-member")).default;
+    console.log("✓ freeze-member loaded");
+  } catch (err) {
+    console.error("✗ Failed to load freeze-member:", err);
+    freezeMember = (_req: any, res: any) => res.status(500).json({ success: false, message: "Handler not loaded" });
+  }
 
   // Settlement endpoint
   const calculateMemberSettlement = (await import("../api/calculate-member-settlement")).default;

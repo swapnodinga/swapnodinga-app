@@ -320,7 +320,7 @@ const uploadProfilePic = async (file: File): Promise<string> => {
       value={{
         currentUser, members, transactions, fixedDeposits, societyTotalFund, isLoading,
         login, register, logout, updateProfile, uploadProfilePic, refreshData,
-        approveMember, deleteMember, submitInstalment, approveInstalment,
+        approveMember, setMemberStatus, deleteMember, submitInstalment, approveInstalment,
         addFixedDeposit, updateFixedDeposit, deleteFixedDeposit,
       }}
     >

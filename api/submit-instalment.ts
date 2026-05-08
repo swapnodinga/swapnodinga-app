@@ -37,6 +37,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
+    const { data: memberData, error: memberError } = await supabase
+      .from("members")
+      .select("id, status, full_name, email")
+      .eq("id", Number(member_id))
+      .single();
+
+    if (memberError) {
+      return res.status(404).json({ success: false, message: "Member not found" });
+    }
+
+    const memberStatus = String(memberData?.status || "").toLowerCase().trim();
+    if (memberStatus === "frozen" || memberStatus === "deactivated") {
+      return res.status(403).json({
+        success: false,
+        message: "This member account cannot make transactions right now.",
+      });
+    }
+
     // 5. Database Insert
     const { error } = await supabase.from("Installments").insert([{
       member_id,

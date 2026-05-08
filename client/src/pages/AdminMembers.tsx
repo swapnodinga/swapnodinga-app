@@ -7,10 +7,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, CheckCircle, UserPlus } from 'lucide-react';
+import { Users, CheckCircle, UserPlus, ShieldAlert, ShieldOff } from 'lucide-react';
 
 export default function AdminMembers() {
-  const { members, approveMember } = useSociety();
+  const { members, approveMember, setMemberStatus } = useSociety();
 
   /**
    * IMPROVED FILTERING LOGIC
@@ -27,7 +27,10 @@ export default function AdminMembers() {
     return status === 'active' || status === 'approved';
   });
 
-  const MemberTable = ({ data, showApprove = false }: { data: any[], showApprove?: boolean }) => (
+  const frozenMembers = members.filter(m => (m.status || '').toLowerCase().trim() === 'frozen');
+  const deactivatedMembers = members.filter(m => (m.status || '').toLowerCase().trim() === 'deactivated');
+
+  const MemberTable = ({ data, showApprove = false, showStatusActions = false }: { data: any[], showApprove?: boolean, showStatusActions?: boolean }) => (
     <Card className="border-none shadow-sm">
       <CardContent className="pt-6">
         <Table>
@@ -38,12 +41,13 @@ export default function AdminMembers() {
               <TableHead className="font-bold">Email</TableHead>
               <TableHead className="font-bold">Status</TableHead>
               {showApprove && <TableHead className="font-bold text-right">Action</TableHead>}
+              {showStatusActions && <TableHead className="font-bold text-right">Action</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={showApprove ? 5 : 4} className="text-center py-12 text-slate-400">
+                <TableCell colSpan={(showApprove || showStatusActions) ? 5 : 4} className="text-center py-12 text-slate-400">
                   <UserPlus className="w-12 h-12 mx-auto mb-2 opacity-20" />
                   <p>No members found in this category.</p>
                 </TableCell>
@@ -80,6 +84,26 @@ export default function AdminMembers() {
                       </Button>
                     </TableCell>
                   )}
+                  {showStatusActions && (
+                    <TableCell className="text-right space-x-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setMemberStatus(member.id, 'frozen')}
+                        className="h-8 gap-2"
+                      >
+                        <ShieldAlert className="h-4 w-4" /> Freeze
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setMemberStatus(member.id, 'deactivated')}
+                        className="h-8 gap-2 border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+                      >
+                        <ShieldOff className="h-4 w-4" /> Deactivate
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
@@ -107,6 +131,9 @@ export default function AdminMembers() {
           <TabsTrigger value="active" className="rounded-lg px-6">
             Active Members ({activeMembers.length})
           </TabsTrigger>
+          <TabsTrigger value="suspended" className="rounded-lg px-6">
+            Frozen / Deactivated ({frozenMembers.length + deactivatedMembers.length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="pending">
@@ -114,7 +141,11 @@ export default function AdminMembers() {
         </TabsContent>
 
         <TabsContent value="active">
-          <MemberTable data={activeMembers} />
+          <MemberTable data={activeMembers} showStatusActions={true} />
+        </TabsContent>
+
+        <TabsContent value="suspended">
+          <MemberTable data={[...frozenMembers, ...deactivatedMembers]} showStatusActions={true} />
         </TabsContent>
       </Tabs>
     </div>

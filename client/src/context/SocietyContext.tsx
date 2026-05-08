@@ -19,6 +19,7 @@ interface SocietyContextType {
   uploadProfilePic: (file: File) => Promise<string>
   refreshData: () => Promise<void>
   approveMember: (id: string) => Promise<void>
+  setMemberStatus: (id: string, status: "active" | "frozen" | "deactivated") => Promise<void>
   deleteMember: (id: string) => Promise<void>
   submitInstalment: (amount: number, file: File, month: string) => Promise<void>
   approveInstalment: (transaction: any, status: "Approved" | "Rejected") => Promise<any>
@@ -176,6 +177,11 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const approveMember = async (id: string) => {
     await callApi("approve-member", { member_id: id })
+    await refreshData()
+  }
+
+  const setMemberStatus = async (id: string, status: "active" | "frozen" | "deactivated") => {
+    await callApi("set-member-status", { member_id: id, status })
     await refreshData()
   }
 

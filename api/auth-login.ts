@@ -27,6 +27,14 @@ export default async function handler(req: any, res: any) {
 
     if (memberError) throw memberError;
 
+    const memberStatus = String(memberData?.status || "").toLowerCase().trim();
+    if (memberStatus === "deactivated") {
+      return res.status(403).json({
+        success: false,
+        message: "This member account is deactivated.",
+      });
+    }
+
     return res.status(200).json({ 
       success: true, 
       user: { ...authData.user, ...memberData },

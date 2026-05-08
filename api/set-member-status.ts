@@ -1,5 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
-
 export default async function handler(req: Request) {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ success: false, message: "Method not allowed" }), {
@@ -17,8 +15,6 @@ export default async function handler(req: Request) {
     });
   }
 
-  const supabase = createClient(url, key);
-
   try {
     const { member_id, status } = await req.json();
     if (!member_id) throw new Error("member_id required");
@@ -30,7 +26,10 @@ export default async function handler(req: Request) {
 
     console.log(`[set-member-status] Updating member ${member_id} => ${normalizedStatus}`);
 
-    const updateResponse = await fetch(`${url}/rest/v1/members?id=eq.${Number(member_id)}`, {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    const updateResponse = await fetch(`${url.replace(/\/$/, "")}/rest/v1/members?id=eq.${Number(member_id)}`, {
       method: "PATCH",
       headers: {
         apikey: key,
@@ -39,7 +38,10 @@ export default async function handler(req: Request) {
         Prefer: "return=minimal",
       },
       body: JSON.stringify({ status: normalizedStatus }),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeout);
 
     const updateText = await updateResponse.text();
     console.log(`[set-member-status] Supabase response ${updateResponse.status}:`, updateText || "<empty>");

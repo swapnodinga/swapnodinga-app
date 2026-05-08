@@ -28,12 +28,25 @@ export default async function handler(req: Request) {
       throw new Error("Valid status is required");
     }
 
-    const { error } = await supabase
-      .from("members")
-      .update({ status: normalizedStatus })
-      .eq("id", Number(member_id));
+    console.log(`[set-member-status] Updating member ${member_id} => ${normalizedStatus}`);
 
-    if (error) throw error;
+    const updateResponse = await fetch(`${url}/rest/v1/members?id=eq.${Number(member_id)}`, {
+      method: "PATCH",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ status: normalizedStatus }),
+    });
+
+    const updateText = await updateResponse.text();
+    console.log(`[set-member-status] Supabase response ${updateResponse.status}:`, updateText || "<empty>");
+
+    if (!updateResponse.ok) {
+      throw new Error(updateText || `Failed to update member status (${updateResponse.status})`);
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

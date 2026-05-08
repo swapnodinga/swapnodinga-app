@@ -92,7 +92,9 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = async () => {
     try {
-      const { data: membersData } = await supabase.from("members").select("*")
+      const { data: membersData, error: membersError } = await supabase.from("members").select("*")
+      if (membersError) console.error("[refreshData] Members query error:", membersError)
+      
       const { data: transData } = await supabase.from("Installments").select("*").order("created_at", { ascending: false })
       const { data: fdData } = await supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
 
@@ -181,8 +183,16 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   }
 
   const setMemberStatus = async (id: string, status: "active" | "frozen" | "deactivated") => {
-    await callApi("set-member-status", { member_id: id, status })
-    await refreshData()
+    try {
+      console.log(`[setMemberStatus] Updating member ${id} to ${status}`)
+      const result = await callApi("set-member-status", { member_id: id, status })
+      console.log(`[setMemberStatus] Update result:`, result)
+      await refreshData()
+      console.log(`[setMemberStatus] Refresh complete`)
+    } catch (err: any) {
+      console.error(`[setMemberStatus] Error:`, err)
+      throw err
+    }
   }
 
   const deleteMember = async (id: string) => {

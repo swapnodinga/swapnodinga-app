@@ -89,7 +89,14 @@ export default function AdminMembers() {
                       <Button 
                         size="sm" 
                         variant="outline"
-                        onClick={() => setMemberStatus(member.id, 'frozen')}
+                        onClick={async () => {
+                          try {
+                            await setMemberStatus(member.id, 'frozen')
+                          } catch (err) {
+                            console.error("Freeze failed:", err)
+                            alert("Failed to freeze member: " + (err as any).message)
+                          }
+                        }}
                         className="h-8 gap-2"
                       >
                         <ShieldAlert className="h-4 w-4" /> Freeze
@@ -97,7 +104,14 @@ export default function AdminMembers() {
                       <Button 
                         size="sm" 
                         variant="outline"
-                        onClick={() => setMemberStatus(member.id, 'deactivated')}
+                        onClick={async () => {
+                          try {
+                            await setMemberStatus(member.id, 'deactivated')
+                          } catch (err) {
+                            console.error("Deactivate failed:", err)
+                            alert("Failed to deactivate member: " + (err as any).message)
+                          }
+                        }}
                         className="h-8 gap-2 border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
                       >
                         <ShieldOff className="h-4 w-4" /> Deactivate

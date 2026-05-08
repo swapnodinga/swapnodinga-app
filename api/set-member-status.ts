@@ -26,10 +26,7 @@ export default async function handler(req: Request) {
 
     console.log(`[set-member-status] Updating member ${member_id} => ${normalizedStatus}`);
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-
-    const updateResponse = await fetch(`${url.replace(/\/$/, "")}/rest/v1/members?id=eq.${Number(member_id)}`, {
+    const request = fetch(`${url.replace(/\/$/, "")}/rest/v1/members?id=eq.${Number(member_id)}`, {
       method: "PATCH",
       headers: {
         apikey: key,
@@ -38,10 +35,13 @@ export default async function handler(req: Request) {
         Prefer: "return=minimal",
       },
       body: JSON.stringify({ status: normalizedStatus }),
-      signal: controller.signal,
     });
 
-    clearTimeout(timeout);
+    const timeout = new Promise<Response>((_, reject) => {
+      setTimeout(() => reject(new Error("Status update timed out while reaching Supabase")), 12000);
+    });
+
+    const updateResponse = await Promise.race([request, timeout]);
 
     const updateText = await updateResponse.text();
     console.log(`[set-member-status] Supabase response ${updateResponse.status}:`, updateText || "<empty>");

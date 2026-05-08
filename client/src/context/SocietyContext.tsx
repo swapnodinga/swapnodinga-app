@@ -92,7 +92,7 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = async () => {
     try {
-      const { data: membersData } = await supabase.from("members_public").select("*")
+      const { data: membersData } = await supabase.from("members").select("*")
       const { data: transData } = await supabase.from("Installments").select("*").order("created_at", { ascending: false })
       const { data: fdData } = await supabase.from("fixed_deposits").select("*").order("start_date", { ascending: false })
 

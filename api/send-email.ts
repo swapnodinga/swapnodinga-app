@@ -84,12 +84,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const reportHtml = `
         <div style="font-family: Arial, sans-serif; color:#111827; margin:20px 0;">
-          <h3 style="margin:16px 0 12px; font-size:18px; color:#0f172a; border-bottom:2px solid #10b981; padding-bottom:8px;">Settlement Report</h3>
-          <p style="margin:8px 0; font-weight:bold;"><strong>Member:</strong> ${member_name}</p>
-          <p style="margin:8px 0; font-weight:bold;"><strong>Society ID:</strong> ${settlement_data.society_id || 'N/A'}</p>
-          <table style="width:100%; border-collapse:collapse; margin-top:16px; border:1px solid #ddd;">
-            <tbody>
-              ${reportRows.map((row: string) => `<tr style="border:1px solid #ddd; background:#f9fafb;">${row.replace(/<tr>/g, '').replace(/<\/tr>/g, '')}</tr>`).join('')}
+          <h3 style="margin:16px 0 12px; font-size:18px; color:#0f172a; border-bottom:3px solid #10b981; padding-bottom:8px;">Settlement Report</h3>
+          <p style="margin:8px 0 4px; font-weight:bold;"><strong>Member:</strong> ${member_name}</p>
+          <p style="margin:4px 0 16px; font-weight:bold;"><strong>Society ID:</strong> ${settlement_data.society_id || 'N/A'}</p>
+          <table cellpadding="10" cellspacing="0" style="width:100%; border-collapse:collapse; border:1px solid #ddd; background:#fff;">
+            <tbody style="font-size:14px;">
+              ${reportRows.join('')}
             </tbody>
           </table>
         </div>

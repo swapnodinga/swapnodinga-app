@@ -3,12 +3,11 @@ import { useSociety } from '../context/SocietyContext';
 import { 
   Table, TableHeader, TableBody, TableHead, TableRow, TableCell 
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Users, CheckCircle, UserPlus, ShieldAlert, ShieldOff, ShieldCheck, Calculator, Loader2 } from 'lucide-react';
+import { Users, CheckCircle, UserPlus, ShieldAlert, ShieldOff, ShieldCheck, Calculator, Loader2, X } from 'lucide-react';
 
 export default function AdminMembers() {
   const { members, approveMember, setMemberStatus, getSettlementPreview } = useSociety();
@@ -225,135 +224,143 @@ export default function AdminMembers() {
         </TabsContent>
       </Tabs>
 
-      {/* Settlement Preview Modal */}
-      <Dialog open={!!settlementModal} onOpenChange={(open) => !open && setSettlementModal(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          {settlementModal && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="text-xl font-bold">Settlement Preview</DialogTitle>
-                <DialogDescription className="text-base">
+      {/* Settlement Preview Modal - Simple div-based */}
+      {settlementModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <CardHeader className="border-b pb-4 flex flex-row items-start justify-between">
+              <div>
+                <CardTitle className="text-xl font-bold">Settlement Preview</CardTitle>
+                <p className="text-sm text-slate-600 mt-1">
                   {settlementModal.member_name} ({settlementModal.society_id})
-                </DialogDescription>
-              </DialogHeader>
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSettlementModal(null)}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </CardHeader>
 
-              <div className="space-y-6">
-                {/* Summary Cards */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
-                    <p className="text-[11px] font-bold text-emerald-700 uppercase">Contributions</p>
-                    <p className="text-2xl font-black text-emerald-900 font-mono">
-                      ৳{settlementModal.contribution_total.toLocaleString(undefined, {maximumFractionDigits: 0})}
-                    </p>
-                  </div>
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <p className="text-[11px] font-bold text-blue-700 uppercase">Dividends</p>
-                    <p className="text-2xl font-black text-blue-900 font-mono">
-                      ৳{settlementModal.earned_dividends.toLocaleString(undefined, {maximumFractionDigits: 0})}
-                    </p>
-                  </div>
-                  <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                    <p className="text-[11px] font-bold text-purple-700 uppercase">Inflow Total</p>
-                    <p className="text-2xl font-black text-purple-900 font-mono">
-                      ৳{settlementModal.summary.inflow.toLocaleString(undefined, {maximumFractionDigits: 0})}
-                    </p>
-                  </div>
+            <CardContent className="space-y-6 pt-6">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+                  <p className="text-[11px] font-bold text-emerald-700 uppercase">Contributions</p>
+                  <p className="text-2xl font-black text-emerald-900 font-mono">
+                    ৳{settlementModal.contribution_total.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                  </p>
                 </div>
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <p className="text-[11px] font-bold text-blue-700 uppercase">Dividends</p>
+                  <p className="text-2xl font-black text-blue-900 font-mono">
+                    ৳{settlementModal.earned_dividends.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                  </p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                  <p className="text-[11px] font-bold text-purple-700 uppercase">Inflow Total</p>
+                  <p className="text-2xl font-black text-purple-900 font-mono">
+                    ৳{settlementModal.summary.inflow.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                  </p>
+                </div>
+              </div>
 
-                {/* Fixed Deposits */}
-                {settlementModal.fixed_deposits && settlementModal.fixed_deposits.length > 0 && (
-                  <Card className="bg-slate-50 border-slate-200">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-bold">Fixed Deposits</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {settlementModal.fixed_deposits.map((fd: any, i: number) => (
-                        <div key={i} className="flex justify-between items-center bg-white p-3 rounded border border-slate-200">
-                          <div>
-                            <p className="text-sm font-semibold text-slate-800">
-                              ৳{fd.amount.toLocaleString()} @ {fd.interest_rate}% for {fd.tenure_months}mo
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              Status: <Badge variant="outline" className="text-[9px]">{fd.status}</Badge>
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xs font-bold text-slate-500">Interest</p>
-                            <p className="text-lg font-black text-emerald-600">
-                              ৳{fd.calculated_interest.toLocaleString(undefined, {maximumFractionDigits: 0})}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                      <div className="border-t pt-3 flex justify-between items-center font-bold">
-                        <span className="text-slate-700">FD Maturity Total</span>
-                        <span className="text-lg font-mono text-slate-900">
-                          ৳{settlementModal.fixed_deposits_total_maturity.toLocaleString(undefined, {maximumFractionDigits: 0})}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Deductions */}
-                <Card className="bg-red-50 border-red-200">
+              {/* Fixed Deposits */}
+              {settlementModal.fixed_deposits && settlementModal.fixed_deposits.length > 0 && (
+                <Card className="bg-slate-50 border-slate-200">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-bold text-red-900">Deductions</CardTitle>
+                    <CardTitle className="text-sm font-bold">Fixed Deposits</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-red-700">Unpaid Installments</span>
-                      <span className="font-mono font-bold">৳{settlementModal.deductions.unpaid_installments.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-red-700">Closing Fee</span>
-                      <span className="font-mono font-bold">৳{settlementModal.deductions.closing_fee.toLocaleString()}</span>
-                    </div>
-                    {settlementModal.deductions.early_exit_penalty > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-red-700">Early Exit Penalty (5%)</span>
-                        <span className="font-mono font-bold">৳{settlementModal.deductions.early_exit_penalty.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                    {settlementModal.fixed_deposits.map((fd: any, i: number) => (
+                      <div key={i} className="flex justify-between items-center bg-white p-3 rounded border border-slate-200">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">
+                            ৳{fd.amount.toLocaleString()} @ {fd.interest_rate}% for {fd.tenure_months}mo
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Status: <Badge variant="outline" className="text-[9px]">{fd.status}</Badge>
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-bold text-slate-500">Interest</p>
+                          <p className="text-lg font-black text-emerald-600">
+                            ৳{fd.calculated_interest.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                          </p>
+                        </div>
                       </div>
-                    )}
-                    <div className="border-t pt-2 flex justify-between font-bold">
-                      <span className="text-red-900">Total Deductions</span>
-                      <span className="font-mono text-red-700">৳{settlementModal.deductions.total.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                    ))}
+                    <div className="border-t pt-3 flex justify-between items-center font-bold">
+                      <span className="text-slate-700">FD Maturity Total</span>
+                      <span className="text-lg font-mono text-slate-900">
+                        ৳{settlementModal.fixed_deposits_total_maturity.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                      </span>
                     </div>
                   </CardContent>
                 </Card>
+              )}
 
-                {/* Net Payout */}
-                <div className="bg-emerald-100 p-6 rounded-lg border-2 border-emerald-400">
-                  <p className="text-sm font-bold text-emerald-700 uppercase mb-2">Net Transfer Amount</p>
-                  <p className="text-4xl font-black text-emerald-900 font-mono">
-                    ৳{settlementModal.net_transfer_amount.toLocaleString(undefined, {maximumFractionDigits: 0})}
-                  </p>
-                  <p className="text-xs text-emerald-600 mt-2">
-                    This is a preview only. No transaction has been recorded yet.
-                  </p>
-                </div>
+              {/* Deductions */}
+              <Card className="bg-red-50 border-red-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-bold text-red-900">Deductions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-red-700">Unpaid Installments</span>
+                    <span className="font-mono font-bold">৳{settlementModal.deductions.unpaid_installments.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-red-700">Closing Fee</span>
+                    <span className="font-mono font-bold">৳{settlementModal.deductions.closing_fee.toLocaleString()}</span>
+                  </div>
+                  {settlementModal.deductions.early_exit_penalty > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-red-700">Early Exit Penalty (5%)</span>
+                      <span className="font-mono font-bold">৳{settlementModal.deductions.early_exit_penalty.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                    </div>
+                  )}
+                  <div className="border-t pt-2 flex justify-between font-bold">
+                    <span className="text-red-900">Total Deductions</span>
+                    <span className="font-mono text-red-700">৳{settlementModal.deductions.total.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                  </div>
+                </CardContent>
+              </Card>
 
-                {/* Action Buttons */}
-                <div className="flex gap-3">
-                  <Button 
-                    variant="outline" 
-                    className="flex-1"
-                    onClick={() => setSettlementModal(null)}
-                  >
-                    Close
-                  </Button>
-                  <Button 
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                    disabled
-                  >
-                    Execute Settlement (Coming Next)
-                  </Button>
-                </div>
+              {/* Net Payout */}
+              <div className="bg-emerald-100 p-6 rounded-lg border-2 border-emerald-400">
+                <p className="text-sm font-bold text-emerald-700 uppercase mb-2">Net Transfer Amount</p>
+                <p className="text-4xl font-black text-emerald-900 font-mono">
+                  ৳{settlementModal.net_transfer_amount.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                </p>
+                <p className="text-xs text-emerald-600 mt-2">
+                  This is a preview only. No transaction has been recorded yet.
+                </p>
               </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => setSettlementModal(null)}
+                >
+                  Close
+                </Button>
+                <Button 
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                  disabled
+                >
+                  Execute Settlement (Coming Next)
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

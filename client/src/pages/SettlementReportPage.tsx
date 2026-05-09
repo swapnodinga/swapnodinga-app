@@ -173,12 +173,13 @@ export default function SettlementReportPage() {
 
     setIsSendingEmail(true);
     try {
-      const response = await fetch("/api/send-settlement-report", {
+      const response = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           member_email: emailInput.trim(),
           member_name: settlement.member_name,
+          email_type: "settlement",
           settlement_data: settlement
         })
       });
@@ -196,8 +197,6 @@ export default function SettlementReportPage() {
       });
 
       setShowEmailDialog(false);
-      // Optionally clear the draft after successful send
-      // localStorage.removeItem("settlement_report_draft");
     } catch (error: any) {
       toast({
         title: "Error Sending Email",

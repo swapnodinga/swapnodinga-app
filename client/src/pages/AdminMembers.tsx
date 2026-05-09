@@ -411,11 +411,11 @@ export default function AdminMembers() {
 
       {/* Settlement Preview Modal - Improved */}
       {settlementModal && (
-        <div className="fixed inset-0 bg-white/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <Card className="w-full max-w-2xl max-h-[calc(100vh-2rem)] shadow-2xl border-emerald-200 flex flex-col overflow-hidden">
-            <CardHeader className="border-b pb-4 flex flex-row items-start justify-between bg-gradient-to-r from-emerald-50 to-blue-50">
+        <div className="fixed inset-0 bg-white/40 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+          <Card className="w-full max-w-2xl h-[calc(100vh-1rem)] sm:h-[calc(100vh-2rem)] shadow-2xl border-emerald-200 flex flex-col overflow-hidden">
+            <CardHeader className="shrink-0 border-b py-4 sm:py-5 flex flex-row items-start justify-between bg-gradient-to-r from-emerald-50 to-blue-50">
               <div>
-                <CardTitle className="text-2xl font-bold text-slate-900">Settlement Preview</CardTitle>
+                <CardTitle className="text-xl sm:text-2xl font-bold text-slate-900">Settlement Preview</CardTitle>
                 <p className="text-sm text-slate-600 mt-1">
                   {settlementModal.member_name} ({settlementModal.society_id})
                 </p>
@@ -433,24 +433,24 @@ export default function AdminMembers() {
               </Button>
             </CardHeader>
 
-            <CardContent className="space-y-6 pt-6 overflow-y-auto min-h-0">
+            <CardContent className="flex-1 min-h-0 space-y-4 overflow-y-auto py-4 sm:py-6">
               {/* Summary Cards */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-emerald-50 p-3 sm:p-4 rounded-lg border border-emerald-200">
                   <p className="text-[11px] font-bold text-emerald-700 uppercase">Contributions</p>
-                  <p className="text-2xl font-black text-emerald-900 font-mono">
+                  <p className="text-xl sm:text-2xl font-black text-emerald-900 font-mono leading-none">
                     ৳{settlementModal.contribution_total.toLocaleString(undefined, {maximumFractionDigits: 0})}
                   </p>
                 </div>
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="bg-blue-50 p-3 sm:p-4 rounded-lg border border-blue-200">
                   <p className="text-[11px] font-bold text-blue-700 uppercase">Dividends</p>
-                  <p className="text-2xl font-black text-blue-900 font-mono">
+                  <p className="text-xl sm:text-2xl font-black text-blue-900 font-mono leading-none">
                     ৳{settlementModal.earned_dividends.toLocaleString(undefined, {maximumFractionDigits: 0})}
                   </p>
                 </div>
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                <div className="bg-purple-50 p-3 sm:p-4 rounded-lg border border-purple-200">
                   <p className="text-[11px] font-bold text-purple-700 uppercase">Inflow Total</p>
-                  <p className="text-2xl font-black text-purple-900 font-mono">
+                  <p className="text-xl sm:text-2xl font-black text-purple-900 font-mono leading-none">
                     ৳{settlementModal.summary.inflow.toLocaleString(undefined, {maximumFractionDigits: 0})}
                   </p>
                 </div>
@@ -459,14 +459,14 @@ export default function AdminMembers() {
               {/* Fixed Deposits */}
               {settlementModal.fixed_deposits && settlementModal.fixed_deposits.length > 0 && (
                 <Card className="bg-slate-50 border-slate-200">
-                  <CardHeader className="pb-3">
+                  <CardHeader className="py-3 pb-2">
                     <CardTitle className="text-sm font-bold">Fixed Deposits</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-2">
+                  <CardContent className="space-y-2 pb-3">
                     {settlementModal.fixed_deposits.map((fd: any, i: number) => (
-                      <div key={i} className="flex justify-between items-center bg-white p-3 rounded border border-slate-200">
+                      <div key={i} className="flex justify-between items-center gap-3 bg-white p-2.5 rounded border border-slate-200">
                         <div>
-                          <p className="text-sm font-semibold text-slate-800">
+                          <p className="text-xs sm:text-sm font-semibold text-slate-800">
                             ৳{fd.amount.toLocaleString()} @ {fd.interest_rate}% for {fd.tenure_months}mo
                           </p>
                           <p className="text-xs text-slate-500">
@@ -474,16 +474,16 @@ export default function AdminMembers() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-xs font-bold text-slate-500">Interest</p>
-                          <p className="text-lg font-black text-emerald-600">
+                          <p className="text-[10px] font-bold text-slate-500 uppercase">Interest</p>
+                          <p className="text-base sm:text-lg font-black text-emerald-600 leading-none">
                             ৳{fd.calculated_interest.toLocaleString(undefined, {maximumFractionDigits: 0})}
                           </p>
                         </div>
                       </div>
                     ))}
-                    <div className="border-t pt-3 flex justify-between items-center font-bold">
+                    <div className="border-t pt-2.5 flex justify-between items-center font-bold">
                       <span className="text-slate-700">FD Maturity Total</span>
-                      <span className="text-lg font-mono text-slate-900">
+                      <span className="text-base sm:text-lg font-mono text-slate-900">
                         ৳{settlementModal.fixed_deposits_total_maturity.toLocaleString(undefined, {maximumFractionDigits: 0})}
                       </span>
                     </div>
@@ -493,13 +493,13 @@ export default function AdminMembers() {
 
               {/* Deductions - SELECTABLE */}
               <Card className="bg-red-50 border-red-200">
-                <CardHeader className="pb-3">
+                <CardHeader className="py-3 pb-2">
                   <CardTitle className="text-sm font-bold text-red-900">Deductions (Admin Select)</CardTitle>
                   <p className="text-xs text-red-700 mt-1">Check/uncheck and edit the amount for each fee</p>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-2.5 pb-4">
                   {/* Disclosure Fee */}
-                  <div className="flex items-center gap-3 p-3 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
+                  <div className="flex items-center gap-3 p-2.5 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
                     <Checkbox
                       id="disclosure"
                       checked={selectedDeductions.disclosure_fee}
@@ -511,22 +511,22 @@ export default function AdminMembers() {
                       }
                     />
                     <div className="flex-1">
-                      <label htmlFor="disclosure" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                      <label htmlFor="disclosure" className="text-sm font-semibold text-slate-800 cursor-pointer leading-none">
                         Disclosure Fee
                       </label>
-                      <p className="text-xs text-slate-500">Member information processing fee</p>
+                      <p className="text-[11px] text-slate-500">Member information processing fee</p>
                     </div>
                     <Input
                       type="number"
                       min="0"
                       value={deductionAmounts.disclosure_fee}
                       onChange={(e) => setDeductionAmounts(prev => ({ ...prev, disclosure_fee: Number(e.target.value) || 0 }))}
-                      className="w-28 h-9 text-right font-mono"
+                      className="w-24 sm:w-28 h-8 sm:h-9 text-right font-mono"
                     />
                   </div>
 
                   {/* Society Fee */}
-                  <div className="flex items-center gap-3 p-3 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
+                  <div className="flex items-center gap-3 p-2.5 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
                     <Checkbox
                       id="society"
                       checked={selectedDeductions.society_fee}
@@ -538,22 +538,22 @@ export default function AdminMembers() {
                       }
                     />
                     <div className="flex-1">
-                      <label htmlFor="society" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                      <label htmlFor="society" className="text-sm font-semibold text-slate-800 cursor-pointer leading-none">
                         Society Fee
                       </label>
-                      <p className="text-xs text-slate-500">Society administration adjustment</p>
+                      <p className="text-[11px] text-slate-500">Society administration adjustment</p>
                     </div>
                     <Input
                       type="number"
                       min="0"
                       value={deductionAmounts.society_fee}
                       onChange={(e) => setDeductionAmounts(prev => ({ ...prev, society_fee: Number(e.target.value) || 0 }))}
-                      className="w-28 h-9 text-right font-mono"
+                      className="w-24 sm:w-28 h-8 sm:h-9 text-right font-mono"
                     />
                   </div>
 
                   {/* Unpaid Installments */}
-                  <div className="flex items-center gap-3 p-3 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
+                  <div className="flex items-center gap-3 p-2.5 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
                     <Checkbox
                       id="unpaid"
                       checked={selectedDeductions.unpaid_installments}
@@ -565,22 +565,22 @@ export default function AdminMembers() {
                       }
                     />
                     <div className="flex-1">
-                      <label htmlFor="unpaid" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                      <label htmlFor="unpaid" className="text-sm font-semibold text-slate-800 cursor-pointer leading-none">
                         Unpaid Installments
                       </label>
-                      <p className="text-xs text-slate-500">From pending/rejected payments</p>
+                      <p className="text-[11px] text-slate-500">From pending/rejected payments</p>
                     </div>
                     <Input
                       type="number"
                       min="0"
                       value={deductionAmounts.unpaid_installments}
                       onChange={(e) => setDeductionAmounts(prev => ({ ...prev, unpaid_installments: Number(e.target.value) || 0 }))}
-                      className="w-28 h-9 text-right font-mono"
+                      className="w-24 sm:w-28 h-8 sm:h-9 text-right font-mono"
                     />
                   </div>
 
                   {/* Closing Fee */}
-                  <div className="flex items-center gap-3 p-3 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
+                  <div className="flex items-center gap-3 p-2.5 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
                     <Checkbox
                       id="closing"
                       checked={selectedDeductions.closing_fee}
@@ -592,23 +592,23 @@ export default function AdminMembers() {
                       }
                     />
                     <div className="flex-1">
-                      <label htmlFor="closing" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                      <label htmlFor="closing" className="text-sm font-semibold text-slate-800 cursor-pointer leading-none">
                         Closing Fee
                       </label>
-                      <p className="text-xs text-slate-500">Account closure administrative fee</p>
+                      <p className="text-[11px] text-slate-500">Account closure administrative fee</p>
                     </div>
                     <Input
                       type="number"
                       min="0"
                       value={deductionAmounts.closing_fee}
                       onChange={(e) => setDeductionAmounts(prev => ({ ...prev, closing_fee: Number(e.target.value) || 0 }))}
-                      className="w-28 h-9 text-right font-mono"
+                      className="w-24 sm:w-28 h-8 sm:h-9 text-right font-mono"
                     />
                   </div>
 
                   {/* Early Settlement Fee */}
                   {settlementModal.deductions.early_exit_penalty > 0 && (
-                    <div className="flex items-center gap-3 p-3 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
+                    <div className="flex items-center gap-3 p-2.5 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
                       <Checkbox
                         id="penalty"
                         checked={selectedDeductions.early_exit_penalty}
@@ -620,25 +620,25 @@ export default function AdminMembers() {
                         }
                       />
                       <div className="flex-1">
-                        <label htmlFor="penalty" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                        <label htmlFor="penalty" className="text-sm font-semibold text-slate-800 cursor-pointer leading-none">
                           Early Settlement Fee (5%)
                         </label>
-                        <p className="text-xs text-slate-500">Applied when active FDs exist</p>
+                        <p className="text-[11px] text-slate-500">Applied when active FDs exist</p>
                       </div>
                       <Input
                         type="number"
                         min="0"
                         value={deductionAmounts.early_exit_penalty}
                         onChange={(e) => setDeductionAmounts(prev => ({ ...prev, early_exit_penalty: Number(e.target.value) || 0 }))}
-                        className="w-28 h-9 text-right font-mono"
+                        className="w-24 sm:w-28 h-8 sm:h-9 text-right font-mono"
                       />
                     </div>
                   )}
 
                   {/* Total Deductions */}
-                  <div className="border-t pt-3 flex justify-between items-center font-bold bg-red-100/50 p-3 rounded">
+                  <div className="border-t pt-2.5 flex justify-between items-center font-bold bg-red-100/50 p-2.5 rounded">
                     <span className="text-red-900">Total Selected Deductions</span>
-                    <span className="font-mono text-lg text-red-700">
+                    <span className="font-mono text-base sm:text-lg text-red-700">
                       ৳{(
                         (selectedDeductions.unpaid_installments ? deductionAmounts.unpaid_installments : 0) +
                         (selectedDeductions.closing_fee ? deductionAmounts.closing_fee : 0) +
@@ -652,9 +652,9 @@ export default function AdminMembers() {
               </Card>
 
               {/* Net Payout - UPDATED */}
-              <div className="bg-emerald-100 p-6 rounded-lg border-2 border-emerald-400">
+              <div className="bg-emerald-100 p-4 sm:p-5 rounded-lg border-2 border-emerald-400">
                 <p className="text-sm font-bold text-emerald-700 uppercase mb-2">Net Transfer Amount</p>
-                <p className="text-4xl font-black text-emerald-900 font-mono">
+                <p className="text-3xl sm:text-4xl font-black text-emerald-900 font-mono leading-none">
                   ৳{Math.max(0, 
                     settlementModal.summary.inflow - (
                       (selectedDeductions.unpaid_installments ? deductionAmounts.unpaid_installments : 0) +
@@ -669,8 +669,9 @@ export default function AdminMembers() {
                   This is a preview only. No transaction has been recorded yet.
                 </p>
               </div>
+            </CardContent>
 
-              {/* Action Buttons */}
+            <div className="shrink-0 border-t bg-white p-3 sm:p-4">
               <div className="flex gap-3">
                 <Button 
                   variant="outline" 
@@ -689,7 +690,7 @@ export default function AdminMembers() {
                   Generate Report
                 </Button>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </div>
       )}

@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, CheckCircle, UserPlus, ShieldAlert, ShieldOff } from 'lucide-react';
+import { Users, CheckCircle, UserPlus, ShieldAlert, ShieldOff, ShieldCheck } from 'lucide-react';
 
 export default function AdminMembers() {
   const { members, approveMember, setMemberStatus } = useSociety();
@@ -86,36 +86,56 @@ export default function AdminMembers() {
                   )}
                   {showStatusActions && (
                     <TableCell className="text-right space-x-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={async () => {
-                          try {
-                            await setMemberStatus(member.id, 'frozen')
-                          } catch (err) {
-                            console.error("Freeze failed:", err)
-                            alert("Failed to freeze member: " + (err as any).message)
-                          }
-                        }}
-                        className="h-8 gap-2"
-                      >
-                        <ShieldAlert className="h-4 w-4" /> Freeze
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={async () => {
-                          try {
-                            await setMemberStatus(member.id, 'deactivated')
-                          } catch (err) {
-                            console.error("Deactivate failed:", err)
-                            alert("Failed to deactivate member: " + (err as any).message)
-                          }
-                        }}
-                        className="h-8 gap-2 border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
-                      >
-                        <ShieldOff className="h-4 w-4" /> Deactivate
-                      </Button>
+                      {['frozen', 'deactivated'].includes(String(member.status || '').toLowerCase()) ? (
+                        <Button 
+                          size="sm" 
+                          variant="default"
+                          onClick={async () => {
+                            try {
+                              await setMemberStatus(member.id, 'active')
+                            } catch (err) {
+                              console.error("Reactivate failed:", err)
+                              alert("Failed to reactivate member: " + (err as any).message)
+                            }
+                          }}
+                          className="h-8 gap-2 bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          <ShieldCheck className="h-4 w-4" /> Reactivate
+                        </Button>
+                      ) : (
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={async () => {
+                              try {
+                                await setMemberStatus(member.id, 'frozen')
+                              } catch (err) {
+                                console.error("Freeze failed:", err)
+                                alert("Failed to freeze member: " + (err as any).message)
+                              }
+                            }}
+                            className="h-8 gap-2"
+                          >
+                            <ShieldAlert className="h-4 w-4" /> Freeze
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={async () => {
+                              try {
+                                await setMemberStatus(member.id, 'deactivated')
+                              } catch (err) {
+                                console.error("Deactivate failed:", err)
+                                alert("Failed to deactivate member: " + (err as any).message)
+                              }
+                            }}
+                            className="h-8 gap-2 border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+                          >
+                            <ShieldOff className="h-4 w-4" /> Deactivate
+                          </Button>
+                        </>
+                      )}
                     </TableCell>
                   )}
                 </TableRow>

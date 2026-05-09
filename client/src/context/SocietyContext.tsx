@@ -26,6 +26,7 @@ interface SocietyContextType {
   addFixedDeposit: (data: any) => Promise<void>
   updateFixedDeposit: (id: string, data: any) => Promise<void>
   deleteFixedDeposit: (id: string) => Promise<void>
+  getSettlementPreview: (id: string) => Promise<any>
 }
 
 const SocietyContext = createContext<SocietyContextType | undefined>(undefined)
@@ -217,6 +218,18 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     await refreshData()
   }
 
+  const getSettlementPreview = async (id: string) => {
+    try {
+      console.log(`[getSettlementPreview] Fetching preview for member ${id}`)
+      const result = await callApi("get-settlement-preview", { member_id: id })
+      console.log(`[getSettlementPreview] Preview result:`, result)
+      return result.data
+    } catch (err: any) {
+      console.error(`[getSettlementPreview] Error:`, err)
+      throw err
+    }
+  }
+
   const login = async (email: string, pass: string) => {
     try {
       const data = await callApi("auth-login", { email, password: pass })
@@ -331,7 +344,7 @@ const uploadProfilePic = async (file: File): Promise<string> => {
         currentUser, members, transactions, fixedDeposits, societyTotalFund, isLoading,
         login, register, logout, updateProfile, uploadProfilePic, refreshData,
         approveMember, setMemberStatus, deleteMember, submitInstalment, approveInstalment,
-        addFixedDeposit, updateFixedDeposit, deleteFixedDeposit,
+        addFixedDeposit, updateFixedDeposit, deleteFixedDeposit, getSettlementPreview,
       }}
     >
       {children}

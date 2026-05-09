@@ -83,12 +83,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const reportHtml = `
-        <div id="settlement-report" style="font-family: Arial, sans-serif; color:#111827;">
-          <h2>Settlement Report</h2>
-          <p><strong>Member:</strong> ${member_name} <br/><strong>Society ID:</strong> ${settlement_data.society_id || 'N/A'}</p>
-          <table style="width:100%; border-collapse:collapse;">
+        <div style="font-family: Arial, sans-serif; color:#111827; margin:20px 0;">
+          <h3 style="margin:16px 0 12px; font-size:18px; color:#0f172a; border-bottom:2px solid #10b981; padding-bottom:8px;">Settlement Report</h3>
+          <p style="margin:8px 0; font-weight:bold;"><strong>Member:</strong> ${member_name}</p>
+          <p style="margin:8px 0; font-weight:bold;"><strong>Society ID:</strong> ${settlement_data.society_id || 'N/A'}</p>
+          <table style="width:100%; border-collapse:collapse; margin-top:16px; border:1px solid #ddd;">
             <tbody>
-              ${reportRows.join('')}
+              ${reportRows.map((row: string) => `<tr style="border:1px solid #ddd; background:#f9fafb;">${row.replace(/<tr>/g, '').replace(/<\/tr>/g, '')}</tr>`).join('')}
             </tbody>
           </table>
         </div>
@@ -128,13 +129,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const bodyHtml = `
-        <div style="font-family: Arial, sans-serif; color:#111827;">
+        <div style="font-family: Arial, sans-serif; color:#111827; line-height:1.6;">
           ${apologyHtml}
           ${reportHtml}
           ${reportDownloadUrl ? `
-            <div style="margin-top:20px; text-align:center;">
-              <p style="margin:0 0 12px; font-weight:700; color:#0f172a;">Settlement Report</p>
-              <a href="${reportDownloadUrl}" style="display:inline-block; background:#10b981; color:#ffffff; text-decoration:none; padding:12px 22px; border-radius:9999px; font-weight:700; font-size:14px;">
+            <div style="margin-top:24px; text-align:center; border-top:1px solid #e5e7eb; padding-top:24px;">
+              <p style="margin:0 0 12px; font-weight:700; color:#0f172a; font-size:14px;">Settlement Report</p>
+              <a href="${reportDownloadUrl}" style="display:inline-block; background:#10b981; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:9999px; font-weight:700; font-size:14px; border:none;">
                 Download Settlement Report
               </a>
             </div>

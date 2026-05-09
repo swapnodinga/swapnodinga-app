@@ -125,6 +125,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Handle regular instalment/transaction emails (default)
+    // Build a simple HTML body so a single EmailJS template can be reused
+    const paymentHtml = `
+      <div style="font-family: Arial, sans-serif; color:#111827;">
+        <h2>Payment Notification</h2>
+        <p>Dear ${member_name},</p>
+        <p>Your payment request has been processed. Please find the details below:</p>
+        <table style="width:100%; border-collapse:collapse; margin-top:12px;">
+          <tbody>
+            <tr><td style="padding:8px;">Amount:</td><td style="padding:8px; text-align:right;">৳${String(amount || '')}</td></tr>
+            <tr><td style="padding:8px;">Month:</td><td style="padding:8px; text-align:right;">${String(month || '')}</td></tr>
+            <tr><td style="padding:8px;">Status:</td><td style="padding:8px; text-align:right;">${String(status || '')}</td></tr>
+          </tbody>
+        </table>
+        ${proof_url ? `<p style="margin-top:12px;">Attached Proof: <a href="${proof_url}">Download</a></p>` : ''}
+      </div>
+    `;
+
     const emailRes = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -140,7 +157,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           month: month,
           status: status,
           proof_url: proof_url || "No proof attached",
-          time: localTime
+          time: localTime,
+          body_html: paymentHtml
         },
       }),
     });

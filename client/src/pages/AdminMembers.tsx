@@ -6,6 +6,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, CheckCircle, UserPlus, ShieldAlert, ShieldOff, ShieldCheck, Calculator, Loader2, X } from 'lucide-react';
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,6 +22,13 @@ export default function AdminMembers() {
     society_fee: false,
     early_exit_penalty: false
   });
+  const [deductionAmounts, setDeductionAmounts] = useState<Record<string, number>>({
+    unpaid_installments: 0,
+    closing_fee: 0,
+    disclosure_fee: 0,
+    society_fee: 0,
+    early_exit_penalty: 0
+  });
 
   const resetSelectedDeductions = () => {
     setSelectedDeductions({
@@ -29,6 +37,13 @@ export default function AdminMembers() {
       disclosure_fee: false,
       society_fee: false,
       early_exit_penalty: false
+    });
+    setDeductionAmounts({
+      unpaid_installments: 0,
+      closing_fee: 0,
+      disclosure_fee: 0,
+      society_fee: 0,
+      early_exit_penalty: 0
     });
   };
 
@@ -192,6 +207,20 @@ export default function AdminMembers() {
     setSettlementLoading(true);
     try {
       const preview = calculateSettlementPreview(member);
+      setSelectedDeductions({
+        unpaid_installments: true,
+        closing_fee: true,
+        disclosure_fee: true,
+        society_fee: true,
+        early_exit_penalty: preview.deductions.early_exit_penalty > 0
+      });
+      setDeductionAmounts({
+        unpaid_installments: preview.deductions.unpaid_installments,
+        closing_fee: preview.deductions.closing_fee,
+        disclosure_fee: preview.deductions.disclosure_fee,
+        society_fee: preview.deductions.society_fee,
+        early_exit_penalty: preview.deductions.early_exit_penalty
+      });
       setSettlementModal(preview);
     } catch (err) {
       console.error("Settlement preview failed:", err);
@@ -383,7 +412,7 @@ export default function AdminMembers() {
       {/* Settlement Preview Modal - Improved */}
       {settlementModal && (
         <div className="fixed inset-0 bg-white/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <Card className="w-full max-w-2xl shadow-2xl border-emerald-200">
+          <Card className="w-full max-w-2xl max-h-[calc(100vh-2rem)] shadow-2xl border-emerald-200 flex flex-col overflow-hidden">
             <CardHeader className="border-b pb-4 flex flex-row items-start justify-between bg-gradient-to-r from-emerald-50 to-blue-50">
               <div>
                 <CardTitle className="text-2xl font-bold text-slate-900">Settlement Preview</CardTitle>
@@ -404,7 +433,7 @@ export default function AdminMembers() {
               </Button>
             </CardHeader>
 
-            <CardContent className="space-y-6 pt-6">
+            <CardContent className="space-y-6 pt-6 overflow-y-auto min-h-0">
               {/* Summary Cards */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
@@ -466,7 +495,7 @@ export default function AdminMembers() {
               <Card className="bg-red-50 border-red-200">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-bold text-red-900">Deductions (Admin Select)</CardTitle>
-                  <p className="text-xs text-red-700 mt-1">Check/uncheck to include or exclude from total</p>
+                  <p className="text-xs text-red-700 mt-1">Check/uncheck and edit the amount for each fee</p>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {/* Disclosure Fee */}
@@ -487,7 +516,13 @@ export default function AdminMembers() {
                       </label>
                       <p className="text-xs text-slate-500">Member information processing fee</p>
                     </div>
-                    <span className="font-mono font-bold text-red-700">৳{settlementModal.deductions.disclosure_fee.toLocaleString()}</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={deductionAmounts.disclosure_fee}
+                      onChange={(e) => setDeductionAmounts(prev => ({ ...prev, disclosure_fee: Number(e.target.value) || 0 }))}
+                      className="w-28 h-9 text-right font-mono"
+                    />
                   </div>
 
                   {/* Society Fee */}
@@ -508,7 +543,13 @@ export default function AdminMembers() {
                       </label>
                       <p className="text-xs text-slate-500">Society administration adjustment</p>
                     </div>
-                    <span className="font-mono font-bold text-red-700">৳{settlementModal.deductions.society_fee.toLocaleString()}</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={deductionAmounts.society_fee}
+                      onChange={(e) => setDeductionAmounts(prev => ({ ...prev, society_fee: Number(e.target.value) || 0 }))}
+                      className="w-28 h-9 text-right font-mono"
+                    />
                   </div>
 
                   {/* Unpaid Installments */}
@@ -529,7 +570,13 @@ export default function AdminMembers() {
                       </label>
                       <p className="text-xs text-slate-500">From pending/rejected payments</p>
                     </div>
-                    <span className="font-mono font-bold text-red-700">৳{settlementModal.deductions.unpaid_installments.toLocaleString()}</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={deductionAmounts.unpaid_installments}
+                      onChange={(e) => setDeductionAmounts(prev => ({ ...prev, unpaid_installments: Number(e.target.value) || 0 }))}
+                      className="w-28 h-9 text-right font-mono"
+                    />
                   </div>
 
                   {/* Closing Fee */}
@@ -550,7 +597,13 @@ export default function AdminMembers() {
                       </label>
                       <p className="text-xs text-slate-500">Account closure administrative fee</p>
                     </div>
-                    <span className="font-mono font-bold text-red-700">৳{settlementModal.deductions.closing_fee.toLocaleString()}</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={deductionAmounts.closing_fee}
+                      onChange={(e) => setDeductionAmounts(prev => ({ ...prev, closing_fee: Number(e.target.value) || 0 }))}
+                      className="w-28 h-9 text-right font-mono"
+                    />
                   </div>
 
                   {/* Early Settlement Fee */}
@@ -572,7 +625,13 @@ export default function AdminMembers() {
                         </label>
                         <p className="text-xs text-slate-500">Applied when active FDs exist</p>
                       </div>
-                      <span className="font-mono font-bold text-red-700">৳{settlementModal.deductions.early_exit_penalty.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={deductionAmounts.early_exit_penalty}
+                        onChange={(e) => setDeductionAmounts(prev => ({ ...prev, early_exit_penalty: Number(e.target.value) || 0 }))}
+                        className="w-28 h-9 text-right font-mono"
+                      />
                     </div>
                   )}
 
@@ -581,11 +640,11 @@ export default function AdminMembers() {
                     <span className="text-red-900">Total Selected Deductions</span>
                     <span className="font-mono text-lg text-red-700">
                       ৳{(
-                        (selectedDeductions.unpaid_installments ? settlementModal.deductions.unpaid_installments : 0) +
-                        (selectedDeductions.closing_fee ? settlementModal.deductions.closing_fee : 0) +
-                        (selectedDeductions.disclosure_fee ? settlementModal.deductions.disclosure_fee : 0) +
-                        (selectedDeductions.society_fee ? settlementModal.deductions.society_fee : 0) +
-                        (selectedDeductions.early_exit_penalty ? settlementModal.deductions.early_exit_penalty : 0)
+                        (selectedDeductions.unpaid_installments ? deductionAmounts.unpaid_installments : 0) +
+                        (selectedDeductions.closing_fee ? deductionAmounts.closing_fee : 0) +
+                        (selectedDeductions.disclosure_fee ? deductionAmounts.disclosure_fee : 0) +
+                        (selectedDeductions.society_fee ? deductionAmounts.society_fee : 0) +
+                        (selectedDeductions.early_exit_penalty ? deductionAmounts.early_exit_penalty : 0)
                       ).toLocaleString(undefined, {maximumFractionDigits: 0})}
                     </span>
                   </div>
@@ -598,11 +657,11 @@ export default function AdminMembers() {
                 <p className="text-4xl font-black text-emerald-900 font-mono">
                   ৳{Math.max(0, 
                     settlementModal.summary.inflow - (
-                      (selectedDeductions.unpaid_installments ? settlementModal.deductions.unpaid_installments : 0) +
-                      (selectedDeductions.closing_fee ? settlementModal.deductions.closing_fee : 0) +
-                      (selectedDeductions.disclosure_fee ? settlementModal.deductions.disclosure_fee : 0) +
-                      (selectedDeductions.society_fee ? settlementModal.deductions.society_fee : 0) +
-                      (selectedDeductions.early_exit_penalty ? settlementModal.deductions.early_exit_penalty : 0)
+                      (selectedDeductions.unpaid_installments ? deductionAmounts.unpaid_installments : 0) +
+                      (selectedDeductions.closing_fee ? deductionAmounts.closing_fee : 0) +
+                      (selectedDeductions.disclosure_fee ? deductionAmounts.disclosure_fee : 0) +
+                      (selectedDeductions.society_fee ? deductionAmounts.society_fee : 0) +
+                      (selectedDeductions.early_exit_penalty ? deductionAmounts.early_exit_penalty : 0)
                     )
                   ).toLocaleString(undefined, {maximumFractionDigits: 0})}
                 </p>

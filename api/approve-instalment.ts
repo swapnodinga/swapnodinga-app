@@ -54,6 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           amount: tx.amount,
           month: tx.month,
           status: status,
+          proof_url: tx.payment_proof_url,
           time: new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" })
         }),
       }).catch(e => console.error("Email notification failed, but payment was approved."));

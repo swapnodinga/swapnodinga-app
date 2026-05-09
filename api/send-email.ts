@@ -96,9 +96,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ${apologyHtml}
           <div style="margin:24px 0; text-align:center;">
             <p style="margin:0 0 12px; font-weight:700; color:#0f172a;">Settlement Report</p>
-            <a href="#settlement-report" style="display:inline-block; background:#10b981; color:#ffffff; text-decoration:none; padding:12px 22px; border-radius:9999px; font-weight:700; font-size:14px;">
-              View Settlement Report
-            </a>
+            <div style="display:inline-block; background:#10b981; color:#ffffff; padding:12px 22px; border-radius:9999px; font-weight:700; font-size:14px; line-height:1;">
+              View Settlement Report Below
+            </div>
           </div>
           ${reportHtml}
         </div>

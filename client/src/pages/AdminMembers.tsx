@@ -8,11 +8,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, CheckCircle, UserPlus, ShieldAlert, ShieldOff, ShieldCheck, Calculator, Loader2, X } from 'lucide-react';
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function AdminMembers() {
   const { members, approveMember, setMemberStatus, transactions, fixedDeposits } = useSociety();
   const [settlementModal, setSettlementModal] = useState<any>(null);
   const [settlementLoading, setSettlementLoading] = useState(false);
+  const [selectedDeductions, setSelectedDeductions] = useState<Record<string, boolean>>({
+    unpaid_installments: true,
+    closing_fee: true,
+    early_exit_penalty: false
+  });
 
   /**
    * IMPROVED FILTERING LOGIC
@@ -358,13 +364,13 @@ export default function AdminMembers() {
         </TabsContent>
       </Tabs>
 
-      {/* Settlement Preview Modal - Simple div-based */}
+      {/* Settlement Preview Modal - Improved */}
       {settlementModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <CardHeader className="border-b pb-4 flex flex-row items-start justify-between">
+        <div className="fixed inset-0 bg-white/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <Card className="w-full max-w-2xl shadow-2xl border-emerald-200">
+            <CardHeader className="border-b pb-4 flex flex-row items-start justify-between bg-gradient-to-r from-emerald-50 to-blue-50">
               <div>
-                <CardTitle className="text-xl font-bold">Settlement Preview</CardTitle>
+                <CardTitle className="text-2xl font-bold text-slate-900">Settlement Preview</CardTitle>
                 <p className="text-sm text-slate-600 mt-1">
                   {settlementModal.member_name} ({settlementModal.society_id})
                 </p>
@@ -372,7 +378,14 @@ export default function AdminMembers() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setSettlementModal(null)}
+                onClick={() => {
+                  setSettlementModal(null);
+                  setSelectedDeductions({
+                    unpaid_installments: true,
+                    closing_fee: true,
+                    early_exit_penalty: false
+                  });
+                }}
                 className="h-8 w-8 p-0"
               >
                 <X className="h-4 w-4" />
@@ -437,38 +450,103 @@ export default function AdminMembers() {
                 </Card>
               )}
 
-              {/* Deductions */}
+              {/* Deductions - SELECTABLE */}
               <Card className="bg-red-50 border-red-200">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-bold text-red-900">Deductions</CardTitle>
+                  <CardTitle className="text-sm font-bold text-red-900">Deductions (Admin Select)</CardTitle>
+                  <p className="text-xs text-red-700 mt-1">Check/uncheck to include or exclude from total</p>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-red-700">Unpaid Installments</span>
-                    <span className="font-mono font-bold">৳{settlementModal.deductions.unpaid_installments.toLocaleString()}</span>
+                <CardContent className="space-y-3">
+                  {/* Unpaid Installments */}
+                  <div className="flex items-center gap-3 p-3 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
+                    <Checkbox
+                      id="unpaid"
+                      checked={selectedDeductions.unpaid_installments}
+                      onCheckedChange={(checked) =>
+                        setSelectedDeductions(prev => ({
+                          ...prev,
+                          unpaid_installments: !!checked
+                        }))
+                      }
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="unpaid" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                        Unpaid Installments
+                      </label>
+                      <p className="text-xs text-slate-500">From pending/rejected payments</p>
+                    </div>
+                    <span className="font-mono font-bold text-red-700">৳{settlementModal.deductions.unpaid_installments.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-red-700">Closing Fee</span>
-                    <span className="font-mono font-bold">৳{settlementModal.deductions.closing_fee.toLocaleString()}</span>
+
+                  {/* Closing Fee */}
+                  <div className="flex items-center gap-3 p-3 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
+                    <Checkbox
+                      id="closing"
+                      checked={selectedDeductions.closing_fee}
+                      onCheckedChange={(checked) =>
+                        setSelectedDeductions(prev => ({
+                          ...prev,
+                          closing_fee: !!checked
+                        }))
+                      }
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="closing" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                        Closing Fee
+                      </label>
+                      <p className="text-xs text-slate-500">Account closure administrative fee</p>
+                    </div>
+                    <span className="font-mono font-bold text-red-700">৳{settlementModal.deductions.closing_fee.toLocaleString()}</span>
                   </div>
+
+                  {/* Early Exit Penalty */}
                   {settlementModal.deductions.early_exit_penalty > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-red-700">Early Exit Penalty (5%)</span>
-                      <span className="font-mono font-bold">৳{settlementModal.deductions.early_exit_penalty.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                    <div className="flex items-center gap-3 p-3 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
+                      <Checkbox
+                        id="penalty"
+                        checked={selectedDeductions.early_exit_penalty}
+                        onCheckedChange={(checked) =>
+                          setSelectedDeductions(prev => ({
+                            ...prev,
+                            early_exit_penalty: !!checked
+                          }))
+                        }
+                      />
+                      <div className="flex-1">
+                        <label htmlFor="penalty" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                          Early Exit Penalty (5%)
+                        </label>
+                        <p className="text-xs text-slate-500">Applied when active FDs exist</p>
+                      </div>
+                      <span className="font-mono font-bold text-red-700">৳{settlementModal.deductions.early_exit_penalty.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
                     </div>
                   )}
-                  <div className="border-t pt-2 flex justify-between font-bold">
-                    <span className="text-red-900">Total Deductions</span>
-                    <span className="font-mono text-red-700">৳{settlementModal.deductions.total.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+
+                  {/* Total Deductions */}
+                  <div className="border-t pt-3 flex justify-between items-center font-bold bg-red-100/50 p-3 rounded">
+                    <span className="text-red-900">Total Selected Deductions</span>
+                    <span className="font-mono text-lg text-red-700">
+                      ৳{(
+                        (selectedDeductions.unpaid_installments ? settlementModal.deductions.unpaid_installments : 0) +
+                        (selectedDeductions.closing_fee ? settlementModal.deductions.closing_fee : 0) +
+                        (selectedDeductions.early_exit_penalty ? settlementModal.deductions.early_exit_penalty : 0)
+                      ).toLocaleString(undefined, {maximumFractionDigits: 0})}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Net Payout */}
+              {/* Net Payout - UPDATED */}
               <div className="bg-emerald-100 p-6 rounded-lg border-2 border-emerald-400">
                 <p className="text-sm font-bold text-emerald-700 uppercase mb-2">Net Transfer Amount</p>
                 <p className="text-4xl font-black text-emerald-900 font-mono">
-                  ৳{settlementModal.net_transfer_amount.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                  ৳{Math.max(0, 
+                    settlementModal.summary.inflow - (
+                      (selectedDeductions.unpaid_installments ? settlementModal.deductions.unpaid_installments : 0) +
+                      (selectedDeductions.closing_fee ? settlementModal.deductions.closing_fee : 0) +
+                      (selectedDeductions.early_exit_penalty ? settlementModal.deductions.early_exit_penalty : 0)
+                    )
+                  ).toLocaleString(undefined, {maximumFractionDigits: 0})}
                 </p>
                 <p className="text-xs text-emerald-600 mt-2">
                   This is a preview only. No transaction has been recorded yet.
@@ -480,7 +558,14 @@ export default function AdminMembers() {
                 <Button 
                   variant="outline" 
                   className="flex-1"
-                  onClick={() => setSettlementModal(null)}
+                  onClick={() => {
+                    setSettlementModal(null);
+                    setSelectedDeductions({
+                      unpaid_installments: true,
+                      closing_fee: true,
+                      early_exit_penalty: false
+                    });
+                  }}
                 >
                   Close
                 </Button>
@@ -488,7 +573,7 @@ export default function AdminMembers() {
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700"
                   disabled
                 >
-                  Execute Settlement (Coming Next)
+                  Generate Report
                 </Button>
               </div>
             </CardContent>

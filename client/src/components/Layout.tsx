@@ -9,7 +9,7 @@ import { useMobile } from "@/hooks/use-mobile";
 import { 
   LayoutDashboard, Users, ShieldCheck, LogOut, 
   ChevronRight, Home, Info, Briefcase, ShieldAlert, Phone,
-  CreditCard, Menu, LogIn, FileText, PiggyBank, LineChart, Settings
+  CreditCard, Menu, LogIn, FileText, PiggyBank, LineChart, Settings, FileCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -111,6 +111,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/admin/members", label: "Manage Members", icon: Users, badge: pendingMembersCount },
     { href: "/admin/payments", label: "Verify Payments", icon: ShieldCheck, badge: pendingPaymentsCount },
     { href: "/admin/reports", label: "Reports", icon: FileText },
+    { href: "/admin/settlement-reports", label: "Settlement Reports", icon: FileCheck },
     { href: "/admin/deposits", label: "Fixed Deposits", icon: PiggyBank },
     { href: "/admin/interest", label: "Interest Records", icon: LineChart },
     { href: "/admin/settings", label: "Site Settings", icon: Settings },

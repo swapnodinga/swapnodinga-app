@@ -16,6 +16,7 @@ import FixedDepositPage from "@/pages/FixedDepositPage";
 import InterestDistribution from "@/pages/InterestDistribution"; 
 import AdminMembers from "@/pages/AdminMembers";
 import ReportsPage from "@/pages/ReportsPage";
+import SettlementReportPage from "@/pages/SettlementReportPage";
 import ProfilePage from "@/pages/ProfilePage";
 import AboutPage from "@/pages/AboutPage";
 import ProjectPage from "@/pages/ProjectPage";
@@ -73,6 +74,10 @@ function Router() {
 
         <Route path="/admin/reports">
           {currentUser?.is_admin ? <ReportsPage /> : <Redirect to="/dashboard" />}
+        </Route>
+
+        <Route path="/admin/settlement-reports">
+          {currentUser?.is_admin ? <SettlementReportPage /> : <Redirect to="/dashboard" />}
         </Route>
 
         <Route path="/admin/deposits">

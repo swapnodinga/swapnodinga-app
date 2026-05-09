@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, CheckCircle, UserPlus, ShieldAlert, ShieldOff, ShieldCheck, Calculator, Loader2, X } from 'lucide-react';
 
 export default function AdminMembers() {
-  const { members, approveMember, setMemberStatus, getSettlementPreview } = useSociety();
+  const { members, approveMember, setMemberStatus, transactions, fixedDeposits } = useSociety();
   const [settlementModal, setSettlementModal] = useState<any>(null);
   const [settlementLoading, setSettlementLoading] = useState(false);
 
@@ -32,14 +32,148 @@ export default function AdminMembers() {
   const frozenMembers = members.filter(m => (m.status || '').toLowerCase().trim() === 'frozen');
   const deactivatedMembers = members.filter(m => (m.status || '').toLowerCase().trim() === 'deactivated');
 
+  // Client-side settlement preview calculation
+  const calculateSettlementPreview = (member: any) => {
+    try {
+      // 1. Member contribution (approved installments)
+      const memberInstallments = (transactions || []).filter(
+        (t: any) => t.member_id === member.id
+      );
+      const approvedInstallments = memberInstallments.filter(
+        (i: any) => i.status?.toLowerCase() === "approved"
+      );
+      const memberContribution = approvedInstallments.reduce(
+        (sum: number, i: any) => sum + Number(i.amount || 0),
+        0
+      );
+
+      // 2. Unpaid installments
+      const pendingInstallments = memberInstallments.filter(
+        (i: any) => i.status?.toLowerCase() === "pending"
+      );
+      const unpaidAmount = pendingInstallments.reduce(
+        (sum: number, i: any) => sum + Number(i.amount || 0),
+        0
+      );
+
+      // 3. Calculate total society contribution for dividend share
+      const allApprovedInstallments = (transactions || []).filter(
+        (t: any) => t.status?.toLowerCase() === "approved"
+      );
+      const totalSocietyContribution = allApprovedInstallments.reduce(
+        (sum: number, i: any) => sum + Number(i.amount || 0),
+        0
+      );
+
+      // 4. Calculate realized interest from fixed deposits
+      let totalRealizedInterest = 0;
+      const today = new Date();
+
+      (fixedDeposits || []).forEach((fd: any) => {
+        try {
+          const start = new Date(fd.start_date);
+          const tenure = Number(fd.tenure_months) || 3;
+          const maturity = new Date(start);
+          maturity.setMonth(maturity.getMonth() + tenure);
+
+          if (maturity <= today) {
+            const interest = (Number(fd.amount) * Number(fd.interest_rate) * tenure) / 1200;
+            totalRealizedInterest += interest;
+          }
+        } catch (e) {
+          console.log("Error processing FD:", e);
+        }
+      });
+
+      // 5. Member's dividend share
+      const memberEquityShare =
+        totalSocietyContribution > 0
+          ? (memberContribution / totalSocietyContribution) * totalRealizedInterest
+          : 0;
+
+      // 6. Member's fixed deposits
+      const memberFDs = (fixedDeposits || []).filter(
+        (fd: any) => fd.member_id === member.id
+      );
+
+      const memberFDDetails = memberFDs.map((fd: any) => {
+        const start = new Date(fd.start_date);
+        const tenure = Number(fd.tenure_months) || 3;
+        const maturity = new Date(start);
+        maturity.setMonth(maturity.getMonth() + tenure);
+
+        const interest = (Number(fd.amount) * Number(fd.interest_rate) * tenure) / 1200;
+        const isMatured = maturity <= today;
+        const maturityAmount = Number(fd.amount) + interest;
+
+        return {
+          id: fd.id,
+          amount: Number(fd.amount),
+          interest_rate: Number(fd.interest_rate),
+          tenure_months: Number(fd.tenure_months),
+          start_date: fd.start_date,
+          status: isMatured ? "MATURED" : "ACTIVE",
+          calculated_interest: interest,
+          maturity_amount: isMatured ? maturityAmount : Number(fd.amount),
+          maturity_date: maturity.toISOString().split("T")[0]
+        };
+      });
+
+      // 7. Deductions
+      const CLOSING_FEE = 500;
+      const EARLY_EXIT_PENALTY_PERCENT = 5;
+
+      const hasActiveFDs = memberFDDetails.some((fd: any) => fd.status === "ACTIVE");
+      const earlyExitPenalty = hasActiveFDs
+        ? (memberContribution * EARLY_EXIT_PENALTY_PERCENT) / 100
+        : 0;
+
+      const totalDeductions = unpaidAmount + CLOSING_FEE + earlyExitPenalty;
+
+      // 8. Net transfer amount
+      const totalFDMaturity = memberFDDetails.reduce(
+        (sum: number, fd: any) => sum + fd.maturity_amount,
+        0
+      );
+      const netTransferAmount =
+        memberContribution + memberEquityShare + totalFDMaturity - totalDeductions;
+
+      return {
+        member_id: member.id,
+        member_name: member.full_name,
+        society_id: member.society_id,
+        contribution_total: memberContribution,
+        earned_dividends: memberEquityShare,
+        fixed_deposits: memberFDDetails,
+        fixed_deposits_total_maturity: totalFDMaturity,
+        deductions: {
+          unpaid_installments: unpaidAmount,
+          closing_fee: CLOSING_FEE,
+          early_exit_penalty: earlyExitPenalty,
+          total: totalDeductions
+        },
+        calculated_interest: memberEquityShare,
+        net_transfer_amount: Math.max(0, netTransferAmount),
+        summary: {
+          inflow: memberContribution + memberEquityShare + totalFDMaturity,
+          outflow: totalDeductions,
+          net_payout: Math.max(0, netTransferAmount)
+        }
+      };
+    } catch (err: any) {
+      console.error("Settlement calculation error:", err);
+      throw err;
+    }
+  };
+
   const handleSettlementClick = async (member: any) => {
     setSettlementLoading(true);
     try {
-      const preview = await getSettlementPreview(member.id);
+      const preview = calculateSettlementPreview(member);
       setSettlementModal(preview);
     } catch (err) {
       console.error("Settlement preview failed:", err);
-      alert("Failed to load settlement preview: " + (err as any).message);
+      alert("Failed to calculate settlement preview: " + (err as any).message);
     } finally {
       setSettlementLoading(false);
     }

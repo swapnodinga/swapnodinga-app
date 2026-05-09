@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Printer, Search, Building2, User, Mail, Loader2 } from "lucide-react";
+import { useLocation } from "wouter";
 
 export default function SettlementReportPage() {
   const { members, transactions, fixedDeposits } = useSociety();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [reportDraft, setReportDraft] = useState<any | null>(null);
@@ -40,6 +42,22 @@ export default function SettlementReportPage() {
       console.error("Failed to load settlement report draft", error);
     }
   }, [members]);
+
+  // When a member is selected from the left list, generate the settlement report automatically
+  useEffect(() => {
+    if (!selectedMemberId) return;
+    const member = members.find(m => m.id === selectedMemberId);
+    if (!member) return;
+    try {
+      const generated = calculateSettlement(member);
+      setReportDraft(generated);
+      if (member.email) setEmailInput(member.email);
+      // scroll to top of page to show report
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e) {
+      console.error('Failed to auto-generate settlement for selected member', e);
+    }
+  }, [selectedMemberId, members]);
 
   // Filter members by search
   const filteredMembers = members.filter(m =>
@@ -216,6 +234,12 @@ export default function SettlementReportPage() {
           Settlement Reports
         </h1>
         <p className="text-slate-600">Generate and send settlement reports to members</p>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <Button variant="outline" onClick={() => setLocation('/admin/members')} className="mt-2">
+          Back
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

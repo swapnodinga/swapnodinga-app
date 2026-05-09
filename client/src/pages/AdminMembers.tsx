@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'wouter';
 import { useSociety } from '../context/SocietyContext';
 import { 
   Table, TableHeader, TableBody, TableHead, TableRow, TableCell 
@@ -13,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 export default function AdminMembers() {
   const { members, approveMember, setMemberStatus, transactions, fixedDeposits } = useSociety();
+  const [, setLocation] = useLocation();
   const [settlementModal, setSettlementModal] = useState<any>(null);
   const [settlementLoading, setSettlementLoading] = useState(false);
   const [selectedDeductions, setSelectedDeductions] = useState<Record<string, boolean>>({
@@ -228,6 +230,63 @@ export default function AdminMembers() {
     } finally {
       setSettlementLoading(false);
     }
+  };
+
+  const getSelectedDeductionsTotal = () => (
+    (selectedDeductions.unpaid_installments ? deductionAmounts.unpaid_installments : 0) +
+    (selectedDeductions.closing_fee ? deductionAmounts.closing_fee : 0) +
+    (selectedDeductions.disclosure_fee ? deductionAmounts.disclosure_fee : 0) +
+    (selectedDeductions.society_fee ? deductionAmounts.society_fee : 0) +
+    (selectedDeductions.early_exit_penalty ? deductionAmounts.early_exit_penalty : 0)
+  );
+
+  const handleGenerateReport = () => {
+    if (!settlementModal) return;
+
+    const deductions = {
+      early_settlement_deduction_fee: {
+        selected: selectedDeductions.disclosure_fee,
+        amount: deductionAmounts.disclosure_fee
+      },
+      society_fee: {
+        selected: selectedDeductions.society_fee,
+        amount: deductionAmounts.society_fee
+      },
+      unpaid_installments: {
+        selected: selectedDeductions.unpaid_installments,
+        amount: deductionAmounts.unpaid_installments
+      },
+      closing_fee: {
+        selected: selectedDeductions.closing_fee,
+        amount: deductionAmounts.closing_fee
+      },
+      early_settlement_fee: {
+        selected: selectedDeductions.early_exit_penalty,
+        amount: deductionAmounts.early_exit_penalty
+      }
+    };
+
+    const totalDeductions = getSelectedDeductionsTotal();
+    const payload = {
+      source: "settlement-modal",
+      generated_at: new Date().toISOString(),
+      member_id: settlementModal.member_id,
+      member_name: settlementModal.member_name,
+      society_id: settlementModal.society_id,
+      contribution_total: settlementModal.contribution_total,
+      earned_dividends: settlementModal.earned_dividends,
+      fixed_deposits: settlementModal.fixed_deposits,
+      fixed_deposits_total_maturity: settlementModal.fixed_deposits_total_maturity,
+      total_inflow: settlementModal.summary.inflow,
+      deductions,
+      total_selected_deductions: totalDeductions,
+      net_settlement_amount: Math.max(0, settlementModal.summary.inflow - totalDeductions)
+    };
+
+    localStorage.setItem("settlement_report_draft", JSON.stringify(payload));
+    setSettlementModal(null);
+    resetSelectedDeductions();
+    setLocation("/admin/settlement-reports");
   };
 
   const MemberTable = ({ data, showApprove = false, showStatusActions = false, showSettlement = false }: { data: any[], showApprove?: boolean, showStatusActions?: boolean, showSettlement?: boolean }) => (
@@ -512,7 +571,7 @@ export default function AdminMembers() {
                     />
                     <div className="flex-1">
                       <label htmlFor="disclosure" className="text-sm font-semibold text-slate-800 cursor-pointer leading-none">
-                        Disclosure Fee
+                        Early Settlement Deduction Fee
                       </label>
                       <p className="text-[11px] text-slate-500">Member information processing fee</p>
                     </div>
@@ -639,13 +698,7 @@ export default function AdminMembers() {
                   <div className="border-t pt-2.5 flex justify-between items-center font-bold bg-red-100/50 p-2.5 rounded">
                     <span className="text-red-900">Total Selected Deductions</span>
                     <span className="font-mono text-base sm:text-lg text-red-700">
-                      ৳{(
-                        (selectedDeductions.unpaid_installments ? deductionAmounts.unpaid_installments : 0) +
-                        (selectedDeductions.closing_fee ? deductionAmounts.closing_fee : 0) +
-                        (selectedDeductions.disclosure_fee ? deductionAmounts.disclosure_fee : 0) +
-                        (selectedDeductions.society_fee ? deductionAmounts.society_fee : 0) +
-                        (selectedDeductions.early_exit_penalty ? deductionAmounts.early_exit_penalty : 0)
-                      ).toLocaleString(undefined, {maximumFractionDigits: 0})}
+                      ৳{getSelectedDeductionsTotal().toLocaleString(undefined, {maximumFractionDigits: 0})}
                     </span>
                   </div>
                 </CardContent>
@@ -656,13 +709,7 @@ export default function AdminMembers() {
                 <p className="text-sm font-bold text-emerald-700 uppercase mb-2">Net Transfer Amount</p>
                 <p className="text-3xl sm:text-4xl font-black text-emerald-900 font-mono leading-none">
                   ৳{Math.max(0, 
-                    settlementModal.summary.inflow - (
-                      (selectedDeductions.unpaid_installments ? deductionAmounts.unpaid_installments : 0) +
-                      (selectedDeductions.closing_fee ? deductionAmounts.closing_fee : 0) +
-                      (selectedDeductions.disclosure_fee ? deductionAmounts.disclosure_fee : 0) +
-                      (selectedDeductions.society_fee ? deductionAmounts.society_fee : 0) +
-                      (selectedDeductions.early_exit_penalty ? deductionAmounts.early_exit_penalty : 0)
-                    )
+                    settlementModal.summary.inflow - getSelectedDeductionsTotal()
                   ).toLocaleString(undefined, {maximumFractionDigits: 0})}
                 </p>
                 <p className="text-xs text-emerald-600 mt-2">
@@ -685,7 +732,7 @@ export default function AdminMembers() {
                 </Button>
                 <Button 
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                  disabled
+                  onClick={handleGenerateReport}
                 >
                   Generate Report
                 </Button>

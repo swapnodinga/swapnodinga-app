@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -17,6 +18,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       dateStyle: "medium",
       timeStyle: "short"
     });
+
+    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
     // Handle settlement report emails
     if (email_type === "settlement") {
@@ -91,15 +94,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         </div>
       `;
 
+      const downloadableSettlementHtml = `
+        <html>
+          <head>
+            <meta charSet="utf-8" />
+            <title>Settlement Report - ${member_name}</title>
+          </head>
+          <body style="font-family: Arial, sans-serif; color:#111827; padding:24px;">
+            ${apologyHtml}
+            ${reportHtml}
+          </body>
+        </html>
+      `;
+
+      let reportDownloadUrl = "";
+      try {
+        const reportFileName = `settlement-reports/${String(settlement_data.society_id || "member").replace(/[^a-zA-Z0-9_-]/g, "-")}-${Date.now()}.html`;
+        const { error: uploadError } = await supabase.storage
+          .from("payments")
+          .upload(reportFileName, new Blob([downloadableSettlementHtml], { type: "text/html" }), {
+            contentType: "text/html",
+            upsert: true,
+          });
+
+        if (!uploadError) {
+          const { data: publicData } = supabase.storage.from("payments").getPublicUrl(reportFileName);
+          reportDownloadUrl = publicData.publicUrl;
+        } else {
+          console.error("Settlement report upload failed:", uploadError.message);
+        }
+      } catch (uploadErr) {
+        console.error("Settlement report upload error:", uploadErr);
+      }
+
       const bodyHtml = `
         <div style="font-family: Arial, sans-serif; color:#111827;">
           ${apologyHtml}
-          <div style="margin:24px 0; text-align:center;">
-            <p style="margin:0 0 12px; font-weight:700; color:#0f172a;">Settlement Report</p>
-            <div style="display:inline-block; background:#10b981; color:#ffffff; padding:12px 22px; border-radius:9999px; font-weight:700; font-size:14px; line-height:1;">
-              View Settlement Report Below
+          ${reportDownloadUrl ? `
+            <div style="margin:24px 0; text-align:center;">
+              <p style="margin:0 0 12px; font-weight:700; color:#0f172a;">Download Settlement Report</p>
+              <a href="${reportDownloadUrl}" style="display:inline-block; background:#10b981; color:#ffffff; text-decoration:none; padding:12px 22px; border-radius:9999px; font-weight:700; font-size:14px;">
+                Download Settlement Report
+              </a>
             </div>
-          </div>
+          ` : ''}
           ${reportHtml}
         </div>
       `;
@@ -118,6 +156,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             subject: subject,
             apology_message: apologyHtml,
             report_html: reportHtml,
+            report_download_url: reportDownloadUrl,
             body_html: bodyHtml,
             time: localTime
           },

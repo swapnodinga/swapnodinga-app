@@ -111,6 +111,11 @@ export default function SettlementReportPage() {
       fixed_deposits_total_maturity: totalFDMaturity,
       unpaid_installments: unpaidAmount,
       closing_fee: 500,
+      disclosure_fee: 100,
+      society_fee: 250,
+      early_settlement_fee: memberFDDetails.some((fd: any) => fd.status === "ACTIVE")
+        ? (memberContribution * 5) / 100
+        : 0,
       total_inflow: memberContribution + memberEquityShare + totalFDMaturity,
       settlement_date: new Date().toLocaleDateString("en-GB")
     };
@@ -232,6 +237,14 @@ export default function SettlementReportPage() {
                 <p className="text-sm font-bold text-red-900 mb-3">Deductions</p>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between bg-white p-2 rounded">
+                    <span className="text-red-700">Disclosure Fee</span>
+                    <span className="font-mono font-bold">৳{settlement.disclosure_fee.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between bg-white p-2 rounded">
+                    <span className="text-red-700">Society Fee</span>
+                    <span className="font-mono font-bold">৳{settlement.society_fee.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between bg-white p-2 rounded">
                     <span className="text-red-700">Unpaid Installments</span>
                     <span className="font-mono font-bold">৳{settlement.unpaid_installments.toLocaleString()}</span>
                   </div>
@@ -239,9 +252,15 @@ export default function SettlementReportPage() {
                     <span className="text-red-700">Closing Fee</span>
                     <span className="font-mono font-bold">৳{settlement.closing_fee.toLocaleString()}</span>
                   </div>
+                  {settlement.early_settlement_fee > 0 && (
+                    <div className="flex justify-between bg-white p-2 rounded">
+                      <span className="text-red-700">Early Settlement Fee (5%)</span>
+                      <span className="font-mono font-bold">৳{settlement.early_settlement_fee.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                    </div>
+                  )}
                   <div className="border-t pt-2 flex justify-between font-bold text-red-900">
                     <span>Total Deductions</span>
-                    <span className="font-mono">৳{(settlement.unpaid_installments + settlement.closing_fee).toLocaleString()}</span>
+                    <span className="font-mono">৳{(settlement.unpaid_installments + settlement.closing_fee + settlement.disclosure_fee + settlement.society_fee + settlement.early_settlement_fee).toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
                   </div>
                 </div>
               </div>
@@ -250,7 +269,7 @@ export default function SettlementReportPage() {
               <div className="bg-emerald-100 p-6 rounded-lg border-2 border-emerald-400">
                 <p className="text-sm font-bold text-emerald-700 uppercase mb-2">Net Settlement Amount Payable</p>
                 <p className="text-4xl font-black text-emerald-900 font-mono">
-                  ৳{Math.max(0, settlement.total_inflow - (settlement.unpaid_installments + settlement.closing_fee)).toLocaleString(undefined, {maximumFractionDigits: 0})}
+                  ৳{Math.max(0, settlement.total_inflow - (settlement.unpaid_installments + settlement.closing_fee + settlement.disclosure_fee + settlement.society_fee + settlement.early_settlement_fee)).toLocaleString(undefined, {maximumFractionDigits: 0})}
                 </p>
               </div>
 

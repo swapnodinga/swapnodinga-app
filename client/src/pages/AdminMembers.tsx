@@ -17,8 +17,20 @@ export default function AdminMembers() {
   const [selectedDeductions, setSelectedDeductions] = useState<Record<string, boolean>>({
     unpaid_installments: true,
     closing_fee: true,
+    disclosure_fee: false,
+    society_fee: false,
     early_exit_penalty: false
   });
+
+  const resetSelectedDeductions = () => {
+    setSelectedDeductions({
+      unpaid_installments: true,
+      closing_fee: true,
+      disclosure_fee: false,
+      society_fee: false,
+      early_exit_penalty: false
+    });
+  };
 
   /**
    * IMPROVED FILTERING LOGIC
@@ -127,6 +139,8 @@ export default function AdminMembers() {
 
       // 7. Deductions
       const CLOSING_FEE = 500;
+      const DISCLOSURE_FEE = 100;
+      const SOCIETY_FEE = 250;
       const EARLY_EXIT_PENALTY_PERCENT = 5;
 
       const hasActiveFDs = memberFDDetails.some((fd: any) => fd.status === "ACTIVE");
@@ -134,7 +148,7 @@ export default function AdminMembers() {
         ? (memberContribution * EARLY_EXIT_PENALTY_PERCENT) / 100
         : 0;
 
-      const totalDeductions = unpaidAmount + CLOSING_FEE + earlyExitPenalty;
+      const totalDeductions = unpaidAmount + CLOSING_FEE + DISCLOSURE_FEE + SOCIETY_FEE + earlyExitPenalty;
 
       // 8. Net transfer amount
       const totalFDMaturity = memberFDDetails.reduce(
@@ -155,6 +169,8 @@ export default function AdminMembers() {
         deductions: {
           unpaid_installments: unpaidAmount,
           closing_fee: CLOSING_FEE,
+          disclosure_fee: DISCLOSURE_FEE,
+          society_fee: SOCIETY_FEE,
           early_exit_penalty: earlyExitPenalty,
           total: totalDeductions
         },
@@ -380,11 +396,7 @@ export default function AdminMembers() {
                 size="sm"
                 onClick={() => {
                   setSettlementModal(null);
-                  setSelectedDeductions({
-                    unpaid_installments: true,
-                    closing_fee: true,
-                    early_exit_penalty: false
-                  });
+                  resetSelectedDeductions();
                 }}
                 className="h-8 w-8 p-0"
               >
@@ -457,6 +469,48 @@ export default function AdminMembers() {
                   <p className="text-xs text-red-700 mt-1">Check/uncheck to include or exclude from total</p>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {/* Disclosure Fee */}
+                  <div className="flex items-center gap-3 p-3 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
+                    <Checkbox
+                      id="disclosure"
+                      checked={selectedDeductions.disclosure_fee}
+                      onCheckedChange={(checked) =>
+                        setSelectedDeductions(prev => ({
+                          ...prev,
+                          disclosure_fee: !!checked
+                        }))
+                      }
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="disclosure" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                        Disclosure Fee
+                      </label>
+                      <p className="text-xs text-slate-500">Member information processing fee</p>
+                    </div>
+                    <span className="font-mono font-bold text-red-700">৳{settlementModal.deductions.disclosure_fee.toLocaleString()}</span>
+                  </div>
+
+                  {/* Society Fee */}
+                  <div className="flex items-center gap-3 p-3 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
+                    <Checkbox
+                      id="society"
+                      checked={selectedDeductions.society_fee}
+                      onCheckedChange={(checked) =>
+                        setSelectedDeductions(prev => ({
+                          ...prev,
+                          society_fee: !!checked
+                        }))
+                      }
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="society" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                        Society Fee
+                      </label>
+                      <p className="text-xs text-slate-500">Society administration adjustment</p>
+                    </div>
+                    <span className="font-mono font-bold text-red-700">৳{settlementModal.deductions.society_fee.toLocaleString()}</span>
+                  </div>
+
                   {/* Unpaid Installments */}
                   <div className="flex items-center gap-3 p-3 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
                     <Checkbox
@@ -499,7 +553,7 @@ export default function AdminMembers() {
                     <span className="font-mono font-bold text-red-700">৳{settlementModal.deductions.closing_fee.toLocaleString()}</span>
                   </div>
 
-                  {/* Early Exit Penalty */}
+                  {/* Early Settlement Fee */}
                   {settlementModal.deductions.early_exit_penalty > 0 && (
                     <div className="flex items-center gap-3 p-3 bg-white rounded border border-red-100 hover:bg-red-50/50 transition-colors">
                       <Checkbox
@@ -514,7 +568,7 @@ export default function AdminMembers() {
                       />
                       <div className="flex-1">
                         <label htmlFor="penalty" className="text-sm font-semibold text-slate-800 cursor-pointer">
-                          Early Exit Penalty (5%)
+                          Early Settlement Fee (5%)
                         </label>
                         <p className="text-xs text-slate-500">Applied when active FDs exist</p>
                       </div>
@@ -529,6 +583,8 @@ export default function AdminMembers() {
                       ৳{(
                         (selectedDeductions.unpaid_installments ? settlementModal.deductions.unpaid_installments : 0) +
                         (selectedDeductions.closing_fee ? settlementModal.deductions.closing_fee : 0) +
+                        (selectedDeductions.disclosure_fee ? settlementModal.deductions.disclosure_fee : 0) +
+                        (selectedDeductions.society_fee ? settlementModal.deductions.society_fee : 0) +
                         (selectedDeductions.early_exit_penalty ? settlementModal.deductions.early_exit_penalty : 0)
                       ).toLocaleString(undefined, {maximumFractionDigits: 0})}
                     </span>
@@ -544,6 +600,8 @@ export default function AdminMembers() {
                     settlementModal.summary.inflow - (
                       (selectedDeductions.unpaid_installments ? settlementModal.deductions.unpaid_installments : 0) +
                       (selectedDeductions.closing_fee ? settlementModal.deductions.closing_fee : 0) +
+                      (selectedDeductions.disclosure_fee ? settlementModal.deductions.disclosure_fee : 0) +
+                      (selectedDeductions.society_fee ? settlementModal.deductions.society_fee : 0) +
                       (selectedDeductions.early_exit_penalty ? settlementModal.deductions.early_exit_penalty : 0)
                     )
                   ).toLocaleString(undefined, {maximumFractionDigits: 0})}
@@ -560,11 +618,7 @@ export default function AdminMembers() {
                   className="flex-1"
                   onClick={() => {
                     setSettlementModal(null);
-                    setSelectedDeductions({
-                      unpaid_installments: true,
-                      closing_fee: true,
-                      early_exit_penalty: false
-                    });
+                    resetSelectedDeductions();
                   }}
                 >
                   Close

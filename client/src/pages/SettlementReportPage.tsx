@@ -2,17 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useSociety } from "@/context/SocietyContext";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Printer, Download, Search, Building2, User, Calendar } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Printer, Download, Search, Building2, User, Calendar, Mail, Loader2 } from "lucide-react";
 
 export default function SettlementReportPage() {
   const { members, transactions, fixedDeposits } = useSociety();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [reportDraft, setReportDraft] = useState<any | null>(null);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [emailInput, setEmailInput] = useState("");
 
   useEffect(() => {
     try {
@@ -20,10 +26,20 @@ export default function SettlementReportPage() {
       if (!raw) return;
       const parsed = JSON.parse(raw);
       setReportDraft(parsed);
+      
+      // Use email from draft if available, otherwise lookup from members
+      if (parsed.member_email) {
+        setEmailInput(parsed.member_email);
+      } else if (parsed.member_id) {
+        const member = members.find(m => m.id === parsed.member_id);
+        if (member?.email) {
+          setEmailInput(member.email);
+        }
+      }
     } catch (error) {
       console.error("Failed to load settlement report draft", error);
     }
-  }, []);
+  }, [members]);
 
   // Filter members by search
   const filteredMembers = members.filter(m =>
@@ -135,6 +151,63 @@ export default function SettlementReportPage() {
 
   const selectedMember = selectedMemberId ? members.find(m => m.id === selectedMemberId) : null;
   const settlement = reportDraft || (selectedMember ? calculateSettlement(selectedMember) : null);
+
+  const handleSendEmail = async () => {
+    if (!emailInput.trim()) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!settlement) {
+      toast({
+        title: "No Settlement Data",
+        description: "Please generate a settlement report first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSendingEmail(true);
+    try {
+      const response = await fetch("/api/send-settlement-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          member_email: emailInput.trim(),
+          member_name: settlement.member_name,
+          settlement_data: settlement
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to send email");
+      }
+
+      toast({
+        title: "Success",
+        description: `Settlement report sent to ${emailInput}`,
+        variant: "default"
+      });
+
+      setShowEmailDialog(false);
+      // Optionally clear the draft after successful send
+      // localStorage.removeItem("settlement_report_draft");
+    } catch (error: any) {
+      toast({
+        title: "Error Sending Email",
+        description: error.message || "An error occurred while sending the email",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6 bg-slate-50 min-h-screen">
@@ -334,9 +407,22 @@ export default function SettlementReportPage() {
                   <Printer className="h-4 w-4" />
                   Print Report
                 </Button>
-                <Button variant="outline" className="flex-1 gap-2" disabled>
-                  <Download className="h-4 w-4" />
-                  Send via Email (Coming Soon)
+                <Button 
+                  className="flex-1 gap-2 bg-blue-600 hover:bg-blue-700" 
+                  onClick={() => setShowEmailDialog(true)}
+                  disabled={isSendingEmail}
+                >
+                  {isSendingEmail ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-4 w-4" />
+                      Send via Email
+                    </>
+                  )}
                 </Button>
               </div>
             </CardContent>
@@ -353,6 +439,62 @@ export default function SettlementReportPage() {
           </Card>
         )}
       </div>
+
+      {/* Email Send Dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Settlement Report</DialogTitle>
+            <DialogDescription>
+              Enter the email address to send the settlement report to
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-2 block">
+                Recipient Email
+              </label>
+              <Input
+                type="email"
+                placeholder="member@example.com"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                disabled={isSendingEmail}
+                className="w-full"
+              />
+            </div>
+            <p className="text-xs text-slate-500">
+              The settlement report will be sent to this email address with a professional HTML format.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowEmailDialog(false)}
+                disabled={isSendingEmail}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={handleSendEmail}
+                disabled={isSendingEmail}
+              >
+                {isSendingEmail ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-4 w-4 mr-2" />
+                    Send Email
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Print Styles */}
       <style>{`

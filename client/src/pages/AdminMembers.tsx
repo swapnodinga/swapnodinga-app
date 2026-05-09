@@ -177,6 +177,7 @@ export default function AdminMembers() {
 
       return {
         member_id: member.id,
+        member_email: member.email,
         member_name: member.full_name,
         society_id: member.society_id,
         contribution_total: memberContribution,
@@ -271,6 +272,7 @@ export default function AdminMembers() {
       source: "settlement-modal",
       generated_at: new Date().toISOString(),
       member_id: settlementModal.member_id,
+      member_email: settlementModal.member_email,
       member_name: settlementModal.member_name,
       society_id: settlementModal.society_id,
       contribution_total: settlementModal.contribution_total,

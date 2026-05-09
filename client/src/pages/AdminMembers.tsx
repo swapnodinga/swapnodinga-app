@@ -575,11 +575,7 @@ export default function AdminMembers() {
                       <label htmlFor="disclosure" className="text-sm font-semibold text-slate-800 cursor-pointer leading-none">
                         Early Settlement Deduction Fee
                       </label>
-                      <div className="text-[11px] text-slate-500">
-                        <p>Withdrawal within 1st year: 8% deduction.</p>
-                        <p>Withdrawal in 2nd or 3rd year: 12% deduction.</p>
-                        <p>After 3rd year: deduction may be 15%.</p>
-                      </div>
+                      <p className="text-[11px] text-slate-500">25% was deducted from total amount (installment + dividends)</p>
                     </div>
                     <Input
                       type="number"

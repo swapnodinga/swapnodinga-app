@@ -47,6 +47,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const subject = `Settlement Report - ${settlement_data.society_id || "Cooperative Society"}`;
 
+      // Build a short apology message and report HTML to include in the email
+      const apologyHtml = `
+        <p>Dear ${member_name},</p>
+        <p>We are sorry to see you leave the cooperative society. Please find your settlement report below and review the details.</p>
+        <p>You can expect to receive the payment within one week. If you have any questions, please reply to this email.</p>
+        <hr />
+      `;
+
+      const reportRows = [] as string[];
+      try {
+        reportRows.push(`<tr><td>Contributions</td><td style="text-align:right">৳${String(Math.round(settlement_data.contribution_total || 0))}</td></tr>`);
+        reportRows.push(`<tr><td>Dividends</td><td style="text-align:right">৳${String(Math.round(settlement_data.earned_dividends || 0))}</td></tr>`);
+        if (settlement_data.fixed_deposits_total_maturity) {
+          reportRows.push(`<tr><td>Fixed Deposits (Maturity)</td><td style="text-align:right">৳${String(Math.round(settlement_data.fixed_deposits_total_maturity || 0))}</td></tr>`);
+        }
+        reportRows.push(`<tr><td><strong>Total Inflow</strong></td><td style="text-align:right"><strong>৳${String(Math.round(settlement_data.total_inflow || 0))}</strong></td></tr>`);
+
+        if (settlement_data.deductions && typeof settlement_data.deductions === 'object') {
+          Object.entries(settlement_data.deductions).forEach(([k, v]: [string, any]) => {
+            if (v && v.selected) {
+              const label = k.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+              reportRows.push(`<tr><td>${label}</td><td style="text-align:right">৳${String(Math.round(v.amount || 0))}</td></tr>`);
+            }
+          });
+        }
+
+        reportRows.push(`<tr><td><strong>Total Deductions</strong></td><td style="text-align:right"><strong>৳${String(Math.round(totalDeductionAmount))}</strong></td></tr>`);
+        reportRows.push(`<tr><td><strong>Net Settlement Amount Payable</strong></td><td style="text-align:right"><strong>৳${String(Math.round(Math.max(0, netAmount)))}</strong></td></tr>`);
+      } catch (e) {
+        console.error('Error building report rows:', e);
+      }
+
+      const reportHtml = `
+        <div style="font-family: Arial, sans-serif; color:#111827;">
+          <h2>Settlement Report</h2>
+          <p><strong>Member:</strong> ${member_name} <br/><strong>Society ID:</strong> ${settlement_data.society_id || 'N/A'}</p>
+          <table style="width:100%; border-collapse:collapse;">
+            <tbody>
+              ${reportRows.join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
       const emailRes = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -59,13 +103,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             to_email: member_email,
             member_name: member_name,
             subject: subject,
-            society_id: settlement_data.society_id || "N/A",
-            contributions: String(Math.round(settlement_data.contribution_total || 0)),
-            dividends: String(Math.round(settlement_data.earned_dividends || 0)),
-            fixed_deposits: String(Math.round(settlement_data.fixed_deposits_total_maturity || 0)),
-            total_inflow: String(Math.round(settlement_data.total_inflow || 0)),
-            total_deductions: String(Math.round(totalDeductionAmount)),
-            net_amount: String(Math.round(Math.max(0, netAmount))),
+            apology_message: apologyHtml,
+            report_html: reportHtml,
             time: localTime
           },
         }),

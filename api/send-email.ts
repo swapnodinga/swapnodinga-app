@@ -153,6 +153,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         template_params: {
           to_email: member_email,
           member_name: member_name,
+          subject: `Payment ${status || "Update"} - ${month || "N/A"}`,
           amount: amount,
           month: month,
           status: status,

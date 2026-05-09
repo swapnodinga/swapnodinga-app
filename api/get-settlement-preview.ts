@@ -44,10 +44,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 2. Get member's approved installments (contribution total)
-    const { data: memberInstallments } = await supabase
-      .from("Installments")
-      .select("amount, status")
-      .eq("member_id", Number(member_id));
+    let memberInstallments: any[] = [];
+    for (const tbl of ['Installments', 'installments']) {
+      const { data, error } = await supabase
+        .from(tbl)
+        .select("amount, status")
+        .eq("member_id", Number(member_id));
+      if (!error && data) {
+        memberInstallments = data;
+        break;
+      }
+    }
 
     const approvedInstallments = (memberInstallments || []).filter((i: any) =>
       i.status?.toLowerCase() === "approved"
@@ -69,9 +76,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 4. Calculate member's dividend share
     // Get all members and their contributions to calculate society pool
     const { data: allMembers } = await supabase.from("members").select("id");
-    const { data: allInstallments } = await supabase
-      .from("Installments")
-      .select("member_id, amount, status");
+    let allInstallments: any[] = [];
+    for (const tbl of ['Installments', 'installments']) {
+      const { data, error } = await supabase
+        .from(tbl)
+        .select("member_id, amount, status");
+      if (!error && data) {
+        allInstallments = data;
+        break;
+      }
+    }
 
     const totalSocietyContribution = (allInstallments || [])
       .filter((i: any) => i.status?.toLowerCase() === "approved")

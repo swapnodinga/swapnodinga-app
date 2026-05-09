@@ -112,8 +112,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const reportFileName = `settlement-reports/${String(settlement_data.society_id || "member").replace(/[^a-zA-Z0-9_-]/g, "-")}-${Date.now()}.html`;
         const { error: uploadError } = await supabase.storage
           .from("payments")
-          .upload(reportFileName, new Blob([downloadableSettlementHtml], { type: "text/html" }), {
-            contentType: "text/html",
+          .upload(reportFileName, new Blob([downloadableSettlementHtml], { type: "application/octet-stream" }), {
+            contentType: "application/octet-stream",
             upsert: true,
           });
 
@@ -130,15 +130,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const bodyHtml = `
         <div style="font-family: Arial, sans-serif; color:#111827;">
           ${apologyHtml}
+          ${reportHtml}
           ${reportDownloadUrl ? `
-            <div style="margin:24px 0; text-align:center;">
-              <p style="margin:0 0 12px; font-weight:700; color:#0f172a;">Download Settlement Report</p>
+            <div style="margin-top:20px; text-align:center;">
+              <p style="margin:0 0 12px; font-weight:700; color:#0f172a;">Settlement Report</p>
               <a href="${reportDownloadUrl}" style="display:inline-block; background:#10b981; color:#ffffff; text-decoration:none; padding:12px 22px; border-radius:9999px; font-weight:700; font-size:14px;">
                 Download Settlement Report
               </a>
             </div>
           ` : ''}
-          ${reportHtml}
         </div>
       `;
 

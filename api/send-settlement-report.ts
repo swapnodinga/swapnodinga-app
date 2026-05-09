@@ -25,29 +25,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       timeStyle: "short"
     });
 
-    const netAmount = settlement_data.net_settlement_amount ?? 
+    // Calculate net amount
+    const netAmount = settlement_data.net_settlement_amount || 
       (settlement_data.total_inflow - settlement_data.total_selected_deductions);
 
-    // Calculate total deductions for display
+    // Calculate total deductions
     let totalDeductionAmount = 0;
-    let deductionSummary = [];
-    try {
-      if (settlement_data.deductions && typeof settlement_data.deductions === 'object') {
-        Object.entries(settlement_data.deductions).forEach(([key, value]: [string, any]) => {
-          if (value && typeof value === 'object' && value.selected) {
-            totalDeductionAmount += Number(value.amount || 0);
-            const label = key.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
-            deductionSummary.push(`${label}: ৳${Number(value.amount || 0).toLocaleString('en-US', {maximumFractionDigits: 0})}`);
+    if (settlement_data.deductions && typeof settlement_data.deductions === 'object') {
+      try {
+        Object.entries(settlement_data.deductions).forEach(([_key, value]: [string, any]) => {
+          if (value && typeof value === 'object' && value.selected && value.amount) {
+            totalDeductionAmount += Number(value.amount);
           }
         });
+      } catch (e) {
+        console.error('Error calculating deductions:', e);
       }
-    } catch (e) {
-      console.error('Error processing deductions:', e);
     }
 
     const subject = `Settlement Report - ${settlement_data.society_id || "Cooperative Society"}`;
 
-    // Send via EmailJS using a simpler template params format
+    // Send via EmailJS
     const emailRes = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -60,13 +58,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           to_email: member_email,
           member_name: member_name,
           subject: subject,
-          society_id: settlement_data.society_id || 'N/A',
-          contributions: Number(settlement_data.contribution_total || 0).toLocaleString('en-US', {maximumFractionDigits: 0}),
-          dividends: Number(settlement_data.earned_dividends || 0).toLocaleString('en-US', {maximumFractionDigits: 0}),
-          fixed_deposits: Number(settlement_data.fixed_deposits_total_maturity || 0).toLocaleString('en-US', {maximumFractionDigits: 0}),
-          total_inflow: Number(settlement_data.total_inflow || 0).toLocaleString('en-US', {maximumFractionDigits: 0}),
-          total_deductions: totalDeductionAmount.toLocaleString('en-US', {maximumFractionDigits: 0}),
-          net_amount: Math.max(0, Math.round(netAmount)).toLocaleString('en-US', {maximumFractionDigits: 0}),
+          society_id: settlement_data.society_id || "N/A",
+          contributions: String(Math.round(settlement_data.contribution_total || 0)),
+          dividends: String(Math.round(settlement_data.earned_dividends || 0)),
+          fixed_deposits: String(Math.round(settlement_data.fixed_deposits_total_maturity || 0)),
+          total_inflow: String(Math.round(settlement_data.total_inflow || 0)),
+          total_deductions: String(Math.round(totalDeductionAmount)),
+          net_amount: String(Math.round(Math.max(0, netAmount))),
           time: localTime
         },
       }),

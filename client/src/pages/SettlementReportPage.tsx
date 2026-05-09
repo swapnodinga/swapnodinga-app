@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Printer, Download, Search, Building2, User, Calendar, Mail, Loader2 } from "lucide-react";
+import { Printer, Search, Building2, User, Mail, Loader2 } from "lucide-react";
 
 export default function SettlementReportPage() {
   const { members, transactions, fixedDeposits } = useSociety();

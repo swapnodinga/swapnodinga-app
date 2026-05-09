@@ -521,6 +521,7 @@ export default function SettlementReportPage() {
             </div>
           )}
         </div>
+      </div>
 
       {/* Email Send Dialog */}
       <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>

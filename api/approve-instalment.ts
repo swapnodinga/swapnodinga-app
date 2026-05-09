@@ -59,9 +59,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }).catch(e => console.error("Email notification failed, but payment was approved."));
     }
 
-    // 4. CLEANUP STORAGE (If Approved)
+    // 4. CLEANUP DATABASE REFERENCES (If Approved)
     if (status === "Approved" && tx.proofPath) {
-      await supabase.storage.from("payments").remove([tx.proofPath]);
       await supabase.from("Installments")
         .update({ payment_proof_url: null, proofPath: null })
         .eq("id", id);

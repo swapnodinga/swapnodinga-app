@@ -136,17 +136,6 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
   const approveInstalment = async (transaction: any, status: "Approved" | "Rejected"): Promise<any> => {
     try {
       await callApi("approve-instalment", { id: transaction.id, status })
-      const memberObj = members.find((m) => String(m.id) === String(transaction.member_id))
-      if (memberObj?.email) {
-        callApi("send-email", {
-          member_name: memberObj.full_name || transaction.memberName,
-          member_email: memberObj.email,
-          amount: transaction.amount,
-          month: transaction.month,
-          status,
-          proof_url: transaction.payment_proof_url,
-        }).catch((e) => console.warn("Email service failed", e))
-      }
       await refreshData()
       return { success: true }
     } catch (err: any) {

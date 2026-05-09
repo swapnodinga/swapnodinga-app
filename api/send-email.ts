@@ -146,7 +146,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             <tr><td style="padding:8px;">Status:</td><td style="padding:8px; text-align:right;">${String(status || '')}</td></tr>
           </tbody>
         </table>
-        ${proof_url ? `<p style="margin-top:12px;">Attached Proof: <a href="${proof_url}">Download</a></p>` : ''}
+        ${proof_url ? `
+          <div style="margin-top:20px; text-align:center;">
+            <p style="margin:0 0 12px; font-weight:700; color:#0f172a;">Payment Proof</p>
+            <a href="${proof_url}" style="display:inline-block; background:#10b981; color:#ffffff; text-decoration:none; padding:12px 22px; border-radius:9999px; font-weight:700; font-size:14px;">
+              Download Payment Proof
+            </a>
+          </div>
+        ` : ''}
       </div>
     `;
 

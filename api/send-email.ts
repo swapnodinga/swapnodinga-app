@@ -91,6 +91,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         </div>
       `;
 
+      const bodyHtml = `
+        <div style="font-family: Arial, sans-serif; color:#111827;">
+          ${apologyHtml}
+          ${reportHtml}
+        </div>
+      `;
+
       const emailRes = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -105,6 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             subject: subject,
             apology_message: apologyHtml,
             report_html: reportHtml,
+            body_html: bodyHtml,
             time: localTime
           },
         }),

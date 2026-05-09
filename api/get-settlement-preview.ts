@@ -43,16 +43,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ success: false, message: "Member not found" });
     }
 
-    // 2. Get member's approved installments (contribution total)
+    // 2. Get member's installments (try both table names)
     let memberInstallments: any[] = [];
     for (const tbl of ['Installments', 'installments']) {
-      const { data, error } = await supabase
-        .from(tbl)
-        .select("amount, status")
-        .eq("member_id", Number(member_id));
-      if (!error && data) {
-        memberInstallments = data;
-        break;
+      try {
+        const { data, error } = await supabase
+          .from(tbl)
+          .select("amount, status")
+          .eq("member_id", Number(member_id));
+        
+        if (!error && data) {
+          memberInstallments = data;
+          console.log(`[get-settlement-preview] Found ${data.length} installments in ${tbl}`);
+          break;
+        }
+      } catch (e) {
+        console.log(`[get-settlement-preview] Table ${tbl} not accessible, trying next...`);
       }
     }
 
@@ -64,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       0
     );
 
-    // 3. Get unpaid (pending) installments
+    // 3. Get unpaid installments
     const pendingInstallments = (memberInstallments || []).filter((i: any) =>
       i.status?.toLowerCase() === "pending"
     );
@@ -73,17 +79,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       0
     );
 
-    // 4. Calculate member's dividend share
-    // Get all members and their contributions to calculate society pool
-    const { data: allMembers } = await supabase.from("members").select("id");
+    // 4. Calculate total society contribution (for dividend calculation)
     let allInstallments: any[] = [];
     for (const tbl of ['Installments', 'installments']) {
-      const { data, error } = await supabase
-        .from(tbl)
-        .select("member_id, amount, status");
-      if (!error && data) {
-        allInstallments = data;
-        break;
+      try {
+        const { data, error } = await supabase
+          .from(tbl)
+          .select("amount, status");
+        
+        if (!error && data) {
+          allInstallments = data;
+          break;
+        }
+      } catch (e) {
+        console.log(`[get-settlement-preview] Could not fetch all installments from ${tbl}`);
       }
     }
 
@@ -91,73 +100,90 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .filter((i: any) => i.status?.toLowerCase() === "approved")
       .reduce((sum: number, i: any) => sum + Number(i.amount || 0), 0);
 
-    // Get total realized interest from fixed deposits
-    const { data: fixedDeposits } = await supabase
-      .from("fixed_deposits")
-      .select("*");
+    // 5. Get total realized interest from fixed deposits
+    let fixedDeposits: any[] = [];
+    try {
+      const { data } = await supabase.from("fixed_deposits").select("*");
+      fixedDeposits = data || [];
+    } catch (e) {
+      console.log(`[get-settlement-preview] Could not fetch fixed deposits`);
+    }
 
     let totalRealizedInterest = 0;
     const today = new Date();
 
     (fixedDeposits || []).forEach((fd: any) => {
-      const start = new Date(fd.start_date);
-      const tenure = Number(fd.tenure_months) || 3;
-      const maturity = new Date(start);
-      maturity.setMonth(maturity.getMonth() + tenure);
+      try {
+        const start = new Date(fd.start_date);
+        const tenure = Number(fd.tenure_months) || 3;
+        const maturity = new Date(start);
+        maturity.setMonth(maturity.getMonth() + tenure);
 
-      // Only add interest if the cycle is finished
-      if (maturity <= today) {
-        const interest = (Number(fd.amount) * Number(fd.interest_rate) * tenure) / 1200;
-        totalRealizedInterest += interest;
+        if (maturity <= today) {
+          const interest = (Number(fd.amount) * Number(fd.interest_rate) * tenure) / 1200;
+          totalRealizedInterest += interest;
+        }
+      } catch (e) {
+        console.log(`[get-settlement-preview] Error processing FD ${fd.id}`, e);
       }
     });
 
-    // Calculate member's share of dividend
+    // 6. Calculate member's dividend share
     const memberEquityShare =
       totalSocietyContribution > 0
         ? (memberContribution / totalSocietyContribution) * totalRealizedInterest
         : 0;
 
-    // 5. Get member's fixed deposits
-    const { data: memberFDs } = await supabase
-      .from("fixed_deposits")
-      .select("*")
-      .eq("member_id", Number(member_id));
+    // 7. Get member's fixed deposits
+    let memberFDs: any[] = [];
+    try {
+      const { data } = await supabase
+        .from("fixed_deposits")
+        .select("*")
+        .eq("member_id", Number(member_id));
+      memberFDs = data || [];
+    } catch (e) {
+      console.log(`[get-settlement-preview] Could not fetch member FDs`);
+    }
 
     const memberFDDetails = (memberFDs || []).map((fd: any) => {
-      const start = new Date(fd.start_date);
-      const tenure = Number(fd.tenure_months) || 3;
-      const maturity = new Date(start);
-      maturity.setMonth(maturity.getMonth() + tenure);
+      try {
+        const start = new Date(fd.start_date);
+        const tenure = Number(fd.tenure_months) || 3;
+        const maturity = new Date(start);
+        maturity.setMonth(maturity.getMonth() + tenure);
 
-      const interest = (Number(fd.amount) * Number(fd.interest_rate) * tenure) / 1200;
-      const isMatured = maturity <= today;
-      const maturityAmount = Number(fd.amount) + interest;
+        const interest = (Number(fd.amount) * Number(fd.interest_rate) * tenure) / 1200;
+        const isMatured = maturity <= today;
+        const maturityAmount = Number(fd.amount) + interest;
 
-      return {
-        id: fd.id,
-        amount: Number(fd.amount),
-        interest_rate: Number(fd.interest_rate),
-        tenure_months: Number(fd.tenure_months),
-        start_date: fd.start_date,
-        status: isMatured ? "MATURED" : "ACTIVE",
-        calculated_interest: interest,
-        maturity_amount: isMatured ? maturityAmount : Number(fd.amount),
-        maturity_date: maturity.toISOString().split("T")[0]
-      };
-    });
+        return {
+          id: fd.id,
+          amount: Number(fd.amount),
+          interest_rate: Number(fd.interest_rate),
+          tenure_months: Number(fd.tenure_months),
+          start_date: fd.start_date,
+          status: isMatured ? "MATURED" : "ACTIVE",
+          calculated_interest: interest,
+          maturity_amount: isMatured ? maturityAmount : Number(fd.amount),
+          maturity_date: maturity.toISOString().split("T")[0]
+        };
+      } catch (e) {
+        console.log(`[get-settlement-preview] Error processing member FD`, e);
+        return null;
+      }
+    }).filter(fd => fd !== null);
 
-    // 6. Calculate deductions
-    const CLOSING_FEE = 500; // Fixed closing fee
-    const EARLY_EXIT_PENALTY_PERCENT = 5; // 5% of contribution if exiting early
+    // 8. Calculate deductions
+    const CLOSING_FEE = 500;
+    const EARLY_EXIT_PENALTY_PERCENT = 5;
 
-    // Check if member has active FDs (early exit scenario)
     const hasActiveFDs = memberFDDetails.some((fd: any) => fd.status === "ACTIVE");
     const earlyExitPenalty = hasActiveFDs ? (memberContribution * EARLY_EXIT_PENALTY_PERCENT) / 100 : 0;
 
     const totalDeductions = unpaidAmount + CLOSING_FEE + earlyExitPenalty;
 
-    // 7. Calculate net transfer amount
+    // 9. Calculate net transfer amount
     const totalFDMaturity = memberFDDetails.reduce(
       (sum: number, fd: any) => sum + fd.maturity_amount,
       0
@@ -188,7 +214,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     };
 
-    console.log(`[get-settlement-preview] Preview calculated:`, preview);
+    console.log(`[get-settlement-preview] Preview calculated successfully`);
     return res.status(200).json({ success: true, data: preview });
   } catch (err: any) {
     console.error("[get-settlement-preview] Handler error:", err);

@@ -96,16 +96,107 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `;
 
       const downloadableSettlementHtml = `
-        <html>
-          <head>
-            <meta charSet="utf-8" />
-            <title>Settlement Report - ${member_name}</title>
-          </head>
-          <body style="font-family: Arial, sans-serif; color:#111827; padding:24px;">
-            ${apologyHtml}
-            ${reportHtml}
-          </body>
-        </html>
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Settlement Report - ${member_name}</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: 'Arial', sans-serif; background:#f5f5f5; padding:20px; }
+      .container { max-width:800px; margin:0 auto; background:#fff; padding:40px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+      .header { text-align:center; border-bottom:3px solid #10b981; padding-bottom:20px; margin-bottom:30px; }
+      .header h1 { font-size:28px; color:#0f172a; margin-bottom:5px; }
+      .header p { color:#666; font-size:14px; }
+      .member-info { background:#f9fafb; padding:20px; border-radius:6px; margin-bottom:30px; border-left:4px solid #10b981; }
+      .member-info p { margin:8px 0; font-size:15px; }
+      .member-info strong { color:#0f172a; font-weight:700; }
+      table { width:100%; border-collapse:collapse; margin:20px 0; }
+      th { background:#f3f4f6; padding:12px; text-align:left; font-weight:700; border-bottom:2px solid #10b981; color:#0f172a; }
+      td { padding:14px 12px; border-bottom:1px solid #e5e7eb; }
+      tr:last-child td { border-bottom:2px solid #10b981; }
+      .label { color:#0f172a; font-weight:600; }
+      .amount { text-align:right; color:#0f172a; font-weight:600; font-family:'Courier New', monospace; }
+      .total-row { background:#f0fdf4; font-weight:700; }
+      .total-row td { background:#f0fdf4; }
+      .net-amount { background:#dbeafe; font-weight:700; font-size:16px; }
+      .footer { margin-top:40px; padding-top:20px; border-top:1px solid #e5e7eb; text-align:center; color:#666; font-size:12px; }
+      @media print { body { background:white; } .container { box-shadow:none; padding:0; } }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Settlement Report</h1>
+        <p>Cooperative Society Member Settlement</p>
+      </div>
+      
+      <div class="member-info">
+        <p><strong>Member Name:</strong> ${member_name}</p>
+        <p><strong>Society ID:</strong> ${settlement_data.society_id || 'N/A'}</p>
+        <p><strong>Report Date:</strong> ${new Date().toLocaleDateString('en-GB')}</p>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Amount (৳)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="label">Contributions</td>
+            <td class="amount">${Math.round(settlement_data.contribution_total || 0).toLocaleString()}</td>
+          </tr>
+          <tr>
+            <td class="label">Dividends</td>
+            <td class="amount">${Math.round(settlement_data.earned_dividends || 0).toLocaleString()}</td>
+          </tr>
+          ${settlement_data.fixed_deposits_total_maturity ? `<tr>
+            <td class="label">Fixed Deposits (Maturity)</td>
+            <td class="amount">${Math.round(settlement_data.fixed_deposits_total_maturity || 0).toLocaleString()}</td>
+          </tr>` : ''}
+          <tr class="total-row">
+            <td class="label">Total Inflow</td>
+            <td class="amount">${Math.round(settlement_data.total_inflow || 0).toLocaleString()}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table>
+        <thead>
+          <tr>
+            <th colspan="2" style="background:#fee2e2; border-bottom:2px solid #dc2626;">Deductions</th>
+          </tr>
+          <tr>
+            <th>Description</th>
+            <th>Amount (৳)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${reportRows.join('')}
+        </tbody>
+      </table>
+
+      <table>
+        <tbody>
+          <tr class="net-amount">
+            <td class="label" style="color:#1e40af; background:#dbeafe;">Net Settlement Amount Payable</td>
+            <td class="amount" style="color:#1e40af; background:#dbeafe;">৳${Math.round(Math.max(0, settlement_data.net_settlement_amount || (settlement_data.total_inflow - (settlement_data.total_selected_deductions || 0)))).toLocaleString()}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="footer">
+        <p>This is an official settlement report from ${settlement_data.society_id || 'Cooperative Society'}.</p>
+        <p>Payment should be received within one week from the date of this report.</p>
+        <p style="margin-top:10px; font-size:11px;">Generated on: ${new Date().toLocaleString('en-GB')}</p>
+      </div>
+    </div>
+  </body>
+</html>
       `;
 
       let reportDownloadUrl = "";

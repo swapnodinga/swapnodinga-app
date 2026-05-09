@@ -242,6 +242,21 @@ export default function SettlementReportPage() {
     ? Math.max(0, settlement.total_inflow - totalDeductions)
     : 0;
 
+  // Check if data is loading
+  const isLoading = !members || members.length === 0;
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-slate-400 border-t-emerald-400 rounded-full animate-spin mx-auto"></div>
+          <p className="text-white text-lg font-semibold">Loading members...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">

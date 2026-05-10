@@ -1,6 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { buildSettlementReportHtml, normalizeSettlementReport } from "../shared/settlement-report";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -31,40 +30,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      const report = normalizeSettlementReport(settlement_data);
-      const reportHtml = buildSettlementReportHtml(settlement_data);
+      // Extract report info directly from settlement_data
+      const reportHtml = settlement_data?.report_html || "Settlement Report - No HTML generated";
+      const societyId = settlement_data?.society_id || settlement_data?.societyId || "N/A";
+      const memberNameReport = settlement_data?.member_name || settlement_data?.memberName || member_name;
 
-      const subject = `Settlement Report - ${report.societyId || "Cooperative Society"}`;
+      const subject = `Settlement Report - ${societyId || "Cooperative Society"}`;
 
       // Build a short apology message and report HTML to include in the email
       const apologyHtml = `
         <p>Dear ${member_name},</p>
         <p>We are sorry to see you leave the cooperative society. Please find your settlement report attached as a downloadable link below.</p>
         <p>You can expect to receive the payment within one week. If you have any questions, please reply to this email.</p>
-        <p><strong>Member:</strong> ${report.memberName}</p>
-        <p><strong>Society ID:</strong> ${report.societyId}</p>
+        <p><strong>Member:</strong> ${memberNameReport}</p>
+        <p><strong>Society ID:</strong> ${societyId}</p>
         <hr />
       `;
       const reportDownloadHtml = reportHtml;
 
-      let reportDownloadUrl = "";
-      try {
-        const reportFileName = `settlement-reports/${String(report.societyId || "member").replace(/[^a-zA-Z0-9_-]/g, "-")}-${Date.now()}.html`;
-        const { error: uploadError } = await supabase.storage
-          .from("payments")
-          .upload(reportFileName, reportDownloadHtml, {
-            contentType: "text/html",
-            upsert: true,
-          });
+      let reportDownloadUrl = settlement_data?.report_download_url || "";
+      
+      // If no download URL provided, try to upload the report
+      if (!reportDownloadUrl && reportHtml) {
+        try {
+          const reportFileName = `settlement-reports/${String(societyId).replace(/[^a-zA-Z0-9_-]/g, "-")}-${Date.now()}.html`;
+          const { error: uploadError } = await supabase.storage
+            .from("payments")
+            .upload(reportFileName, reportHtml, {
+              contentType: "text/html",
+              upsert: true,
+            });
 
-        if (!uploadError) {
-          const { data: publicData } = supabase.storage.from("payments").getPublicUrl(reportFileName);
-          reportDownloadUrl = publicData.publicUrl;
-        } else {
-          console.error("Settlement report upload failed:", uploadError.message);
+          if (!uploadError) {
+            const { data: publicData } = supabase.storage.from("payments").getPublicUrl(reportFileName);
+            reportDownloadUrl = publicData.publicUrl;
+          } else {
+            console.error("Settlement report upload failed:", uploadError.message);
+          }
+        } catch (uploadErr) {
+          console.error("Settlement report upload error:", uploadErr);
         }
-      } catch (uploadErr) {
-        console.error("Settlement report upload error:", uploadErr);
       }
 
       const bodyHtml = `

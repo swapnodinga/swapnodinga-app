@@ -159,7 +159,7 @@ export default function SettlementReportPage() {
       unpaid_installments: unpaidAmount,
       closing_fee: 500,
       disclosure_fee: 100,
-      society_fee: 250,
+      society_fee: 500,
       early_settlement_fee: memberFDDetails.some((fd: any) => fd.status === "ACTIVE")
         ? (memberContribution * 5) / 100
         : 0,
@@ -244,6 +244,7 @@ export default function SettlementReportPage() {
 
     setIsSendingEmail(true);
     try {
+      const reportHtml = buildSettlementReportHtml(settlement);
       const response = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -251,7 +252,10 @@ export default function SettlementReportPage() {
           member_email: emailInput.trim(),
           member_name: settlement.member_name,
           email_type: "settlement",
-          settlement_data: settlement
+          settlement_data: {
+            ...settlement,
+            report_html: reportHtml
+          }
         })
       });
 
@@ -282,12 +286,12 @@ export default function SettlementReportPage() {
       setEmailInput("");
     } catch (error: any) {
       console.error("Email sending error:", error);
+      console.error("Full error details:", { error, stack: error.stack });
       toast({
         title: "Error Sending Email",
         description: error.message || "An error occurred while sending the email",
         variant: "destructive"
       });
-      console.error("Full error details:", error);
     } finally {
       setIsSendingEmail(false);
     }

@@ -124,9 +124,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           </div>
           ${reportDownloadUrl ? `
             <div style="margin-top:24px; text-align:center; border-top:1px solid #e5e7eb; padding-top:24px;">
-              <p style="margin:0 0 12px; font-weight:700; color:#0f172a; font-size:14px;">Printable Settlement Report</p>
-              <a href="${reportDownloadUrl}" style="display:inline-block; background:#10b981; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:9999px; font-weight:700; font-size:14px; border:none;">
-                Open Printable Report
+              <a href="${reportDownloadUrl}" download="settlement-report-${societyId}.html" style="display:inline-block; background:#10b981; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:9999px; font-weight:700; font-size:14px; border:none; cursor:pointer;">
+                Download Report
               </a>
             </div>
           ` : ''}

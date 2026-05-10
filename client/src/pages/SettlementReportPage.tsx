@@ -174,15 +174,31 @@ export default function SettlementReportPage() {
 
   const handlePrintReport = () => {
     if (!settlement) return;
-    const printWindow = window.open("", "_blank", "noopener,noreferrer,width=900,height=1100");
-    if (!printWindow) return;
-    printWindow.document.open();
-    printWindow.document.write(buildSettlementReportHtml(settlement));
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 300);
+    try {
+      const html = buildSettlementReportHtml(settlement);
+      // Use data URL for more reliable print window rendering
+      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+      const printWindow = window.open(dataUrl, "_blank", "noopener,noreferrer,width=900,height=1100");
+      if (!printWindow) {
+        toast({
+          title: "Print Failed",
+          description: "Unable to open print window. Check if pop-ups are blocked.",
+          variant: "destructive"
+        });
+        return;
+      }
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    } catch (error: any) {
+      console.error("Print error:", error);
+      toast({
+        title: "Print Error",
+        description: error.message || "Failed to prepare report for printing",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleDownloadReport = () => {
@@ -231,10 +247,19 @@ export default function SettlementReportPage() {
         })
       });
 
-      const data = await response.json();
-      
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error("Failed to parse response as JSON:", parseError);
+        const text = await response.text();
+        console.error("Response text:", text);
+        data = { message: "Server returned invalid response" };
+      }
+
       if (!response.ok) {
-        throw new Error(data.message || "Failed to send email");
+        console.error("Email API error response:", { status: response.status, data });
+        throw new Error(data?.message || `Failed to send email (Status: ${response.status})`);
       }
 
       toast({
@@ -244,12 +269,15 @@ export default function SettlementReportPage() {
       });
 
       setShowEmailDialog(false);
+      setEmailInput("");
     } catch (error: any) {
+      console.error("Email sending error:", error);
       toast({
         title: "Error Sending Email",
         description: error.message || "An error occurred while sending the email",
         variant: "destructive"
       });
+      console.error("Full error details:", error);
     } finally {
       setIsSendingEmail(false);
     }

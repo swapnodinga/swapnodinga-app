@@ -261,6 +261,56 @@ export default function SettlementReportPage() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
+  const handleDownloadPdf = async () => {
+    if (!settlement) return;
+
+    try {
+      const html2pdf = (await import("html2pdf.js")).default;
+      const html = getReportHtml();
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.left = "-10000px";
+      iframe.style.top = "0";
+      iframe.style.width = "900px";
+      iframe.style.height = "1200px";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+
+      await new Promise<void>((resolve, reject) => {
+        iframe.onload = () => resolve();
+        iframe.onerror = () => reject(new Error("Failed to load report for PDF generation"));
+        iframe.srcdoc = html;
+      });
+
+      const reportBody = iframe.contentDocument?.body;
+      if (!reportBody) {
+        throw new Error("Unable to access report content for PDF generation");
+      }
+
+      const filename = `settlement-report-${report?.societyId || settlement.society_id || "member"}.pdf`;
+
+      await html2pdf()
+        .set({
+          margin: 10,
+          filename,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        })
+        .from(reportBody)
+        .save();
+
+      document.body.removeChild(iframe);
+    } catch (error: any) {
+      console.error("PDF download error:", error);
+      toast({
+        title: "PDF Download Failed",
+        description: error.message || "Unable to generate PDF report",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSendEmail = async () => {
     if (!emailInput.trim()) {
       toast({
@@ -458,6 +508,10 @@ export default function SettlementReportPage() {
                     <Button className="flex-1 gap-2 bg-blue-600 hover:bg-blue-700" onClick={handleDownloadReport}>
                       <Download className="h-4 w-4" />
                       Download HTML
+                    </Button>
+                    <Button className="flex-1 gap-2 bg-indigo-600 hover:bg-indigo-700" onClick={handleDownloadPdf}>
+                      <Download className="h-4 w-4" />
+                      Download PDF
                     </Button>
                     <Button
                       className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700"

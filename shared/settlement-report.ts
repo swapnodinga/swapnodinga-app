@@ -108,7 +108,7 @@ export const buildSettlementReportHtml = (settlement: SettlementInput) => {
         --blue-soft: #eff6ff;
       }
       * { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: Arial, Helvetica, sans-serif; }
+      html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Noto Sans', 'Helvetica Neue', Arial, sans-serif; }
       body { padding: 20px; }
       .page { max-width: 900px; margin: 0 auto; background: white; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08); }
       .header { padding: 28px 32px; background: linear-gradient(135deg, #f8fafc, #ecfeff); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
@@ -119,7 +119,7 @@ export const buildSettlementReportHtml = (settlement: SettlementInput) => {
       .info { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; margin-bottom: 18px; }
       .label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
       .value { font-size: 20px; font-weight: 800; }
-      .mono { font-family: 'Courier New', monospace; }
+      .mono { font-family: 'Segoe UI', 'Noto Sans', 'Courier New', monospace; }
       .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
       .card { border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
       .card h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: .02em; text-transform: uppercase; }

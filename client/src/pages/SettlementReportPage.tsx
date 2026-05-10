@@ -201,33 +201,42 @@ export default function SettlementReportPage() {
   const settlement = baseSettlement ? applyDeductionsEdit(baseSettlement) : null;
   const report = settlement ? normalizeSettlementReport(settlement) : null;
 
+  const getReportHtml = () => (settlement ? buildSettlementReportHtml(settlement) : "");
+
+  const handleOpenPrintableReport = () => {
+    if (!settlement) return;
+    const html = getReportHtml();
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+  };
+
   const handlePrintReport = () => {
     if (!settlement) return;
     try {
-      const html = buildSettlementReportHtml(settlement);
-      // Use iframe approach for more reliable printing
+      const html = getReportHtml();
+      // Use srcdoc in a hidden iframe for reliable rendering and printing
       const iframe = document.createElement("iframe");
-      iframe.style.display = "none";
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
       document.body.appendChild(iframe);
-      
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (!iframeDoc) {
-        toast({
-          title: "Print Failed",
-          description: "Unable to access iframe document",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      iframeDoc.open();
-      iframeDoc.write(html);
-      iframeDoc.close();
-      
-      setTimeout(() => {
-        iframe.contentWindow?.print();
-        document.body.removeChild(iframe);
-      }, 500);
+
+      iframe.onload = () => {
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          window.setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
+        }, 300);
+      };
+
+      iframe.srcdoc = html;
     } catch (error: any) {
       console.error("Print error:", error);
       toast({
@@ -240,7 +249,7 @@ export default function SettlementReportPage() {
 
   const handleDownloadReport = () => {
     if (!settlement) return;
-    const html = buildSettlementReportHtml(settlement);
+    const html = getReportHtml();
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -439,6 +448,49 @@ export default function SettlementReportPage() {
                     <p className="text-xs font-bold tracking-[0.16em] uppercase text-emerald-700">Net Transfer Amount</p>
                     <p className="mt-2 text-5xl font-black text-emerald-950 font-mono">{`৳${report.netAmount.toLocaleString('en-US')}`}</p>
                     <p className="mt-2 text-sm text-emerald-700">This is the final amount payable after deductions.</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Report Summary</p>
+                      <p className="mt-1 text-sm text-slate-600">This text summary matches the settlement values used in print and download.</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-2">
+                        <span className="text-slate-500">Member</span>
+                        <span className="font-semibold text-slate-900 text-right">{report.memberName}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-2">
+                        <span className="text-slate-500">Society ID</span>
+                        <span className="font-semibold text-slate-900 text-right font-mono">{report.societyId}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-2">
+                        <span className="text-slate-500">Contributions</span>
+                        <span className="font-semibold text-slate-900 text-right font-mono">{`৳${report.contributionTotal.toLocaleString('en-US')}`}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-2">
+                        <span className="text-slate-500">Dividends</span>
+                        <span className="font-semibold text-slate-900 text-right font-mono">{`৳${report.earnedDividends.toLocaleString('en-US')}`}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-2">
+                        <span className="text-slate-500">Total Inflow</span>
+                        <span className="font-semibold text-slate-900 text-right font-mono">{`৳${report.totalInflow.toLocaleString('en-US')}`}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-2">
+                        <span className="text-slate-500">Total Deductions</span>
+                        <span className="font-semibold text-red-700 text-right font-mono">{`৳${report.totalDeductions.toLocaleString('en-US')}`}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 md:col-span-2 pt-2">
+                        <span className="text-slate-500">Net Settlement Amount</span>
+                        <span className="font-black text-emerald-700 text-right font-mono text-lg">{`৳${report.netAmount.toLocaleString('en-US')}`}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      <Button type="button" variant="outline" onClick={handleOpenPrintableReport} className="gap-2">
+                        <Printer className="h-4 w-4" />
+                        Open Printable Report
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="flex flex-col gap-3 md:flex-row print:hidden">

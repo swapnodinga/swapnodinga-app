@@ -451,6 +451,10 @@ export default function SettlementReportPage() {
                     <p className="mt-2 text-sm text-emerald-700">This is the final amount payable after deductions.</p>
                   </div>
 
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-4 text-center text-sm leading-6 text-slate-600 print:border-slate-300 print:bg-white">
+                    This is sytem auto generated report. please communicate with swapnodinga admin, if you have anything mismatch
+                  </div>
+
                   <div className="flex flex-col gap-3 md:flex-row print:hidden">
                     <Button className="flex-1 gap-2 bg-slate-800 hover:bg-slate-900" onClick={handlePrintReport}>
                       <Printer className="h-4 w-4" />

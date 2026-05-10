@@ -202,6 +202,10 @@ export const buildSettlementReportHtml = (settlement: SettlementInput) => {
           <div class="amount mono">${formatAmount(report.netAmount)}</div>
           <div style="margin-top:8px; color:#065f46; font-size:13px;">This is the final payable amount after deductions.</div>
         </section>
+
+        <p style="margin:18px 4px 0; padding:14px 16px; border:1px dashed var(--line); border-radius:12px; color:var(--muted); font-size:13px; line-height:1.6; text-align:center; background:#fafafa;">
+          This is sytem auto generated report. please communicate with swapnodinga admin, if you have anything mismatch
+        </p>
       </div>
 
       <footer class="footer">

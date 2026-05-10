@@ -41,8 +41,6 @@ const buildSettlementPdfBuffer = async (data: {
       ["Contributions", formatMoney(data.contributionTotal)],
       ["Dividends", formatMoney(data.earnedDividends)],
       ["Total Inflow", formatMoney(data.totalInflow)],
-      ["Total Deductions", formatMoney(data.totalDeductions)],
-      ["Net Settlement Amount", formatMoney(data.netAmount)],
     ];
 
     summaryRows.forEach(([label, value]) => {
@@ -63,6 +61,14 @@ const buildSettlementPdfBuffer = async (data: {
       doc.fillColor("#b91c1c").font("Helvetica-Bold").text(formatMoney(deduction.amount), { align: "right" });
       doc.moveDown(0.25);
     });
+
+    doc.moveDown(0.2);
+    doc.fontSize(11).font("Helvetica-Bold").fillColor("#991b1c").text("Total Deductions", { continued: true });
+    doc.fillColor("#b91c1c").text(formatMoney(data.totalDeductions), { align: "right" });
+
+    doc.moveDown(0.2);
+    doc.fontSize(11).font("Helvetica-Bold").fillColor("#065f46").text("Net Settlement Amount", { continued: true });
+    doc.fillColor("#059669").text(formatMoney(data.netAmount), { align: "right" });
 
     doc.moveDown(1);
     doc.fontSize(10).fillColor("#64748b").text(`Generated on ${new Date().toLocaleString("en-GB")}`, { align: "center" });
@@ -236,15 +242,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 <td style="padding:8px 0; color:#64748b;">Total Inflow</td>
                 <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace;">${formatMoney(totalInflow)}</td>
               </tr>
-              <tr>
-                <td style="padding:8px 0; color:#64748b;">Total Deductions</td>
-                <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace; color:#b91c1c;">${formatMoney(totalDeductions)}</td>
-              </tr>
-              <tr>
-                <td style="padding:8px 0 0; color:#64748b; font-weight:700;">Net Settlement Amount</td>
-                <td style="padding:8px 0 0; text-align:right; font-weight:900; font-family:monospace; color:#059669;">${formatMoney(netAmount)}</td>
-              </tr>
             </table>
+          </div>
+          <div style="margin-top:18px; border-top:1px solid #e5e7eb; padding-top:16px; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; justify-content:space-between; gap:16px; font-weight:700; color:#64748b;">
+              <span>Total Deductions</span>
+              <span style="font-family:monospace; color:#b91c1c;">${formatMoney(totalDeductions)}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; gap:16px; font-weight:900; color:#065f46;">
+              <span>Net Settlement Amount</span>
+              <span style="font-family:monospace; color:#059669;">${formatMoney(netAmount)}</span>
+            </div>
+          </div>
+          <div style="margin-top:20px; padding:14px 16px; border:1px dashed #d1d5db; border-radius:12px; color:#64748b; font-size:12px; line-height:1.6; text-align:center; background:#fafafa;">
+            This is sytem auto generated report. please communicate with swapnodinga admin, if you have anything mismatch
           </div>
           ${reportDownloadUrl ? `
             <div style="margin-top:24px; text-align:center; border-top:1px solid #e5e7eb; padding-top:24px;">

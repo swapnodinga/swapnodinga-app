@@ -43,13 +43,13 @@ const buildSettlementPdfBuffer = async (data: {
 
     if (logoBuffer) {
       doc.image(logoBuffer, 250, 42, { width: 100 });
-      doc.moveDown(4.5);
+      doc.moveDown(5.5);
       doc.fontSize(10).font("Helvetica-Oblique").fillColor("#2d5a4a").text("Sobar Jonno Somoyon, Swapnodinga-r Ayojon", { align: "center" });
-      doc.moveDown(0.4);
+      doc.moveDown(0.6);
       doc.fontSize(22).font("Helvetica-Bold").fillColor("#111827").text("Settlement Report", { align: "center" });
-      doc.moveDown(0.3);
+      doc.moveDown(0.4);
       doc.fontSize(11).font("Helvetica").fillColor("#64748b").text("Cooperative Society member settlement summary", { align: "center" });
-      doc.moveDown(0.8);
+      doc.moveDown(1);
     } else {
       doc.fontSize(22).font("Helvetica-Bold").text("Settlement Report", { align: "center" });
       doc.moveDown(0.5);

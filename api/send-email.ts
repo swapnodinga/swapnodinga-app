@@ -66,7 +66,7 @@ const buildSettlementPdfBuffer = async (data: {
     doc.fontSize(11).font("Helvetica-Bold").fillColor("#991b1c").text("Total Deductions", { continued: true });
     doc.fillColor("#b91c1c").text(formatMoney(data.totalDeductions), { align: "right" });
 
-    doc.moveDown(0.2);
+    doc.moveDown(0.7);
     doc.fontSize(11).font("Helvetica-Bold").fillColor("#065f46").text("Net Settlement Amount", { continued: true });
     doc.fillColor("#059669").text(formatMoney(data.netAmount), { align: "right" });
 
@@ -247,7 +247,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           <div style="margin-top:18px; border-top:1px solid #e5e7eb; padding-top:16px; display:flex; flex-direction:column; gap:8px;">
             <div style="display:flex; justify-content:space-between; gap:16px; font-weight:700; color:#64748b;">
               <span>Total Deductions</span>
-              <span style="font-family:monospace; color:#b91c1c;">${formatMoney(totalDeductions)}</span>
+              <span style="font-family:monospace; color:#b91c1c; padding-right:14px; display:inline-block;">${formatMoney(totalDeductions)}</span>
             </div>
             <div style="display:flex; justify-content:space-between; gap:16px; font-weight:900; color:#065f46;">
               <span>Net Settlement Amount</span>

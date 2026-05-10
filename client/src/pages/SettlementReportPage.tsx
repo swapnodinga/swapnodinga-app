@@ -450,49 +450,6 @@ export default function SettlementReportPage() {
                     <p className="mt-2 text-sm text-emerald-700">This is the final amount payable after deductions.</p>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-3">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Report Summary</p>
-                      <p className="mt-1 text-sm text-slate-600">This text summary matches the settlement values used in print and download.</p>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-2">
-                        <span className="text-slate-500">Member</span>
-                        <span className="font-semibold text-slate-900 text-right">{report.memberName}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-2">
-                        <span className="text-slate-500">Society ID</span>
-                        <span className="font-semibold text-slate-900 text-right font-mono">{report.societyId}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-2">
-                        <span className="text-slate-500">Contributions</span>
-                        <span className="font-semibold text-slate-900 text-right font-mono">{`৳${report.contributionTotal.toLocaleString('en-US')}`}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-2">
-                        <span className="text-slate-500">Dividends</span>
-                        <span className="font-semibold text-slate-900 text-right font-mono">{`৳${report.earnedDividends.toLocaleString('en-US')}`}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-2">
-                        <span className="text-slate-500">Total Inflow</span>
-                        <span className="font-semibold text-slate-900 text-right font-mono">{`৳${report.totalInflow.toLocaleString('en-US')}`}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-2">
-                        <span className="text-slate-500">Total Deductions</span>
-                        <span className="font-semibold text-red-700 text-right font-mono">{`৳${report.totalDeductions.toLocaleString('en-US')}`}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-4 md:col-span-2 pt-2">
-                        <span className="text-slate-500">Net Settlement Amount</span>
-                        <span className="font-black text-emerald-700 text-right font-mono text-lg">{`৳${report.netAmount.toLocaleString('en-US')}`}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      <Button type="button" variant="outline" onClick={handleOpenPrintableReport} className="gap-2">
-                        <Printer className="h-4 w-4" />
-                        Open Printable Report
-                      </Button>
-                    </div>
-                  </div>
-
                   <div className="flex flex-col gap-3 md:flex-row print:hidden">
                     <Button className="flex-1 gap-2 bg-slate-800 hover:bg-slate-900" onClick={handlePrintReport}>
                       <Printer className="h-4 w-4" />

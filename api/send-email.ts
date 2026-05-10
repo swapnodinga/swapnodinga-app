@@ -32,8 +32,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Extract report info directly from settlement_data
       const reportHtml = settlement_data?.report_html || "Settlement Report - No HTML generated";
+      const formatAmount = (value: any) => `৳${Math.round(Number(value || 0)).toLocaleString("en-US")}`;
       const societyId = settlement_data?.society_id || settlement_data?.societyId || "N/A";
       const memberNameReport = settlement_data?.member_name || settlement_data?.memberName || member_name;
+      const contributionTotal = Number(settlement_data?.contribution_total || 0);
+      const earnedDividends = Number(settlement_data?.earned_dividends || 0);
+      const totalInflow = Number(settlement_data?.total_inflow || 0);
+      const totalDeductions = Number(
+        settlement_data?.total_selected_deductions ??
+        settlement_data?.total_deductions ??
+        0
+      );
+      const netAmount = Number(
+        settlement_data?.net_settlement_amount ??
+        settlement_data?.net_transfer_amount ??
+        Math.max(0, totalInflow - totalDeductions)
+      );
 
       const subject = `Settlement Report - ${societyId || "Cooperative Society"}`;
 
@@ -75,11 +89,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const bodyHtml = `
         <div style="font-family: Arial, sans-serif; color:#111827; line-height:1.6;">
           ${apologyHtml}
+          <div style="margin:20px 0; padding:18px; border:1px solid #dbe4ef; border-radius:14px; background:#f8fafc;">
+            <p style="margin:0 0 12px; font-size:12px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#64748b;">Report Summary</p>
+            <table style="width:100%; border-collapse:collapse; font-size:14px;">
+              <tr>
+                <td style="padding:8px 0; color:#64748b;">Member</td>
+                <td style="padding:8px 0; text-align:right; font-weight:700;">${memberNameReport}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0; color:#64748b;">Society ID</td>
+                <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace;">${societyId}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0; color:#64748b;">Contributions</td>
+                <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace;">${formatAmount(contributionTotal)}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0; color:#64748b;">Dividends</td>
+                <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace;">${formatAmount(earnedDividends)}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0; color:#64748b;">Total Inflow</td>
+                <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace;">${formatAmount(totalInflow)}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0; color:#64748b;">Total Deductions</td>
+                <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace; color:#b91c1c;">${formatAmount(totalDeductions)}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0 0; color:#64748b; font-weight:700;">Net Settlement Amount</td>
+                <td style="padding:8px 0 0; text-align:right; font-weight:900; font-family:monospace; color:#059669;">${formatAmount(netAmount)}</td>
+              </tr>
+            </table>
+          </div>
           ${reportDownloadUrl ? `
             <div style="margin-top:24px; text-align:center; border-top:1px solid #e5e7eb; padding-top:24px;">
-              <p style="margin:0 0 12px; font-weight:700; color:#0f172a; font-size:14px;">Settlement Report</p>
+              <p style="margin:0 0 12px; font-weight:700; color:#0f172a; font-size:14px;">Printable Settlement Report</p>
               <a href="${reportDownloadUrl}" style="display:inline-block; background:#10b981; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:9999px; font-weight:700; font-size:14px; border:none;">
-                Download Settlement Report
+                Open Printable Report
               </a>
             </div>
           ` : ''}

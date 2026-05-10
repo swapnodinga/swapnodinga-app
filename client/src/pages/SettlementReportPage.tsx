@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Printer, Search, Building2, User, Mail, Loader2, Download } from "lucide-react";
 import { useLocation } from "wouter";
 import { buildSettlementReportHtml, normalizeSettlementReport } from "@shared/settlement-report";
@@ -21,8 +22,15 @@ export default function SettlementReportPage() {
   const [reportDraft, setReportDraft] = useState<any | null>(null);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
-  const [emailInput, setEmailInput] = useState("");
 
+  const [emailInput, setEmailInput] = useState("");
+  const [deductionsEdit, setDeductionsEdit] = useState<Record<string, { amount: number; selected: boolean }>>({
+    unpaid_installments: { amount: 0, selected: true },
+    closing_fee: { amount: 500, selected: true },
+    disclosure_fee: { amount: 100, selected: true },
+    society_fee: { amount: 500, selected: true },
+    early_settlement_fee: { amount: 0, selected: true }
+  });
   useEffect(() => {
     try {
       const raw = localStorage.getItem("settlement_report_draft");
@@ -46,6 +54,15 @@ export default function SettlementReportPage() {
 
   // When a member is selected from the left list, generate the settlement report automatically
   useEffect(() => {
+    // Reset deductions editor
+    setDeductionsEdit({
+      unpaid_installments: { amount: 0, selected: true },
+      closing_fee: { amount: 500, selected: true },
+      disclosure_fee: { amount: 100, selected: true },
+      society_fee: { amount: 500, selected: true },
+      early_settlement_fee: { amount: 0, selected: true }
+    });
+
     if (!selectedMemberId) return;
     const member = members.find(m => m.id === selectedMemberId);
     if (!member) return;
@@ -168,8 +185,20 @@ export default function SettlementReportPage() {
     };
   };
 
+  const applyDeductionsEdit = (baseSettlement: any) => {
+    const result = { ...baseSettlement };
+    let totalDed = 0;
+    Object.entries(deductionsEdit).forEach(([key, cfg]: [string, any]) => {
+      result[key] = cfg.selected ? cfg.amount : 0;
+      if (cfg.selected) totalDed += cfg.amount;
+    });
+    result.total_selected_deductions = totalDed;
+    return result;
+  };
+
   const selectedMember = selectedMemberId ? members.find(m => m.id === selectedMemberId) : null;
-  const settlement = reportDraft || (selectedMember ? calculateSettlement(selectedMember) : null);
+  const baseSettlement = reportDraft || (selectedMember ? calculateSettlement(selectedMember) : null);
+  const settlement = baseSettlement ? applyDeductionsEdit(baseSettlement) : null;
   const report = settlement ? normalizeSettlementReport(settlement) : null;
 
   const handlePrintReport = () => {
@@ -448,6 +477,39 @@ export default function SettlementReportPage() {
                 <CardContent className="py-20 text-center">
                   <User className="h-16 w-16 mx-auto text-slate-300 mb-4" />
                   <p className="text-slate-500 text-lg">Select a member to view their settlement report</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {baseSettlement && (
+            <div className="lg:col-span-3 print:col-span-4">
+              <Card className="shadow-md border-amber-200 bg-amber-50 print:hidden">
+                <CardHeader className="pb-3 bg-amber-100 border-b border-amber-200">
+                  <CardTitle className="text-amber-900">Customize Deductions</CardTitle>
+                  <p className="text-xs text-amber-700 mt-2 font-normal">Select which deductions to include and edit amounts</p>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-3">
+                  {Object.entries(deductionsEdit).map(([key, cfg]: [string, any]) => {
+                    const labels: Record<string, string> = {
+                      unpaid_installments: "Unpaid Installments",
+                      closing_fee: "Closing Fee",
+                      disclosure_fee: "Disclosure Fee",
+                      society_fee: "Society Fee",
+                      early_settlement_fee: "Early Settlement Fee"
+                    };
+                    return (
+                      <div key={key} className="flex items-center gap-3 p-2 bg-white rounded border border-amber-100">
+                        <Checkbox
+                          checked={cfg.selected}
+                          onCheckedChange={(checked) => setDeductionsEdit(prev => ({...prev, [key]: {...prev[key], selected: !!checked}}))}
+                        />
+                        <span className="flex-1 text-sm font-medium text-slate-700">{labels[key]}</span>
+                        <Input type="number" value={cfg.amount} onChange={(e) => setDeductionsEdit(prev => ({...prev, [key]: {...prev[key], amount: Number(e.target.value) || 0}}))} className="w-20 h-8 text-right text-xs" min="0" />
+                        <span className="text-xs text-slate-500 w-8">৳</span>
+                      </div>
+                    );
+                  })}
                 </CardContent>
               </Card>
             </div>

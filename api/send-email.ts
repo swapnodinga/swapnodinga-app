@@ -9,10 +9,40 @@ const getBaseUrl = () => {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method === "GET" && req.query.download === "1") {
+    const path = String(req.query.path || "").trim();
+    const filename = String(req.query.filename || "settlement-report.html").trim();
+
+    if (!path) {
+      return res.status(400).json({ success: false, message: "path query parameter is required" });
+    }
+
+    try {
+      const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+      const { data, error } = await supabase.storage.from("payments").download(path);
+
+      if (error || !data) {
+        return res.status(404).json({
+          success: false,
+          message: error?.message || "Report file not found",
+        });
+      }
+
+      const buffer = Buffer.from(await data.arrayBuffer());
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename.replace(/\"/g, "")}"`);
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).send(buffer);
+    } catch (err: any) {
+      console.error("Download settlement report error:", err);
+      return res.status(500).json({ success: false, message: err.message || "Failed to download report" });
+    }
+  }
   if (req.method !== "POST") return res.status(405).json({ success: false, message: "Method not allowed" });
 
   try {
@@ -83,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           if (!uploadError) {
             const downloadFileName = `settlement-report-${String(societyId).replace(/[^a-zA-Z0-9_-]/g, "-")}.html`;
-            reportDownloadUrl = `${getBaseUrl()}/api/download-settlement-report?path=${encodeURIComponent(reportFileName)}&filename=${encodeURIComponent(downloadFileName)}`;
+            reportDownloadUrl = `${getBaseUrl()}/api/send-email?download=1&path=${encodeURIComponent(reportFileName)}&filename=${encodeURIComponent(downloadFileName)}`;
           } else {
             console.error("Settlement report upload failed:", uploadError.message);
           }

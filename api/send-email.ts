@@ -8,7 +8,7 @@ const getBaseUrl = () => {
   return "http://localhost:3000";
 };
 
-const formatMoney = (value: any) => `৳${Math.round(Number(value || 0)).toLocaleString("en-US")}`;
+const formatMoney = (value: any) => `Tk ${Math.round(Number(value || 0)).toLocaleString("en-US")}`;
 
 const buildSettlementPdfBuffer = async (data: {
   memberName: string;

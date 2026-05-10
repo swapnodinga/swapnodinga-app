@@ -1,10 +1,74 @@
 import { createClient } from "@supabase/supabase-js";
+import PDFDocument from "pdfkit";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const getBaseUrl = () => {
   if (process.env.APP_BASE_URL) return process.env.APP_BASE_URL;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return "http://localhost:3000";
+};
+
+const formatMoney = (value: any) => `৳${Math.round(Number(value || 0)).toLocaleString("en-US")}`;
+
+const buildSettlementPdfBuffer = async (data: {
+  memberName: string;
+  societyId: string;
+  contributionTotal: number;
+  earnedDividends: number;
+  totalInflow: number;
+  totalDeductions: number;
+  netAmount: number;
+  deductions: Array<{ label: string; amount: number }>;
+}) => {
+  return new Promise<Buffer>((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margin: 48, bufferPages: true });
+    const chunks: Buffer[] = [];
+
+    doc.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    doc.fontSize(22).font("Helvetica-Bold").text("Settlement Report", { align: "center" });
+    doc.moveDown(0.5);
+    doc.fontSize(11).font("Helvetica").fillColor("#64748b").text("Cooperative Society member settlement summary", { align: "center" });
+    doc.moveDown(1.2);
+
+    doc.fillColor("#111827").fontSize(13).font("Helvetica-Bold").text(`Member: ${data.memberName}`);
+    doc.font("Helvetica-Bold").text(`Society ID: ${data.societyId}`);
+    doc.moveDown(1);
+
+    const summaryRows = [
+      ["Contributions", formatMoney(data.contributionTotal)],
+      ["Dividends", formatMoney(data.earnedDividends)],
+      ["Total Inflow", formatMoney(data.totalInflow)],
+      ["Total Deductions", formatMoney(data.totalDeductions)],
+      ["Net Settlement Amount", formatMoney(data.netAmount)],
+    ];
+
+    summaryRows.forEach(([label, value]) => {
+      doc.fontSize(12).font("Helvetica").fillColor("#475569").text(label, { continued: true });
+      doc.fillColor("#111827").font("Helvetica-Bold").text(value, { align: "right" });
+      doc.moveDown(0.4);
+    });
+
+    doc.moveDown(0.6);
+    doc.moveTo(48, doc.y).lineTo(547, doc.y).strokeColor("#dbe4ef").stroke();
+    doc.moveDown(0.8);
+
+    doc.fontSize(13).font("Helvetica-Bold").fillColor("#b91c1c").text("Deductions");
+    doc.moveDown(0.4);
+
+    data.deductions.forEach((deduction) => {
+      doc.fontSize(11).font("Helvetica").fillColor("#334155").text(deduction.label, { continued: true });
+      doc.fillColor("#b91c1c").font("Helvetica-Bold").text(formatMoney(deduction.amount), { align: "right" });
+      doc.moveDown(0.25);
+    });
+
+    doc.moveDown(1);
+    doc.fontSize(10).fillColor("#64748b").text(`Generated on ${new Date().toLocaleString("en-GB")}`, { align: "center" });
+
+    doc.end();
+  });
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -33,8 +97,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const buffer = Buffer.from(await data.arrayBuffer());
+      const isPdf = filename.toLowerCase().endsWith(".pdf") || path.toLowerCase().endsWith(".pdf");
 
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Content-Type", isPdf ? "application/pdf" : "text/html; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename="${filename.replace(/\"/g, "")}"`);
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).send(buffer);
@@ -68,15 +133,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Extract report info directly from settlement_data
       const reportHtml = settlement_data?.report_html || "Settlement Report - No HTML generated";
-      const formatAmount = (value: any) => `৳${Math.round(Number(value || 0)).toLocaleString("en-US")}`;
       const societyId = settlement_data?.society_id || settlement_data?.societyId || "N/A";
       const memberNameReport = settlement_data?.member_name || settlement_data?.memberName || member_name;
       const contributionTotal = Number(settlement_data?.contribution_total || 0);
       const earnedDividends = Number(settlement_data?.earned_dividends || 0);
       const totalInflow = Number(settlement_data?.total_inflow || 0);
+      const deductionsList = Array.isArray(settlement_data?.deductions)
+        ? settlement_data.deductions
+            .filter((entry: any) => entry && entry.selected !== false)
+            .map((entry: any) => ({ label: String(entry.label || entry.key || "Deduction"), amount: Number(entry.amount || 0) }))
+        : [];
       const totalDeductions = Number(
         settlement_data?.total_selected_deductions ??
         settlement_data?.total_deductions ??
+        deductionsList.reduce((sum: number, entry: any) => sum + Number(entry.amount || 0), 0) ??
         0
       );
       const netAmount = Number(
@@ -96,29 +166,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         <p><strong>Society ID:</strong> ${societyId}</p>
         <hr />
       `;
-      const reportDownloadHtml = reportHtml;
+      const reportSummaryForPdf = {
+        memberName: memberNameReport,
+        societyId,
+        contributionTotal,
+        earnedDividends,
+        totalInflow,
+        totalDeductions,
+        netAmount,
+        deductions: deductionsList.length > 0
+          ? deductionsList
+          : [
+              { label: "Unpaid Installments", amount: Number(settlement_data?.unpaid_installments || 0) },
+              { label: "Closing Fee", amount: Number(settlement_data?.closing_fee || 0) },
+              { label: "Disclosure Fee", amount: Number(settlement_data?.disclosure_fee || 0) },
+              { label: "Society Fee", amount: Number(settlement_data?.society_fee || 0) },
+              { label: "Early Settlement Fee", amount: Number(settlement_data?.early_settlement_fee || 0) },
+            ],
+      };
 
       let reportDownloadUrl = settlement_data?.report_download_url || "";
       
-      // If no download URL provided, try to upload the report
-      if (!reportDownloadUrl && reportHtml) {
+      // If no download URL provided, generate and upload a PDF report
+      if (!reportDownloadUrl) {
         try {
-          const reportFileName = `settlement-reports/${String(societyId).replace(/[^a-zA-Z0-9_-]/g, "-")}-${Date.now()}.html`;
+          const pdfBuffer = await buildSettlementPdfBuffer(reportSummaryForPdf);
+          const reportFileName = `settlement-reports/${String(societyId).replace(/[^a-zA-Z0-9_-]/g, "-")}-${Date.now()}.pdf`;
           const { error: uploadError } = await supabase.storage
             .from("payments")
-            .upload(reportFileName, reportHtml, {
-              contentType: "text/html",
+            .upload(reportFileName, new Uint8Array(pdfBuffer), {
+              contentType: "application/pdf",
               upsert: true,
             });
 
           if (!uploadError) {
-            const downloadFileName = `settlement-report-${String(societyId).replace(/[^a-zA-Z0-9_-]/g, "-")}.html`;
+            const downloadFileName = `settlement-report-${String(societyId).replace(/[^a-zA-Z0-9_-]/g, "-")}.pdf`;
             reportDownloadUrl = `${getBaseUrl()}/api/send-email?download=1&path=${encodeURIComponent(reportFileName)}&filename=${encodeURIComponent(downloadFileName)}`;
           } else {
-            console.error("Settlement report upload failed:", uploadError.message);
+            console.error("Settlement PDF upload failed:", uploadError.message);
           }
         } catch (uploadErr) {
-          console.error("Settlement report upload error:", uploadErr);
+          console.error("Settlement PDF generation/upload error:", uploadErr);
         }
       }
 
@@ -138,30 +226,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               </tr>
               <tr>
                 <td style="padding:8px 0; color:#64748b;">Contributions</td>
-                <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace;">${formatAmount(contributionTotal)}</td>
+                <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace;">${formatMoney(contributionTotal)}</td>
               </tr>
               <tr>
                 <td style="padding:8px 0; color:#64748b;">Dividends</td>
-                <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace;">${formatAmount(earnedDividends)}</td>
+                <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace;">${formatMoney(earnedDividends)}</td>
               </tr>
               <tr>
                 <td style="padding:8px 0; color:#64748b;">Total Inflow</td>
-                <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace;">${formatAmount(totalInflow)}</td>
+                <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace;">${formatMoney(totalInflow)}</td>
               </tr>
               <tr>
                 <td style="padding:8px 0; color:#64748b;">Total Deductions</td>
-                <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace; color:#b91c1c;">${formatAmount(totalDeductions)}</td>
+                <td style="padding:8px 0; text-align:right; font-weight:700; font-family:monospace; color:#b91c1c;">${formatMoney(totalDeductions)}</td>
               </tr>
               <tr>
                 <td style="padding:8px 0 0; color:#64748b; font-weight:700;">Net Settlement Amount</td>
-                <td style="padding:8px 0 0; text-align:right; font-weight:900; font-family:monospace; color:#059669;">${formatAmount(netAmount)}</td>
+                <td style="padding:8px 0 0; text-align:right; font-weight:900; font-family:monospace; color:#059669;">${formatMoney(netAmount)}</td>
               </tr>
             </table>
           </div>
           ${reportDownloadUrl ? `
             <div style="margin-top:24px; text-align:center; border-top:1px solid #e5e7eb; padding-top:24px;">
-              <a href="${reportDownloadUrl}" download="settlement-report-${societyId}.html" style="display:inline-block; background:#10b981; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:9999px; font-weight:700; font-size:14px; border:none; cursor:pointer;">
-                Download Report
+              <a href="${reportDownloadUrl}" download="settlement-report-${societyId}.pdf" style="display:inline-block; background:#10b981; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:9999px; font-weight:700; font-size:14px; border:none; cursor:pointer;">
+                Download PDF Report
               </a>
             </div>
           ` : ''}

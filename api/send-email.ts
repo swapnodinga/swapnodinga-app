@@ -1,6 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
+const getBaseUrl = () => {
+  if (process.env.APP_BASE_URL) return process.env.APP_BASE_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3000";
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -76,8 +82,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
 
           if (!uploadError) {
-            const { data: publicData } = supabase.storage.from("payments").getPublicUrl(reportFileName);
-            reportDownloadUrl = publicData.publicUrl;
+            const downloadFileName = `settlement-report-${String(societyId).replace(/[^a-zA-Z0-9_-]/g, "-")}.html`;
+            reportDownloadUrl = `${getBaseUrl()}/api/download-settlement-report?path=${encodeURIComponent(reportFileName)}&filename=${encodeURIComponent(downloadFileName)}`;
           } else {
             console.error("Settlement report upload failed:", uploadError.message);
           }

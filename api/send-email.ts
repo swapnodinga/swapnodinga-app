@@ -1,4 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
+import fs from "fs";
+import path from "path";
 import PDFDocument from "pdfkit";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
@@ -9,6 +11,16 @@ const getBaseUrl = () => {
 };
 
 const formatMoney = (value: any) => `Tk ${Math.round(Number(value || 0)).toLocaleString("en-US")}`;
+
+const getLogoBuffer = () => {
+  const logoPath = path.join(process.cwd(), "client", "src", "assets", "generated_images", "SwapnoDinga_Logo_Update.png");
+
+  try {
+    return fs.readFileSync(logoPath);
+  } catch {
+    return null;
+  }
+};
 
 const buildSettlementPdfBuffer = async (data: {
   memberName: string;
@@ -23,15 +35,23 @@ const buildSettlementPdfBuffer = async (data: {
   return new Promise<Buffer>((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 48, bufferPages: true });
     const chunks: Buffer[] = [];
+    const logoBuffer = getLogoBuffer();
 
     doc.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    doc.fontSize(22).font("Helvetica-Bold").text("Settlement Report", { align: "center" });
-    doc.moveDown(0.5);
-    doc.fontSize(11).font("Helvetica").fillColor("#64748b").text("Cooperative Society member settlement summary", { align: "center" });
-    doc.moveDown(1.2);
+    if (logoBuffer) {
+      doc.image(logoBuffer, 48, 42, { width: 72 });
+      doc.fontSize(22).font("Helvetica-Bold").text("Settlement Report", 132, 54, { align: "left" });
+      doc.fontSize(11).font("Helvetica").fillColor("#64748b").text("Cooperative Society member settlement summary", 132, 82, { align: "left" });
+      doc.y = 132;
+    } else {
+      doc.fontSize(22).font("Helvetica-Bold").text("Settlement Report", { align: "center" });
+      doc.moveDown(0.5);
+      doc.fontSize(11).font("Helvetica").fillColor("#64748b").text("Cooperative Society member settlement summary", { align: "center" });
+      doc.moveDown(1.2);
+    }
 
     doc.fillColor("#111827").fontSize(13).font("Helvetica-Bold").text(`Member: ${data.memberName}`);
     doc.font("Helvetica-Bold").text(`Society ID: ${data.societyId}`);
@@ -72,6 +92,13 @@ const buildSettlementPdfBuffer = async (data: {
 
     doc.moveDown(1);
     doc.fontSize(10).fillColor("#64748b").text(`Generated on ${new Date().toLocaleString("en-GB")}`, { align: "center" });
+
+    doc.moveDown(0.8);
+    doc.fontSize(9).fillColor("#64748b").text("This is system auto generated report, please contact with swapnodinga admin, if you notice any mismatch", {
+      align: "center",
+      width: 420,
+      lineGap: 2,
+    });
 
     doc.end();
   });

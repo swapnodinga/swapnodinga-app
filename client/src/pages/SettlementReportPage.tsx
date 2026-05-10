@@ -176,20 +176,28 @@ export default function SettlementReportPage() {
     if (!settlement) return;
     try {
       const html = buildSettlementReportHtml(settlement);
-      // Use data URL for more reliable print window rendering
-      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
-      const printWindow = window.open(dataUrl, "_blank", "noopener,noreferrer,width=900,height=1100");
-      if (!printWindow) {
+      // Use iframe approach for more reliable printing
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      document.body.appendChild(iframe);
+      
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!iframeDoc) {
         toast({
           title: "Print Failed",
-          description: "Unable to open print window. Check if pop-ups are blocked.",
+          description: "Unable to access iframe document",
           variant: "destructive"
         });
         return;
       }
-      printWindow.focus();
+      
+      iframeDoc.open();
+      iframeDoc.write(html);
+      iframeDoc.close();
+      
       setTimeout(() => {
-        printWindow.print();
+        iframe.contentWindow?.print();
+        document.body.removeChild(iframe);
       }, 500);
     } catch (error: any) {
       console.error("Print error:", error);
@@ -247,14 +255,16 @@ export default function SettlementReportPage() {
         })
       });
 
-      let data;
+      // Read response body once as text first
+      const responseText = await response.text();
+      let data = { message: "Unknown error" };
+      
       try {
-        data = await response.json();
+        data = JSON.parse(responseText);
       } catch (parseError) {
         console.error("Failed to parse response as JSON:", parseError);
-        const text = await response.text();
-        console.error("Response text:", text);
-        data = { message: "Server returned invalid response" };
+        console.error("Response text:", responseText);
+        data = { message: responseText || "Server returned invalid response" };
       }
 
       if (!response.ok) {

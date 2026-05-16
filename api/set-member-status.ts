@@ -42,10 +42,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       updatePayload.onboarding_type = onboarding_type === "full_replacement" ? "full_replacement" : "fresh_start";
     }
 
-    const { error } = await supabase
+    let { error } = await supabase
       .from("members")
       .update(updatePayload)
       .eq("id", Number(member_id));
+
+    // Backward-compatible fallback for databases where onboarding_type is not migrated yet.
+    if (error?.message?.toLowerCase().includes("onboarding_type") && normalizedStatus === "active") {
+      ({ error } = await supabase
+        .from("members")
+        .update({ status: normalizedStatus })
+        .eq("id", Number(member_id)));
+    }
 
     if (error) {
       console.error("[set-member-status] Supabase update error:", error);

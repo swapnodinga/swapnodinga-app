@@ -18,10 +18,16 @@ export default async function handler(req: Request) {
   const supabase = createClient(url, key);
 
   try {
-    const { member_id } = await req.json();
+    const { member_id, onboarding_type } = await req.json();
     if (!member_id) throw new Error("member_id required");
 
-    const { error } = await supabase.from("members").update({ status: "active" }).eq("id", Number(member_id));
+    const { error } = await supabase
+      .from("members")
+      .update({ 
+        status: "active",
+        onboarding_type: onboarding_type || 'fresh_start'
+      })
+      .eq("id", Number(member_id));
     if (error) throw error;
 
     return new Response(JSON.stringify({ success: true }), {

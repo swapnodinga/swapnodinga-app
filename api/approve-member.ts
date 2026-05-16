@@ -1,41 +1,51 @@
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 
-export default async function handler(req: Request) {
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ success: false, message: "Method not allowed" }), {
-      status: 405, headers: { "Content-Type": "application/json" },
-    });
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
   }
 
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  if (req.method !== "POST") {
+    return res.status(405).json({ success: false, message: "Method not allowed" });
+  }
+
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
   if (!url || !key) {
-    return new Response(JSON.stringify({ success: false, message: "Supabase credentials missing" }), {
-      status: 500, headers: { "Content-Type": "application/json" },
-    });
+    return res.status(500).json({ success: false, message: "Supabase credentials missing" });
   }
 
   const supabase = createClient(url, key);
 
   try {
-    const { member_id, onboarding_type } = await req.json();
-    if (!member_id) throw new Error("member_id required");
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const { member_id, onboarding_type } = body || {};
+
+    if (!member_id) {
+      return res.status(400).json({ success: false, message: "member_id required" });
+    }
+
+    const normalizedType = onboarding_type === "full_replacement" ? "full_replacement" : "fresh_start";
 
     const { error } = await supabase
       .from("members")
-      .update({ 
+      .update({
         status: "active",
-        onboarding_type: onboarding_type || 'fresh_start'
+        onboarding_type: normalizedType,
       })
       .eq("id", Number(member_id));
-    if (error) throw error;
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-    });
+    if (error) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+
+    return res.status(200).json({ success: true });
   } catch (err: any) {
-    return new Response(JSON.stringify({ success: false, message: err.message }), {
-      status: 500, headers: { "Content-Type": "application/json" },
-    });
+    return res.status(500).json({ success: false, message: err.message || "Unknown error" });
   }
 }

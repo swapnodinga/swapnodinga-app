@@ -78,12 +78,15 @@ Deno.serve(async (req) => {
       }
 
       case 'approve_member': {
-        const { member_id } = params;
+        const { member_id, onboarding_type } = params;
         if (!member_id) throw new Error("member_id required");
 
         const { error } = await supabaseAdmin
           .from('members')
-          .update({ status: 'active' })
+          .update({ 
+            status: 'active',
+            onboarding_type: onboarding_type || 'fresh_start'
+          })
           .eq('id', Number(member_id));
 
         if (error) throw error;

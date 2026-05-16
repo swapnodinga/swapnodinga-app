@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useSociety } from '../context/SocietyContext';
+import { OnboardingTypeDialog } from '../components/OnboardingTypeDialog';
 import { 
   Table, TableHeader, TableBody, TableHead, TableRow, TableCell 
 } from "@/components/ui/table";
@@ -17,6 +18,12 @@ export default function AdminMembers() {
   const [, setLocation] = useLocation();
   const [settlementModal, setSettlementModal] = useState<any>(null);
   const [settlementLoading, setSettlementLoading] = useState(false);
+  const [onboardingDialog, setOnboardingDialog] = useState<{ isOpen: boolean; memberId: string | null; memberName: string }>({
+    isOpen: false,
+    memberId: null,
+    memberName: ''
+  });
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
   const [selectedDeductions, setSelectedDeductions] = useState<Record<string, boolean>>({
     unpaid_installments: true,
     closing_fee: true,
@@ -339,7 +346,11 @@ export default function AdminMembers() {
                       <Button 
                         size="sm" 
                         variant="default"
-                        onClick={() => approveMember(member.id)}
+                        onClick={() => setOnboardingDialog({ 
+                          isOpen: true, 
+                          memberId: member.id, 
+                          memberName: member.full_name || member.name 
+                        })}
                         className="bg-emerald-600 hover:bg-emerald-700 h-8 gap-2"
                       >
                         <CheckCircle className="h-4 w-4" /> Approve
@@ -469,6 +480,27 @@ export default function AdminMembers() {
           <MemberTable data={[...frozenMembers, ...deactivatedMembers]} showStatusActions={true} />
         </TabsContent>
       </Tabs>
+
+      {/* Onboarding Type Dialog */}
+      <OnboardingTypeDialog
+        isOpen={onboardingDialog.isOpen}
+        memberName={onboardingDialog.memberName}
+        isLoading={onboardingLoading}
+        onSelect={async (type) => {
+          if (!onboardingDialog.memberId) return;
+          setOnboardingLoading(true);
+          try {
+            await approveMember(onboardingDialog.memberId, type);
+            setOnboardingDialog({ isOpen: false, memberId: null, memberName: '' });
+          } catch (err) {
+            console.error("Approval failed:", err);
+            alert("Failed to approve member: " + (err as any).message);
+          } finally {
+            setOnboardingLoading(false);
+          }
+        }}
+        onCancel={() => setOnboardingDialog({ isOpen: false, memberId: null, memberName: '' })}
+      />
 
       {/* Settlement Preview Modal - Improved */}
       {settlementModal && (

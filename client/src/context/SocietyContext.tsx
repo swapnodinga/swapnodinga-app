@@ -18,7 +18,7 @@ interface SocietyContextType {
   updateProfile: (data: any) => Promise<void>
   uploadProfilePic: (file: File) => Promise<string>
   refreshData: () => Promise<void>
-  approveMember: (id: string) => Promise<void>
+  approveMember: (id: string, onboarding_type?: 'fresh_start' | 'full_replacement') => Promise<void>
   setMemberStatus: (id: string, status: "active" | "frozen" | "deactivated") => Promise<void>
   deleteMember: (id: string) => Promise<void>
   submitInstalment: (amount: number, file: File, month: string) => Promise<void>
@@ -166,8 +166,8 @@ export function SocietyProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const approveMember = async (id: string) => {
-    await callApi("approve-member", { member_id: id })
+  const approveMember = async (id: string, onboarding_type?: 'fresh_start' | 'full_replacement') => {
+    await callApi("approve-member", { member_id: id, onboarding_type: onboarding_type || 'fresh_start' })
     await refreshData()
   }
 

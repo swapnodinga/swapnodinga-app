@@ -24,7 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    const { member_id, status } = body || {};
+    const { member_id, status, onboarding_type } = body || {};
 
     if (!member_id) {
       return res.status(400).json({ success: false, message: "member_id required" });
@@ -37,9 +37,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`[set-member-status] Updating member ${member_id} => ${normalizedStatus}`);
 
+    const updatePayload: Record<string, any> = { status: normalizedStatus };
+    if (normalizedStatus === "active") {
+      updatePayload.onboarding_type = onboarding_type === "full_replacement" ? "full_replacement" : "fresh_start";
+    }
+
     const { error } = await supabase
       .from("members")
-      .update({ status: normalizedStatus })
+      .update(updatePayload)
       .eq("id", Number(member_id));
 
     if (error) {

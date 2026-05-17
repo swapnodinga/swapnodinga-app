@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useSociety } from '../context/SocietyContext';
 import { OnboardingTypeDialog } from '../components/OnboardingTypeDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { 
   Table, TableHeader, TableBody, TableHead, TableRow, TableCell 
 } from "@/components/ui/table";
@@ -24,6 +25,11 @@ export default function AdminMembers() {
     memberName: ''
   });
   const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [replaceDialog, setReplaceDialog] = useState<{ isOpen: boolean; oldMemberId?: number; oldMemberName?: string }>(
+    { isOpen: false }
+  );
+  const [replaceLoading, setReplaceLoading] = useState(false);
+  const [dryRunResult, setDryRunResult] = useState<any | null>(null);
   const [selectedDeductions, setSelectedDeductions] = useState<Record<string, boolean>>({
     unpaid_installments: true,
     closing_fee: true,
@@ -407,6 +413,20 @@ export default function AdminMembers() {
                           >
                             <ShieldOff className="h-4 w-4" /> Deactivate
                           </Button>
+                          {/* Replace Member button - visible for deactivated members */}
+                          {String(member.status || '').toLowerCase() === 'deactivated' && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => {
+                                setReplaceDialog({ isOpen: true, oldMemberId: member.id, oldMemberName: member.full_name || member.name });
+                                setDryRunResult(null);
+                              }}
+                              className="h-8 gap-2 bg-amber-600 hover:bg-amber-700 ml-2"
+                            >
+                              Replace
+                            </Button>
+                          )}
                         </>
                       )}
                     </TableCell>
@@ -510,6 +530,74 @@ export default function AdminMembers() {
               <div>
                 <CardTitle className="text-xl sm:text-2xl font-bold text-slate-900">Settlement Preview</CardTitle>
                 <p className="text-sm text-slate-600 mt-1">
+          {/* Replace Member Dialog */}
+          <Dialog open={replaceDialog.isOpen} onOpenChange={(open) => { if(!open) setReplaceDialog({ isOpen: false }); }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Replace Member Records</DialogTitle>
+                <DialogDescription>Transfer records from <strong>{replaceDialog.oldMemberName}</strong> to another active member. Start with a dry-run to preview changes.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-4">
+                <label className="text-sm font-medium">Select target (active member)</label>
+                <select className="w-full border rounded p-2" id="replace-target-select">
+                  <option value="">-- Select member --</option>
+                  {activeMembers.map((m:any) => (
+                    <option key={m.id} value={m.id}>{m.society_id} — {m.full_name}</option>
+                  ))}
+                </select>
+
+                <div className="flex gap-2">
+                  <Button onClick={async () => {
+                    const sel = (document.getElementById('replace-target-select') as HTMLSelectElement).value;
+                    if (!sel) return alert('Select a target member');
+                    setReplaceLoading(true);
+                    try {
+                      const res = await fetch(`/api/replace-member-records?dry_run=1`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ old_member_id: replaceDialog.oldMemberId, new_member_id: Number(sel), admin_id: 1 })
+                      });
+                      const data = await res.json();
+                      setDryRunResult(data);
+                    } catch (err) {
+                      console.error('Dry-run failed', err);
+                      alert('Dry-run failed: ' + (err as any).message);
+                    } finally { setReplaceLoading(false); }
+                  }} disabled={replaceLoading}>{replaceLoading ? 'Running...' : 'Run Dry-Run'}</Button>
+                  <Button variant="outline" onClick={() => { setReplaceDialog({ isOpen: false }); setDryRunResult(null); }}>Close</Button>
+                </div>
+
+                {dryRunResult && (
+                  <div className="bg-slate-50 p-3 rounded border">
+                    <p className="font-bold">Dry-run Summary</p>
+                    <pre className="text-sm mt-2">{JSON.stringify(dryRunResult, null, 2)}</pre>
+                    <div className="flex gap-2 mt-3">
+                      <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={async () => {
+                        if (!confirm('This will perform the replacement and modify data. Proceed?')) return;
+                        setReplaceLoading(true);
+                        try {
+                          const sel = (document.getElementById('replace-target-select') as HTMLSelectElement).value;
+                          const res = await fetch(`/api/replace-member-records`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ old_member_id: replaceDialog.oldMemberId, new_member_id: Number(sel), admin_id: 1 })
+                          });
+                          const d = await res.json();
+                          alert('Replacement result: ' + JSON.stringify(d));
+                          setReplaceDialog({ isOpen: false });
+                          setDryRunResult(null);
+                        } catch (err) {
+                          console.error('Replacement failed', err);
+                          alert('Replacement failed: ' + (err as any).message);
+                        } finally { setReplaceLoading(false); }
+                      }}>Execute Replacement</Button>
+                      <Button variant="outline" onClick={() => { setDryRunResult(null); }}>Clear</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
                   {settlementModal.member_name} ({settlementModal.society_id})
                 </p>
               </div>

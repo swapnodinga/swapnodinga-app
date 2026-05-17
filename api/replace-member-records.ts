@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ success: false, message: "Supabase credentials missing" });
   }
 
-  const supabase = createClient(url, key);
+  const supabase = createClient(url as string, key as string);
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
@@ -65,85 +65,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ success: false, message: "New member not found" });
     }
 
-    // 1) Transfer installments/transactions.
-    const { error: installmentsErr } = await supabase
-      .from("Installments")
-      .update({
-        member_id: newId,
-        memberName: newMember.full_name,
-        society_id: newMember.society_id,
-      })
-      .eq("member_id", oldId);
+    // Call transactional Postgres function to perform the replacement atomically
+    const dryRun = Boolean(req.query?.dry_run === '1' || req.query?.dry_run === 'true' || req.body?.dry_run === true);
+    const adminId = req.body?.admin_id ? Number(req.body.admin_id) : null;
 
-    if (installmentsErr) {
-      return res.status(500).json({ success: false, message: installmentsErr.message });
-    }
-
-    // 2) Transfer fixed deposits.
-    const { error: fdErr } = await supabase
-      .from("fixed_deposits")
-      .update({
-        member_id: newId,
-        society_id: newMember.society_id,
-      })
-      .eq("member_id", oldId);
-
-    if (fdErr) {
-      return res.status(500).json({ success: false, message: fdErr.message });
-    }
-
-    // 3) Mark old member as replaced/deactivated. Includes fallback for not-yet-migrated columns.
-    let { error: oldUpdateErr } = await supabase
-      .from("members")
-      .update({
-        status: "deactivated",
-        replaced_by_member_id: newId,
-        replaced_at: new Date().toISOString(),
-      })
-      .eq("id", oldId);
-
-    if (oldUpdateErr?.message?.toLowerCase().includes("replaced_")) {
-      ({ error: oldUpdateErr } = await supabase
-        .from("members")
-        .update({ status: "deactivated" })
-        .eq("id", oldId));
-    }
-
-    if (oldUpdateErr) {
-      return res.status(500).json({ success: false, message: oldUpdateErr.message });
-    }
-
-    // 4) Ensure new member is active and tagged as full_replacement if column exists.
-    let { error: newUpdateErr } = await supabase
-      .from("members")
-      .update({
-        status: "active",
-        onboarding_type: "full_replacement",
-      })
-      .eq("id", newId);
-
-    if (newUpdateErr?.message?.toLowerCase().includes("onboarding_type")) {
-      ({ error: newUpdateErr } = await supabase
-        .from("members")
-        .update({ status: "active" })
-        .eq("id", newId));
-    }
-
-    if (newUpdateErr) {
-      return res.status(500).json({ success: false, message: newUpdateErr.message });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Member records transferred successfully",
-      summary: {
-        old_member_id: oldId,
-        new_member_id: newId,
-        old_member_name: oldMember.full_name,
-        new_member_name: newMember.full_name,
-        notes: notes || null,
-      },
+    const { data, error } = await supabase.rpc('replace_member_records', {
+      p_old_id: oldId,
+      p_new_id: newId,
+      p_admin_id: adminId,
+      p_notes: notes || null,
+      p_dry_run: dryRun,
     });
+
+    if (error) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+
+    return res.status(200).json({ success: true, message: 'Member replacement executed', result: data });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message || "Unknown error" });
   }

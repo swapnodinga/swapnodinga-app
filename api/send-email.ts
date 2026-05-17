@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
-import fs from "fs";
-import path from "path";
-import PDFDocument from "pdfkit";
+import * as fs from "fs";
+import * as path from "path";
+import PDFDocument = require("pdfkit");
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const getBaseUrl = () => {
